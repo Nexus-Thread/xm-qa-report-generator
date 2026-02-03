@@ -1,0 +1,1 @@
+# xm-qa-report-generator
