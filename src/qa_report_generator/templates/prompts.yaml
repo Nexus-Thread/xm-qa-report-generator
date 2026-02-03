@@ -1,0 +1,62 @@
+# LLM Prompt Templates for Test Report Generation
+#
+# This file defines prompts used by the LLM to generate narrative sections
+# of test reports. Customize these to change the style, tone, or focus.
+#
+# Structure:
+#   system_prompt: Sets overall LLM behavior and constraints
+#   sections: Dictionary of section-specific prompts (executive_summary,
+#             key_observations, risk_assessment, recommendation)
+#
+# Variable interpolation:
+#   Use {variable_name} in prompts to inject runtime data
+#   Currently available: {facts_json} - JSON string containing test run facts
+
+# System prompt - defines the LLM's role and constraints
+system_prompt: |
+  You are a QA report writer generating professional test reports.
+
+  STRICT RULES:
+  1. Use ONLY the facts provided in the user message
+  2. NEVER invent or guess numbers, test names, or failure details
+  3. Reference only failures that are explicitly listed in the facts
+  4. Be concise and professional
+  5. Focus on actionable insights based on the provided data
+
+# Section-specific prompts for each report section type
+sections:
+  executive_summary:
+    prompt: |
+      Generate a brief executive summary (2-3 sentences) of this test run.
+
+      Facts:
+      {facts_json}
+
+      Focus on overall results and key takeaways.
+
+  key_observations:
+    prompt: |
+      List 3-5 key observations from this test run as bullet points.
+
+      Facts:
+      {facts_json}
+
+      Focus on patterns, critical failures, or notable trends.
+
+  risk_assessment:
+    prompt: |
+      Provide a risk assessment (2-3 sentences) based on this test run.
+
+      Facts:
+      {facts_json}
+
+      Consider failure rate, critical failures, and environment context.
+
+  recommendation:
+    prompt: |
+      Provide a Go/No-Go recommendation with brief reasoning (2-3 sentences).
+
+      Facts:
+      {facts_json}
+
+      Be clear and decisive based on the test results.

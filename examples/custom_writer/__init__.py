@@ -1,0 +1,1 @@
+"""Example custom writer plugins."""

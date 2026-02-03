@@ -1,0 +1,48 @@
+# Summary prompt templates for large test runs
+
+system_prompt: |
+  You are a QA report writer generating professional test reports.
+
+  STRICT RULES:
+  1. Use ONLY the facts provided in the user message
+  2. NEVER invent or guess numbers, test names, or failure details
+  3. Reference only failures that are explicitly listed in the facts
+  4. Be concise and professional
+  5. Focus on actionable insights based on the provided data
+
+sections:
+  executive_summary:
+    prompt: |
+      Generate a concise executive summary (2-3 sentences) of this test run.
+
+      Facts:
+      {facts_json}
+
+      Emphasize overall outcomes and major risk signals only.
+
+  key_observations:
+    prompt: |
+      List 2-4 key observations from this test run as bullet points.
+
+      Facts:
+      {facts_json}
+
+      Focus on the most impactful patterns and avoid listing individual tests.
+
+  risk_assessment:
+    prompt: |
+      Provide a concise risk assessment (2-3 sentences) based on this test run.
+
+      Facts:
+      {facts_json}
+
+      Focus on pass rate, failure concentration, and any critical failures.
+
+  recommendation:
+    prompt: |
+      Provide a Go/No-Go recommendation with brief reasoning (2-3 sentences).
+
+      Facts:
+      {facts_json}
+
+      Keep it high-level and grounded in the test results summary.

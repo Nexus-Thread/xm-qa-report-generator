@@ -1,0 +1,106 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/qa_report_generator"]
+
+[project]
+name = "qa-report-generator"
+version = "0.1.0"
+description = "LLM-powered reporting from pytest results"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "openai>=2.15.0",
+    "pydantic>=2.12.5",
+    "pydantic-settings>=2.12.0",
+    "typer>=0.9.0",
+    "rich>=13.0.0",
+    "pyyaml>=6.0.3",
+    "tiktoken>=0.9.0",
+]
+
+[project.scripts]
+qa-report-generator = "qa_report_generator.cli:main"
+
+[project.entry-points."qa_report_generator.parsers"]
+# custom-parser = "your_package.parsers:CustomParser"
+
+[project.entry-points."qa_report_generator.writers"]
+# custom-writer = "your_package.writers:CustomWriter"
+
+[project.entry-points."qa_report_generator.hooks"]
+
+[dependency-groups]
+dev = [
+    "hypothesis>=6.103.0",
+    "mypy>=1.15.0",
+    "pre-commit>=4.5.1",
+    "pytest>=9.0.2",
+    "pytest-benchmark>=4.0.0",
+    "pytest-cov>=7.0.0",
+    "pytest-json-report>=1.5.0",
+    "pytest-xdist>=3.8.0",
+    "ruff>=0.14.14",
+    "types-PyYAML>=6.0.12.20241230",
+]
+# custom-hook = "your_package.hooks:register"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = "test_*.py"
+python_classes = "Test*"
+python_functions = "test_*"
+
+[tool.ruff]
+target-version = "py311"
+line-length = 160
+extend-exclude = ["dummy_project"]
+
+[tool.ruff.lint]
+select = ["ALL"]
+ignore = [
+    "E501",    # line too long (handled by formatter)
+    "D203",    # incorrect-blank-line-before-class (incompatible with D211)
+    "D213",    # multi-line-summary-second-line (incompatible with D212)
+    "COM812",  # trailing-comma-missing (conflicts with formatter)
+    "ISC001",  # single-line-implicit-string-concatenation (conflicts with formatter)
+    "ANN401",  # allow Any in external interfaces
+    "FBT001",  # allow boolean positional args in public APIs
+    "FBT002",  # allow boolean defaults in public APIs
+    "PLC0415", # allow runtime imports for optional dependencies
+    "PLR2004", # allow magic numbers in comparisons
+    "RUF012",  # allow mutable class attributes without ClassVar
+    "S110",    # allow bare except with pass in non-critical logging
+    "BLE001",  # allow broad exception in non-critical logging
+    "TRY401",  # allow logging.exception with exception object
+]
+
+[tool.ruff.lint.per-file-ignores]
+"**/test_*.py" = ["S101"]
+"tests/unit/adapters/output/narrative/test_llm_adapter.py" = ["D103", "PLR2004", "SLF001"]
+"tests/**/__init__.py" = ["D104"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["qa_report_generator"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "auto"
+
+[tool.mypy]
+python_version = "3.11"
+plugins = ["pydantic.mypy"]
+warn_unused_ignores = true
+warn_redundant_casts = true
+warn_unused_configs = true
+check_untyped_defs = true
+no_implicit_optional = true
+strict_equality = true
+show_error_codes = true
+ignore_missing_imports = true
+explicit_package_bases = true
+mypy_path = ["src"]
+exclude = ["dummy_project"]
