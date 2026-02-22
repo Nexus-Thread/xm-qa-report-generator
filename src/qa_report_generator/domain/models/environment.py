@@ -18,4 +18,4 @@ class EnvironmentMeta(BaseModel):
         if v is None:
             return None
         cleaned = v.strip()
-        return cleaned if cleaned else None
+        return cleaned or None

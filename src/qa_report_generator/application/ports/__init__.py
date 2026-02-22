@@ -5,6 +5,7 @@ from qa_report_generator.application.ports.input import (
     CompareReportsUseCase,
     GenerateReportsUseCase,
     ReportGenerationResult,
+    ValidateReportUseCase,
 )
 
 # Output Ports
@@ -23,4 +24,5 @@ __all__ = [
     "ReportGenerationResult",
     "ReportParser",
     "ReportWriter",
+    "ValidateReportUseCase",
 ]

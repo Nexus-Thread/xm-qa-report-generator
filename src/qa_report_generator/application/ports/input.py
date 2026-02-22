@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from qa_report_generator.domain.analytics.models import ReportDiff
-from qa_report_generator.domain.models import EnvironmentMeta
+from qa_report_generator.domain.models import EnvironmentMeta, RunMetrics
 
 
 @dataclass(frozen=True)
@@ -41,3 +41,11 @@ class CompareReportsUseCase(ABC):
     @abstractmethod
     def compare(self, report_a: Path, report_b: Path) -> ReportDiff:
         """Compare two test reports and return diff summary."""
+
+
+class ValidateReportUseCase(ABC):
+    """Validate a report input and return parsed metrics."""
+
+    @abstractmethod
+    def validate_report(self, report_path: Path) -> RunMetrics:
+        """Validate report structure by parsing it."""

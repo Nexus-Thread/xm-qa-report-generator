@@ -18,6 +18,7 @@ class ConsoleFormatter:
     def __init__(self, console: Console) -> None:
         """Initialize formatter with a console instance."""
         self._console = console
+        self._error_console = Console(stderr=True)
 
     def print_info(self, message: str, verbosity: OutputVerbosity) -> None:
         """Print info message if verbosity allows."""
@@ -36,8 +37,7 @@ class ConsoleFormatter:
 
     def print_error(self, message: str) -> None:
         """Print error message (always shown)."""
-        error_console = Console(stderr=True)
-        error_console.print(f"[red]{message}[/red]")
+        self._error_console.print(f"[red]{message}[/red]")
 
     def print_blank_line(self, verbosity: OutputVerbosity) -> None:
         """Print a blank line if verbosity allows."""

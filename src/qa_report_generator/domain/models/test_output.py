@@ -18,4 +18,4 @@ class TestOutput(BaseModel):
         if v is None:
             return None
         cleaned = v.rstrip()
-        return cleaned if cleaned else None
+        return cleaned or None

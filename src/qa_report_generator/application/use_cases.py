@@ -9,6 +9,7 @@ from qa_report_generator.application.ports.input import (
     CompareReportsUseCase,
     GenerateReportsUseCase,
     ReportGenerationResult,
+    ValidateReportUseCase,
 )
 from qa_report_generator.application.ports.output import (
     NarrativeGenerator,
@@ -305,3 +306,15 @@ class ReportComparisonService(CompareReportsUseCase):
         metrics_a = self._parser.parse(report_a)
         metrics_b = self._parser.parse(report_b)
         return diff_runs(metrics_a, metrics_b)
+
+
+class ReportValidationService(ValidateReportUseCase):
+    """Validate a report by parsing it through the configured parser."""
+
+    def __init__(self, parser: ReportParser) -> None:
+        """Initialize the validation service."""
+        self._parser = parser
+
+    def validate_report(self, report_path: Path) -> RunMetrics:
+        """Validate report structure and return parsed metrics."""
+        return self._parser.parse(report_path)

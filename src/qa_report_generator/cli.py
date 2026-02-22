@@ -17,7 +17,11 @@ from qa_report_generator.adapters.output.narrative import LLMAdapter, LLMAdapter
 from qa_report_generator.adapters.output.parsers import PytestJsonParser
 from qa_report_generator.adapters.output.persistence.cache import FileReportCache
 from qa_report_generator.adapters.output.persistence.markdown_writer import MarkdownReportWriter
-from qa_report_generator.application.use_cases import ReportComparisonService, ReportGenerationService
+from qa_report_generator.application.use_cases import (
+    ReportComparisonService,
+    ReportGenerationService,
+    ReportValidationService,
+)
 from qa_report_generator.config import Config
 from qa_report_generator.logging_config import setup_logging
 from qa_report_generator.plugins import discover_plugins
@@ -80,11 +84,13 @@ def create_cli_adapter() -> CliAdapter:
         report_cache=cache,
     )
     compare_use_case = ReportComparisonService(parser)
+    validate_use_case = ReportValidationService(parser)
 
     # Create and return CLI adapter (driving side)
     return CliAdapter(
         generate_reports_use_case=report_use_case,
         compare_reports_use_case=compare_use_case,
+        validate_report_use_case=validate_use_case,
         config=config,
     )
 

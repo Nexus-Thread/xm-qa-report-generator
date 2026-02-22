@@ -18,7 +18,11 @@ from qa_report_generator.adapters.input.cli_adapter.types import (
 )
 from qa_report_generator.adapters.input.cli_adapter.utils import apply_profile, resolve_verbosity
 from qa_report_generator.adapters.input.cli_adapter.validators import InputValidator
-from qa_report_generator.application.ports.input import CompareReportsUseCase, GenerateReportsUseCase
+from qa_report_generator.application.ports.input import (
+    CompareReportsUseCase,
+    GenerateReportsUseCase,
+    ValidateReportUseCase,
+)
 from qa_report_generator.config import Config
 from qa_report_generator.domain.analytics.models import ReportDiff
 from qa_report_generator.domain.exceptions import ReportingError
@@ -32,6 +36,7 @@ class CommandHandler:
         self,
         generate_reports_use_case: GenerateReportsUseCase,
         compare_reports_use_case: CompareReportsUseCase,
+        validate_report_use_case: ValidateReportUseCase,
         config: Config | None,
         console: Console,
     ) -> None:
@@ -40,6 +45,7 @@ class CommandHandler:
         Args:
             generate_reports_use_case: Use case for report generation
             compare_reports_use_case: Use case for report comparison
+            validate_report_use_case: Use case for report input validation
             config: Configuration object (optional, for validation command)
             console: Rich console instance
 
@@ -49,7 +55,7 @@ class CommandHandler:
         self._config = config
         self._console = console
         self._formatter = ConsoleFormatter(console)
-        self._validator = InputValidator(self._formatter)
+        self._validator = InputValidator(self._formatter, validate_report_use_case)
 
     def diff_command(
         self,
@@ -76,8 +82,15 @@ class CommandHandler:
         ],
     ) -> None:
         """Compare two pytest JSON reports and summarize differences."""
-        diff = self._compare_use_case.compare(report_a, report_b)
-        self._render_diff(diff)
+        try:
+            diff = self._compare_use_case.compare(report_a, report_b)
+            self._render_diff(diff)
+        except ReportingError as e:
+            self._formatter.print_error(f"❌ Error ({e.error_code}): {e}")
+            raise typer.Exit(code=1) from e
+        except Exception as e:
+            self._formatter.print_error(f"❌ Error: {e}")
+            raise typer.Exit(code=1) from e
 
     def generate_command(  # noqa: PLR0913
         self,
@@ -132,6 +145,7 @@ class CommandHandler:
             typer.Option(
                 "--max-failures",
                 help="Maximum number of failures to include (use -1 to disable limiting)",
+                min=-1,
             ),
         ] = 20,
         no_llm: Annotated[
@@ -304,7 +318,7 @@ class CommandHandler:
             build=build,
             commit=commit,
             target_url=target_url,
-            max_failures=None if max_failures < 0 else max_failures,
+            max_failures=None if max_failures == -1 else max_failures,
             enable_llm=not no_llm,
             regenerate_narratives=regenerate_narratives,
         )
@@ -374,9 +388,7 @@ class CommandHandler:
             # Stage 1: Preparation
             tracker.update_stage("📊 Preparing input report...", 0)
             tracker.log_verbose(f"Reading: {options.json_report}")
-            prep_start = time.time()
-            prep_duration = time.time() - prep_start
-            tracker.log_verbose(f"Preparation completed in {prep_duration:.2f}s")
+            tracker.log_verbose("Preparation completed")
             tracker.update_stage("📊 Preparing input report...", 1)
 
             # Stage 2: LLM status check

@@ -1,7 +1,7 @@
 """Type definitions for CLI adapter."""
 
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
 
 
@@ -31,7 +31,7 @@ class GenerationResult:
     total_duration: float
 
 
-class OutputVerbosity(str, Enum):
+class OutputVerbosity(StrEnum):
     """Output verbosity levels for CLI."""
 
     QUIET = "quiet"
