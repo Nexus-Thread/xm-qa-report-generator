@@ -49,6 +49,36 @@ class LLMAdapterConfig(BaseModel):
         description="Exponential backoff multiplier for retries (wait time = factor^attempt)",
     )
 
+    @property
+    def base_url(self) -> str:
+        """Return OpenAI-compatible base URL."""
+        return self.llm_base_url
+
+    @property
+    def api_key(self) -> str:
+        """Return API key for OpenAI-compatible endpoint."""
+        return self.llm_api_key
+
+    @property
+    def max_retries(self) -> int:
+        """Return maximum retry attempts."""
+        return self.llm_max_retries
+
+    @property
+    def backoff_seconds(self) -> float:
+        """Return retry backoff base duration in seconds."""
+        return self.llm_retry_backoff_factor
+
+    @property
+    def verify_ssl(self) -> bool:
+        """Return SSL verification flag."""
+        return True
+
+    @property
+    def timeout_seconds(self) -> float:
+        """Return HTTP timeout in seconds."""
+        return self.llm_timeout
+
     @field_validator("llm_model", "llm_base_url", "llm_api_key")
     @classmethod
     def validate_required_strings(cls, v: str) -> str:
