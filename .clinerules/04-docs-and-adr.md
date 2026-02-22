@@ -14,6 +14,8 @@ Use these rules to keep documentation consistent and decision records traceable.
 
 ## Changelog notes
 - **Must** call out breaking changes explicitly.
+- **Must** record release-facing changes in `CHANGELOG.md` when that file exists.
+- **Should** include a concise changelog-style summary in PR notes when `CHANGELOG.md` is not maintained.
 
 ## API docs rules
 - **Should** document public ports, CLI interfaces, and plugin extension points.

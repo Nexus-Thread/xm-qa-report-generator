@@ -8,7 +8,7 @@ Use these rules to keep reviews fast, changesets focused, and CI reliable.
 - **Should** include a concise summary and test evidence in the PR description.
 
 ## Commit message style
-- **Must** use imperative, present tense (e.g., "Add report writer adapter").
+- **Must** use imperative, present tense (e.g., "Add user repository adapter").
 - **Should** include a scope prefix when useful (e.g., `docs:`, `tests:`, `adapters:`).
 - **Must** keep commits focused; avoid mixing unrelated changes.
 

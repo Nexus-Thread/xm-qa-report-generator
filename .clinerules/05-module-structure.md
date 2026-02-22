@@ -44,30 +44,30 @@ Use these rules to keep files focused, navigable, and easy to maintain.
 ### Re-export pattern
 ```python
 # Innermost: submodule/__init__.py
-from .adapter import FileReportCache
-__all__ = ["FileReportCache"]
+from .adapter import CacheAdapter
+__all__ = ["CacheAdapter"]
 
 # Parent: parent/__init__.py
-from .submodule import FileReportCache
+from .submodule import CacheAdapter
 from .other_submodule import OtherClass
-__all__ = ["FileReportCache", "OtherClass"]
+__all__ = ["CacheAdapter", "OtherClass"]
 ```
 
 ### Example: persistence adapters
 ```python
 # persistence/cache/__init__.py
-from .adapter import FileReportCache
-__all__ = ["FileReportCache"]
+from .adapter import CacheAdapter
+__all__ = ["CacheAdapter"]
 
-# persistence/markdown_writer/__init__.py
-from .adapter import MarkdownReportWriter
-__all__ = ["MarkdownReportWriter"]
+# persistence/database/__init__.py
+from .adapter import DatabaseAdapter
+__all__ = ["DatabaseAdapter"]
 
 # persistence/__init__.py
-from .cache import FileReportCache
-from .markdown_writer import MarkdownReportWriter
-__all__ = ["FileReportCache", "MarkdownReportWriter"]
+from .cache import CacheAdapter
+from .database import DatabaseAdapter
+__all__ = ["CacheAdapter", "DatabaseAdapter"]
 
 # Usage (clean, short import)
-from qa_report_generator.adapters.output.persistence import FileReportCache
+from myproject.adapters.output.persistence import CacheAdapter
 ```

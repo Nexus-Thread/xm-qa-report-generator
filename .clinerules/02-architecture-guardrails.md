@@ -12,7 +12,7 @@ Use this doctrine as the default architecture standard for this repo. Any deviat
 - **Domain**: Entities, value objects, domain services, and domain errors. No I/O concerns.
 - **Application**: Use cases orchestration. Defines **ports** (input/output) and coordinates domain behavior.
 - **Ports**: Contracts that isolate the core from infrastructure. Input ports (commands/queries) and output ports (persistence, messaging, external APIs).
-- **Adapters**: Implementation of ports at the system edge (CLI, HTTP, DB, LLM, queues, etc.).
+- **Adapters**: Implementation of ports at the system edge (CLI, HTTP, DB, external APIs, message queues, etc.).
 - **Infrastructure**: Frameworks, SDKs, DB drivers, HTTP clients, serializers, etc. Lives only in adapters.
 
 ## Dependency rules (allowed/forbidden)
@@ -50,13 +50,13 @@ Use this doctrine as the default architecture standard for this repo. Any deviat
 ## Module/package structure guidance
 - `domain/`: entities, value objects, domain services, domain errors.
 - `application/`: use cases + ports + DTOs.
-- `adapters/`: input (CLI/HTTP) and output (persistence, APIs, LLM, etc.).
+- `adapters/`: input (CLI/HTTP/GraphQL) and output (persistence, external APIs, messaging, etc.).
 - `infrastructure/` (optional): shared infra utilities used by adapters only.
 
 ## Naming conventions (layer-aware)
 - `.../ports/` for interfaces/protocols.
 - `.../adapters/input/` and `.../adapters/output/` for adapter implementations.
-- DTOs named for their intent: `CreateReportCommand`, `ReportSummaryDTO`.
+- DTOs named for their intent: `CreateOrderCommand`, `UserProfileDTO`, `PaymentResultDTO`.
 
 ## No-go examples (explicitly banned)
 - Importing an HTTP client in `domain/` or `application/`.
@@ -81,19 +81,19 @@ When you have multiple output adapters (e.g., persistence, narrative, parsers), 
 adapters/output/
 ├── persistence/
 │   ├── cache/
-│   │   ├── __init__.py       # Exports FileReportCache
+│   │   ├── __init__.py       # Exports CacheAdapter
 │   │   └── adapter.py        # Implementation
-│   └── markdown_writer/
-│       ├── __init__.py       # Exports MarkdownReportWriter
+│   └── database/
+│       ├── __init__.py       # Exports DatabaseAdapter
 │       ├── adapter.py        # Main class
-│       ├── formatters.py
-│       └── renderers.py
-├── narrative/
+│       ├── mappers.py
+│       └── queries.py
+├── messaging/
 │   ├── __init__.py
-│   └── llm_adapter.py
-└── parsers/
+│   └── queue_adapter.py
+└── external_api/
     ├── __init__.py
-    └── pytest_json_parser.py
+    └── http_client.py
 ```
 
 ❌ **Inconsistent structure (avoid)**
@@ -101,14 +101,14 @@ adapters/output/
 adapters/output/
 ├── persistence/
 │   ├── cache.py               # ❌ Standalone file
-│   └── markdown_writer/       # ✅ Subdirectory
+│   └── database/              # ✅ Subdirectory
 │       └── ...
 ```
 
 ### Naming conventions
-- Directory: `snake_case` (e.g., `report_cache/`, `llm_client/`, `markdown_writer/`)
-- Main file: semantic name matching responsibility (e.g., `adapter.py`, `parser.py`, `writer.py`)
-- Supporting files: `types.py`, `formatters.py`, `validators.py`, `serializers.py`, etc.
+- Directory: `snake_case` (e.g., `user_repository/`, `email_client/`, `payment_gateway/`)
+- Main file: semantic name matching responsibility (e.g., `adapter.py`, `repository.py`, `client.py`)
+- Supporting files: `types.py`, `mappers.py`, `validators.py`, `serializers.py`, etc.
 
 ### Exceptions
 - When there's only **one** adapter in a category and no plans for more, a single file may be acceptable.

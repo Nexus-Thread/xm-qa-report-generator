@@ -28,3 +28,4 @@ Use these rules for all automated tests to keep signal high and feedback fast.
 ## Running tests
 - **Should** run a focused subset during development.
 - **Must** run the full suite (`pytest tests/`) before handoff or PR.
+- **Must** follow the full local quality gate order in `09-tooling-and-ci.md` before handoff.
