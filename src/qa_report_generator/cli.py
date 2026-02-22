@@ -13,18 +13,59 @@ Architecture notes:
 from pathlib import Path
 
 from qa_report_generator.adapters.input.cli_adapter import CliAdapter
+from qa_report_generator.adapters.input.env import EnvSettingsAdapter
 from qa_report_generator.adapters.output.narrative import LLMAdapter, LLMAdapterConfig
 from qa_report_generator.adapters.output.parsers import PytestJsonParser
 from qa_report_generator.adapters.output.persistence.cache import FileReportCache
 from qa_report_generator.adapters.output.persistence.markdown_writer import MarkdownReportWriter
+from qa_report_generator.application.dtos import AppSettings
 from qa_report_generator.application.use_cases import (
     ReportComparisonService,
     ReportGenerationService,
     ReportValidationService,
 )
-from qa_report_generator.config import Config
+from qa_report_generator.config import Config, PreprocessingProfile
 from qa_report_generator.logging_config import setup_logging
 from qa_report_generator.plugins import discover_plugins
+
+
+def _to_runtime_config(settings: AppSettings) -> Config:
+    """Convert application settings DTO to runtime configuration model."""
+    profile = PreprocessingProfile(settings.preprocessing_profile) if settings.preprocessing_profile else None
+    return Config(
+        log_level=settings.log_level,
+        log_format=settings.log_format,
+        prompt_template_path=settings.prompt_template_path,
+        llm_model=settings.llm_model,
+        llm_base_url=settings.llm_base_url,
+        llm_api_key=settings.llm_api_key,
+        llm_temperature=settings.llm_temperature,
+        llm_reasoning_effort=settings.llm_reasoning_effort,
+        llm_timeout=settings.llm_timeout,
+        llm_max_retries=settings.llm_max_retries,
+        llm_retry_backoff_factor=settings.llm_retry_backoff_factor,
+        max_parallel_llm_sections=settings.max_parallel_llm_sections,
+        max_output_lines_per_failure=settings.max_output_lines_per_failure,
+        enable_failure_grouping=settings.enable_failure_grouping,
+        failure_clustering_threshold=settings.failure_clustering_threshold,
+        max_failures_for_detailed_prompt=settings.max_failures_for_detailed_prompt,
+        preprocessing_profile=profile,
+        plugin_modules=list(settings.plugin_modules),
+    )
+
+
+def _build_llm_adapter_config(config: Config) -> LLMAdapterConfig:
+    """Build technical LLM adapter settings from application config."""
+    return LLMAdapterConfig(
+        llm_model=config.llm_model,
+        llm_base_url=config.llm_base_url,
+        llm_api_key=config.llm_api_key,
+        llm_temperature=config.llm_temperature,
+        llm_reasoning_effort=config.llm_reasoning_effort,
+        llm_timeout=config.llm_timeout,
+        llm_max_retries=config.llm_max_retries,
+        llm_retry_backoff_factor=config.llm_retry_backoff_factor,
+    )
 
 
 def create_cli_adapter() -> CliAdapter:
@@ -50,18 +91,9 @@ def create_cli_adapter() -> CliAdapter:
 
     """
     # Create configurations
-    config = Config()  # Business-level: logging, prompts
-    config.apply_profile_defaults()
-    llm_config = LLMAdapterConfig(
-        llm_model=config.llm_model,
-        llm_base_url=config.llm_base_url,
-        llm_api_key=config.llm_api_key,
-        llm_temperature=config.llm_temperature,
-        llm_reasoning_effort=config.llm_reasoning_effort,
-        llm_timeout=config.llm_timeout,
-        llm_max_retries=config.llm_max_retries,
-        llm_retry_backoff_factor=config.llm_retry_backoff_factor,
-    )
+    settings = EnvSettingsAdapter().load()
+    config = _to_runtime_config(settings)
+    llm_config = _build_llm_adapter_config(config)
 
     # Setup logging based on business configuration
     setup_logging(config)

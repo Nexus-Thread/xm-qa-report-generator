@@ -7,7 +7,7 @@ JSON format for production monitoring and log aggregation.
 Example:
     >>> from qa_report_generator.config import Config
     >>> from qa_report_generator.logging_config import setup_logging
-    >>> setup_logging()  # default: simple format, INFO level
+    >>> setup_logging(Config())
     >>> setup_logging(Config(log_format="json", log_level="WARNING"))
 
 """
@@ -57,16 +57,13 @@ class JsonFormatter(logging.Formatter):
         return json.dumps(log_data)
 
 
-def setup_logging(config: Config | None = None) -> None:
+def setup_logging(config: Config) -> None:
     """Configure logging based on configuration settings.
 
     Args:
-        config: Configuration object (loads from env if None).
+        config: Configuration object.
 
     """
-    if config is None:
-        config = Config()
-
     # Get log level
     log_level = getattr(logging, config.log_level.upper(), logging.INFO)
 

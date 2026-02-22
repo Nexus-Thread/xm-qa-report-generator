@@ -32,7 +32,7 @@ def resolve_verbosity(*, verbose: bool, quiet: bool, formatter: ConsoleFormatter
     return OutputVerbosity.NORMAL
 
 
-def apply_profile(profile: str | None, config: Config | None, formatter: ConsoleFormatter) -> None:
+def apply_profile(profile: str | None, config: Config, formatter: ConsoleFormatter) -> None:
     """Apply preprocessing profile to configuration.
 
     Args:
@@ -41,15 +41,11 @@ def apply_profile(profile: str | None, config: Config | None, formatter: Console
         formatter: Console formatter for error messages
 
     Raises:
-        typer.Exit: If profile is invalid or config is unavailable
+        typer.Exit: If profile is invalid
 
     """
     if not profile:
         return
-
-    if config is None:
-        formatter.print_error("❌ Configuration is not available for profile selection")
-        raise typer.Exit(code=1)
 
     try:
         config.preprocessing_profile = PreprocessingProfile(profile)

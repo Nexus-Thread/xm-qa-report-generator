@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import Enum, StrEnum
 from typing import NewType
 
 from pydantic import BaseModel, Field, field_validator
@@ -12,7 +12,7 @@ TestName = NewType("TestName", str)
 SuiteName = NewType("SuiteName", str)
 
 
-class TestStatus(str, Enum):
+class TestStatus(StrEnum):
     """Possible outcomes of a test execution."""
 
     PASSED = "passed"
@@ -22,7 +22,7 @@ class TestStatus(str, Enum):
     __test__ = False
 
 
-class SectionType(str, Enum):
+class SectionType(StrEnum):
     """Types of narrative sections in generated reports."""
 
     EXECUTIVE_SUMMARY = "executive_summary"

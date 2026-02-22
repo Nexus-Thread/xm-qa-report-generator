@@ -20,7 +20,7 @@ class CliAdapter:
         generate_reports_use_case: GenerateReportsUseCase,
         compare_reports_use_case: CompareReportsUseCase,
         validate_report_use_case: ValidateReportUseCase,
-        config: Config | None = None,
+        config: Config,
     ) -> None:
         """Initialize CLI adapter.
 
@@ -28,7 +28,7 @@ class CliAdapter:
             generate_reports_use_case: Use case for report generation
             compare_reports_use_case: Use case for report comparison
             validate_report_use_case: Use case for report input validation
-            config: Configuration object (optional, for validation command)
+            config: Configuration object
 
         """
         self._console = Console()

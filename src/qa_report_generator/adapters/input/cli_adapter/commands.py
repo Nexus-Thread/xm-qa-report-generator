@@ -37,7 +37,7 @@ class CommandHandler:
         generate_reports_use_case: GenerateReportsUseCase,
         compare_reports_use_case: CompareReportsUseCase,
         validate_report_use_case: ValidateReportUseCase,
-        config: Config | None,
+        config: Config,
         console: Console,
     ) -> None:
         """Initialize command handler.
@@ -46,7 +46,7 @@ class CommandHandler:
             generate_reports_use_case: Use case for report generation
             compare_reports_use_case: Use case for report comparison
             validate_report_use_case: Use case for report input validation
-            config: Configuration object (optional, for validation command)
+            config: Configuration object
             console: Rich console instance
 
         """
@@ -264,8 +264,7 @@ class CommandHandler:
         try:
             self._formatter.print_info("🔍 [bold]Validating configuration...[/bold]", verbosity)
             self._console.print()
-
-            config = self._config or Config()
+            config = self._config
 
             config_table = Table(show_header=False, box=None, padding=(0, 2))
             config_table.add_column("Setting", style="cyan", no_wrap=True)

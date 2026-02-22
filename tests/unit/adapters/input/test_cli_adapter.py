@@ -50,11 +50,12 @@ def _make_adapter(config: Config | None = None) -> tuple[CliAdapter, Mock, Mock,
     generate_use_case = Mock()
     compare_use_case = Mock()
     validate_use_case = Mock()
+    effective_config = config or Config()
     adapter = CliAdapter(
         generate_use_case,
         compare_use_case,
         validate_use_case,
-        config=config,
+        config=effective_config,
     )
     return adapter, generate_use_case, compare_use_case, validate_use_case
 
@@ -203,30 +204,6 @@ def test_generate_resolves_verbosity_flags(tmp_path: Path) -> None:
     assert result.exit_code == 1
     output = result.stdout + result.stderr
     assert "Cannot use both" in output
-
-
-def test_generate_profile_requires_config(tmp_path: Path) -> None:
-    """Profile selection should fail if config is missing."""
-    report_path = tmp_path / "report.json"
-    report_path.write_text("{}", encoding="utf-8")
-    adapter, _, _, _ = _make_adapter(config=None)
-
-    result = _runner().invoke(
-        adapter._app,  # noqa: SLF001
-        [
-            "generate",
-            "--json-report",
-            str(report_path),
-            "--out",
-            str(tmp_path / "out"),
-            "--profile",
-            "minimal",
-        ],
-    )
-
-    assert result.exit_code == 1
-    output = result.stdout + result.stderr
-    assert "Configuration is not available" in output
 
 
 def test_generate_profile_invalid_value(tmp_path: Path) -> None:

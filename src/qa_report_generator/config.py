@@ -6,7 +6,7 @@ root. Adapter-level configs should be constructed from this model.
 """
 
 import logging
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -14,7 +14,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 logger = logging.getLogger(__name__)
 
 
-class PreprocessingProfile(str, Enum):
+class PreprocessingProfile(StrEnum):
     """Predefined preprocessing profiles for report generation."""
 
     MINIMAL = "minimal"
