@@ -22,7 +22,7 @@ class PreprocessingProfile(StrEnum):
     DETAILED = "detailed"
 
 
-class Config(BaseSettings):
+class EnvSettings(BaseSettings):
     """Business-level application configuration.
 
     Contains application settings like logging, prompt templates, and LLM defaults
@@ -31,12 +31,12 @@ class Config(BaseSettings):
     Loads configuration from environment variables or a .env file.
 
     Example:
-        >>> config = Config()
+        >>> config = EnvSettings()
         >>> config.log_level
         'INFO'
         >>> import os
         >>> os.environ["LOG_LEVEL"] = "DEBUG"
-        >>> Config().log_level
+        >>> EnvSettings().log_level
         'DEBUG'
 
     """
@@ -230,3 +230,7 @@ class Config(BaseSettings):
         for field_name, value in profile_defaults.items():
             if field_name not in self.model_fields_set:
                 setattr(self, field_name, value)
+
+
+# Backward-compatible alias.
+Config = EnvSettings

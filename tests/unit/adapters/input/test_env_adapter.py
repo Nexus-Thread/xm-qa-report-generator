@@ -4,39 +4,113 @@ from __future__ import annotations
 
 import pytest
 
-from qa_report_generator.adapters.input.env import EnvSettingsAdapter, load_config_from_env
+from qa_report_generator.adapters.input.env import EnvSettingsAdapter, load_config_from_env, load_settings_from_env
 from qa_report_generator.adapters.input.env import adapter as env_adapter_module
 from qa_report_generator.application.dtos import AppSettings
-from qa_report_generator.config import Config, PreprocessingProfile
+from qa_report_generator.config import EnvSettings, PreprocessingProfile
 from qa_report_generator.domain.exceptions import ConfigurationError
 
+# ---------------------------------------------------------------------------
+# load_settings_from_env
+# ---------------------------------------------------------------------------
 
-def test_load_config_from_env_applies_profile_defaults(monkeypatch: pytest.MonkeyPatch) -> None:
+
+def test_load_settings_from_env_applies_profile_defaults(monkeypatch: pytest.MonkeyPatch) -> None:
     """Env loader should apply preprocessing profile defaults."""
     monkeypatch.setenv("PREPROCESSING_PROFILE", PreprocessingProfile.MINIMAL.value)
 
-    config = load_config_from_env()
+    settings = load_settings_from_env()
 
-    assert config.preprocessing_profile == PreprocessingProfile.MINIMAL
-    assert config.max_output_lines_per_failure == 10
-    assert config.enable_failure_grouping is False
+    assert settings.preprocessing_profile == PreprocessingProfile.MINIMAL
+    assert settings.max_output_lines_per_failure == 10
+    assert settings.enable_failure_grouping is False
 
 
-def test_load_config_from_env_raises_configuration_error(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Env loader should translate validation errors to configuration errors."""
+def test_load_settings_from_env_raises_configuration_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Env loader should translate Pydantic validation errors to ConfigurationError."""
     monkeypatch.setenv("LOG_LEVEL", "not-a-level")
 
     with pytest.raises(ConfigurationError):
-        load_config_from_env()
+        load_settings_from_env()
 
 
-def test_env_settings_adapter_delegates_to_env_loader(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Adapter should return mapped DTO values from the settings loader."""
-    expected = Config(log_level="DEBUG")
-    monkeypatch.setattr(env_adapter_module, "load_config_from_env", lambda: expected)
+def test_load_settings_from_env_returns_env_settings_instance() -> None:
+    """load_settings_from_env should return an EnvSettings instance."""
+    settings = load_settings_from_env()
 
+    assert isinstance(settings, EnvSettings)
+
+
+# ---------------------------------------------------------------------------
+# load_config_from_env (backward-compat alias)
+# ---------------------------------------------------------------------------
+
+
+def test_load_config_from_env_is_alias_for_load_settings_from_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    """load_config_from_env should return the same result as load_settings_from_env."""
+    monkeypatch.setenv("PREPROCESSING_PROFILE", PreprocessingProfile.BALANCED.value)
+
+    via_alias = load_config_from_env()
+    via_primary = load_settings_from_env()
+
+    # Both calls produce equivalent objects with the same field values.
+    assert via_alias.preprocessing_profile == via_primary.preprocessing_profile
+    assert via_alias.log_level == via_primary.log_level
+
+
+# ---------------------------------------------------------------------------
+# EnvSettingsAdapter
+# ---------------------------------------------------------------------------
+
+
+def test_env_settings_adapter_returns_app_settings() -> None:
+    """Adapter.load() should return an AppSettings dataclass instance."""
     settings = EnvSettingsAdapter().load()
 
     assert isinstance(settings, AppSettings)
-    assert settings.log_level == "DEBUG"
-    assert settings.llm_model == expected.llm_model
+
+
+def test_env_settings_adapter_maps_all_fields(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Adapter should return mapped DTO values from the settings loader."""
+    stub = EnvSettings(log_level="DEBUG")
+    monkeypatch.setattr(env_adapter_module, "load_settings_from_env", lambda: stub)
+
+    result = EnvSettingsAdapter().load()
+
+    assert isinstance(result, AppSettings)
+    assert result.log_level == "DEBUG"
+    assert result.llm_model == stub.llm_model
+    assert result.llm_timeout == stub.llm_timeout
+    assert result.enable_failure_grouping == stub.enable_failure_grouping
+
+
+def test_env_settings_adapter_maps_preprocessing_profile_to_str(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Adapter should demote PreprocessingProfile enum to plain str in AppSettings."""
+    stub = EnvSettings(preprocessing_profile=PreprocessingProfile.DETAILED)
+    monkeypatch.setattr(env_adapter_module, "load_settings_from_env", lambda: stub)
+
+    result = EnvSettingsAdapter().load()
+
+    assert result.preprocessing_profile == PreprocessingProfile.DETAILED.value
+    assert isinstance(result.preprocessing_profile, str)
+
+
+def test_env_settings_adapter_maps_none_profile(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Adapter should pass None through when no profile is set."""
+    stub = EnvSettings(preprocessing_profile=None)
+    monkeypatch.setattr(env_adapter_module, "load_settings_from_env", lambda: stub)
+
+    result = EnvSettingsAdapter().load()
+
+    assert result.preprocessing_profile is None
+
+
+def test_env_settings_adapter_maps_plugin_modules_to_tuple(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Adapter should convert plugin_modules list to tuple in AppSettings."""
+    stub = EnvSettings(plugin_modules=["my.plugin", "other.plugin"])
+    monkeypatch.setattr(env_adapter_module, "load_settings_from_env", lambda: stub)
+
+    result = EnvSettingsAdapter().load()
+
+    assert result.plugin_modules == ("my.plugin", "other.plugin")
+    assert isinstance(result.plugin_modules, tuple)
