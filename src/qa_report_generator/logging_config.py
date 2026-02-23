@@ -1,16 +1,4 @@
-"""Logging configuration for the reporting PoC.
-
-This module provides centralized logging setup with support for both human-readable
-and structured JSON formats. Use the simple format for development/debugging and
-JSON format for production monitoring and log aggregation.
-
-Example:
-    >>> from qa_report_generator.config import Config
-    >>> from qa_report_generator.logging_config import setup_logging
-    >>> setup_logging(Config())
-    >>> setup_logging(Config(log_format="json", log_level="WARNING"))
-
-"""
+"""Logging configuration for the reporting PoC."""
 
 import logging
 import sys
@@ -18,7 +6,7 @@ from collections.abc import Mapping
 from datetime import UTC
 from typing import Any
 
-from qa_report_generator.config import Config
+from qa_report_generator.application.dtos import AppSettings
 
 
 class JsonFormatter(logging.Formatter):
@@ -57,7 +45,7 @@ class JsonFormatter(logging.Formatter):
         return json.dumps(log_data)
 
 
-def setup_logging(config: Config) -> None:
+def setup_logging(config: AppSettings) -> None:
     """Configure logging based on configuration settings.
 
     Args:

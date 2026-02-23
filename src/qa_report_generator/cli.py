@@ -1,34 +1,24 @@
-"""CLI entry point for the reporting PoC.
-
-This module serves as the composition root for the application, implementing
-dependency injection by wiring together all components (adapters, use cases,
-and configuration) before starting the CLI.
-
-Architecture notes:
-- Config: Business-level settings (logging, prompts)
-- LLMAdapterConfig: Technical adapter settings (timeouts, retries)
-- Clear separation of concerns following hexagonal architecture
-"""
+"""Composition root: wires all adapters, use cases, and configuration into the CLI."""
 
 from pathlib import Path
 
 from qa_report_generator.adapters.input.cli_adapter import CliAdapter
-from qa_report_generator.adapters.input.env import load_settings_from_env
+from qa_report_generator.adapters.input.env import EnvSettingsAdapter
 from qa_report_generator.adapters.output.narrative import LLMAdapter, LLMAdapterConfig
 from qa_report_generator.adapters.output.parsers import PytestJsonParser
 from qa_report_generator.adapters.output.persistence.cache import FileReportCache
 from qa_report_generator.adapters.output.persistence.markdown_writer import MarkdownReportWriter
+from qa_report_generator.application.dtos import AppSettings
 from qa_report_generator.application.use_cases import (
     ReportComparisonService,
     ReportGenerationService,
     ReportValidationService,
 )
-from qa_report_generator.config import EnvSettings
 from qa_report_generator.logging_config import setup_logging
 from qa_report_generator.plugins import discover_plugins
 
 
-def _build_llm_adapter_config(config: EnvSettings) -> LLMAdapterConfig:
+def _build_llm_adapter_config(config: AppSettings) -> LLMAdapterConfig:
     """Build technical LLM adapter settings from application config."""
     return LLMAdapterConfig(
         llm_model=config.llm_model,
@@ -55,17 +45,12 @@ def create_cli_adapter() -> CliAdapter:
     2. Application: wire adapters into the use case (business logic)
     3. Interface: return the CLI adapter (user-facing entry point)
 
-    Architecture recap:
-    - Config (business-level): Logging, prompt templates
-    - LLMAdapterConfig (technical-level): Provider, timeouts, retries
-    - Clear separation following hexagonal architecture
-
     Returns:
         Fully configured CLI adapter ready to handle user commands.
 
     """
     # Load configuration directly from environment (composition root — infrastructure layer)
-    config = load_settings_from_env()
+    config = EnvSettingsAdapter().load()
     llm_config = _build_llm_adapter_config(config)
 
     # Setup logging based on business configuration

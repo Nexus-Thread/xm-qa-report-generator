@@ -3,8 +3,8 @@
 import logging
 from pathlib import Path
 
+from qa_report_generator.application.dtos import AppSettings
 from qa_report_generator.application.ports.output import NarrativeGenerator, ReportWriter
-from qa_report_generator.config import Config
 from qa_report_generator.domain.exceptions import PersistenceError
 from qa_report_generator.domain.models import ReportFacts
 from qa_report_generator.templates import PromptLoader, PromptTemplate
@@ -19,7 +19,7 @@ class MarkdownReportWriter(ReportWriter):
 
     def __init__(
         self,
-        config: Config,
+        config: AppSettings,
         prompt_template_path: Path | None = None,
     ) -> None:
         """Initialize markdown report writer.
@@ -83,7 +83,7 @@ class MarkdownReportWriter(ReportWriter):
             logger.info("Both reports saved successfully")
             return summary_path, signoff_path
 
-    def _load_prompt_template(self, config: Config, prompt_template_path: Path | None) -> PromptTemplate:
+    def _load_prompt_template(self, config: AppSettings, prompt_template_path: Path | None) -> PromptTemplate:
         """Load prompt template from path or use default.
 
         Args:
@@ -102,7 +102,7 @@ class MarkdownReportWriter(ReportWriter):
         logger.info("Loading default prompt templates")
         return PromptLoader.load_default()
 
-    def _resolve_prompt_path(self, config: Config, prompt_template_path: Path | None) -> Path | None:
+    def _resolve_prompt_path(self, config: AppSettings, prompt_template_path: Path | None) -> Path | None:
         """Resolve the effective prompt template path."""
         if prompt_template_path is not None:
             return prompt_template_path

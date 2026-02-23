@@ -18,12 +18,12 @@ from qa_report_generator.adapters.input.cli_adapter.types import (
 )
 from qa_report_generator.adapters.input.cli_adapter.utils import apply_profile, resolve_verbosity
 from qa_report_generator.adapters.input.cli_adapter.validators import InputValidator
+from qa_report_generator.application.dtos import AppSettings
 from qa_report_generator.application.ports.input import (
     CompareReportsUseCase,
     GenerateReportsUseCase,
     ValidateReportUseCase,
 )
-from qa_report_generator.config import Config
 from qa_report_generator.domain.analytics.models import ReportDiff
 from qa_report_generator.domain.exceptions import ReportingError
 from qa_report_generator.domain.models import EnvironmentMeta
@@ -37,7 +37,7 @@ class CommandHandler:
         generate_reports_use_case: GenerateReportsUseCase,
         compare_reports_use_case: CompareReportsUseCase,
         validate_report_use_case: ValidateReportUseCase,
-        config: Config,
+        config: AppSettings,
         console: Console,
     ) -> None:
         """Initialize command handler.
@@ -195,7 +195,7 @@ class CommandHandler:
     ) -> None:
         """Generate pytest summary and QA sign-off reports."""
         verbosity = resolve_verbosity(verbose=verbose, quiet=quiet, formatter=self._formatter)
-        apply_profile(profile, self._config, self._formatter)
+        self._config = apply_profile(profile, self._config, self._formatter)
         options = self._build_report_options(
             json_report=json_report,
             out=out,

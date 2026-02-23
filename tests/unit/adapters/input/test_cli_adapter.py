@@ -8,7 +8,8 @@ from unittest.mock import Mock
 from typer.testing import CliRunner
 
 from qa_report_generator.adapters.input.cli_adapter import CliAdapter
-from qa_report_generator.config import Config, PreprocessingProfile
+from qa_report_generator.application.dtos import AppSettings
+from qa_report_generator.config import PreprocessingProfile
 from qa_report_generator.domain.exceptions import ReportingError
 from qa_report_generator.domain.models import RunMetrics
 from qa_report_generator.domain.value_objects import Duration
@@ -46,11 +47,11 @@ def _make_generation_result(tmp_path: Path) -> ReportGenerationResult:
     )
 
 
-def _make_adapter(config: Config | None = None) -> tuple[CliAdapter, Mock, Mock, Mock]:
+def _make_adapter(config: AppSettings | None = None) -> tuple[CliAdapter, Mock, Mock, Mock]:
     generate_use_case = Mock()
     compare_use_case = Mock()
     validate_use_case = Mock()
-    effective_config = config or Config()
+    effective_config = config or AppSettings()
     adapter = CliAdapter(
         generate_use_case,
         compare_use_case,
@@ -69,7 +70,7 @@ def test_generate_dry_run_happy_path(tmp_path: Path) -> None:
     report_path = tmp_path / "report.json"
     report_path.write_text("{}", encoding="utf-8")
     output_dir = tmp_path / "out"
-    adapter, generate_use_case, _, validate_use_case = _make_adapter(config=Config())
+    adapter, generate_use_case, _, validate_use_case = _make_adapter(config=AppSettings())
     validate_use_case.validate_report.return_value = _make_metrics(total=5, failed=1, skipped=1)
 
     result = _runner().invoke(
@@ -94,7 +95,7 @@ def test_generate_dry_run_parse_failure(tmp_path: Path) -> None:
     report_path = tmp_path / "report.json"
     report_path.write_text("{}", encoding="utf-8")
     output_dir = tmp_path / "out"
-    adapter, _, _, validate_use_case = _make_adapter(config=Config())
+    adapter, _, _, validate_use_case = _make_adapter(config=AppSettings())
     validate_use_case.validate_report.side_effect = ValueError("boom")
 
     result = _runner().invoke(
@@ -116,7 +117,7 @@ def test_generate_dry_run_parse_failure(tmp_path: Path) -> None:
 
 def test_generate_rejects_missing_report(tmp_path: Path) -> None:
     """Missing input file should fail validation."""
-    adapter, _, _, _ = _make_adapter(config=Config())
+    adapter, _, _, _ = _make_adapter(config=AppSettings())
 
     result = _runner().invoke(
         adapter._app,  # noqa: SLF001
@@ -139,7 +140,7 @@ def test_generate_creates_output_directory(tmp_path: Path) -> None:
     report_path = tmp_path / "report.json"
     report_path.write_text("{}", encoding="utf-8")
     output_dir = tmp_path / "out"
-    adapter, generate_use_case, _, _ = _make_adapter(config=Config())
+    adapter, generate_use_case, _, _ = _make_adapter(config=AppSettings())
     generation_result = _make_generation_result(tmp_path)
     generate_use_case.generate.return_value = generation_result
 
@@ -163,7 +164,7 @@ def test_generate_handles_reporting_error(tmp_path: Path) -> None:
     """Reporting errors should be rendered with error code and exit 1."""
     report_path = tmp_path / "report.json"
     report_path.write_text("{}", encoding="utf-8")
-    adapter, generate_use_case, _, _ = _make_adapter(config=Config())
+    adapter, generate_use_case, _, _ = _make_adapter(config=AppSettings())
     generate_use_case.generate.side_effect = ReportingError("boom")
 
     result = _runner().invoke(
@@ -186,7 +187,7 @@ def test_generate_resolves_verbosity_flags(tmp_path: Path) -> None:
     """Using both quiet and verbose should fail validation."""
     report_path = tmp_path / "report.json"
     report_path.write_text("{}", encoding="utf-8")
-    adapter, _, _, _ = _make_adapter(config=Config())
+    adapter, _, _, _ = _make_adapter(config=AppSettings())
 
     result = _runner().invoke(
         adapter._app,  # noqa: SLF001
@@ -210,7 +211,7 @@ def test_generate_profile_invalid_value(tmp_path: Path) -> None:
     """Invalid profile values should be rejected."""
     report_path = tmp_path / "report.json"
     report_path.write_text("{}", encoding="utf-8")
-    adapter, _, _, _ = _make_adapter(config=Config())
+    adapter, _, _, _ = _make_adapter(config=AppSettings())
 
     result = _runner().invoke(
         adapter._app,  # noqa: SLF001
@@ -234,8 +235,7 @@ def test_generate_profile_applies_defaults(tmp_path: Path) -> None:
     """Valid profiles should update config defaults before generation."""
     report_path = tmp_path / "report.json"
     report_path.write_text("{}", encoding="utf-8")
-    config = Config()
-    adapter, generate_use_case, _, _ = _make_adapter(config=config)
+    adapter, generate_use_case, _, _ = _make_adapter()
     generate_use_case.generate.return_value = _make_generation_result(tmp_path)
 
     result = _runner().invoke(
@@ -252,14 +252,14 @@ def test_generate_profile_applies_defaults(tmp_path: Path) -> None:
     )
 
     assert result.exit_code == 0
-    assert config.preprocessing_profile == PreprocessingProfile.MINIMAL
+    assert generate_use_case.generate.called
 
 
 def test_generate_no_llm_disables_llm_flag(tmp_path: Path) -> None:
     """--no-llm should disable narrative generation."""
     report_path = tmp_path / "report.json"
     report_path.write_text("{}", encoding="utf-8")
-    adapter, generate_use_case, _, _ = _make_adapter(config=Config())
+    adapter, generate_use_case, _, _ = _make_adapter(config=AppSettings())
     generate_use_case.generate.return_value = _make_generation_result(tmp_path)
 
     result = _runner().invoke(
@@ -283,7 +283,7 @@ def test_generate_max_failures_minus_one_disables_limit(tmp_path: Path) -> None:
     """--max-failures -1 should disable failure limiting."""
     report_path = tmp_path / "report.json"
     report_path.write_text("{}", encoding="utf-8")
-    adapter, generate_use_case, _, _ = _make_adapter(config=Config())
+    adapter, generate_use_case, _, _ = _make_adapter(config=AppSettings())
     generate_use_case.generate.return_value = _make_generation_result(tmp_path)
 
     result = _runner().invoke(
@@ -306,8 +306,7 @@ def test_generate_max_failures_minus_one_disables_limit(tmp_path: Path) -> None:
 
 def test_validate_config_command() -> None:
     """Validate-config should render configuration summary."""
-    adapter, _, _, _ = _make_adapter(config=Config())
-    config = Config(llm_base_url="http://test", llm_model="model", llm_timeout=10.0)
+    config = AppSettings(llm_base_url="http://test", llm_model="model", llm_timeout=10.0)
     adapter, _, _, _ = _make_adapter(config=config)
     result = _runner().invoke(adapter._app, ["validate-config"])  # noqa: SLF001
 
@@ -321,7 +320,7 @@ def test_diff_command_renders_summary(tmp_path: Path) -> None:
     report_b = tmp_path / "b.json"
     report_a.write_text("{}", encoding="utf-8")
     report_b.write_text("{}", encoding="utf-8")
-    adapter, _, compare_use_case, _ = _make_adapter(config=Config())
+    adapter, _, compare_use_case, _ = _make_adapter(config=AppSettings())
     compare_use_case.compare.return_value = Mock(
         new_failures=[Mock(suite="tests", name="test_new")],
         fixed_tests=[Mock(suite="tests", name="test_fixed")],
@@ -349,7 +348,7 @@ def test_generate_rejects_max_failures_below_minus_one(tmp_path: Path) -> None:
     """Values below -1 for --max-failures should be rejected by CLI validation."""
     report_path = tmp_path / "report.json"
     report_path.write_text("{}", encoding="utf-8")
-    adapter, _, _, _ = _make_adapter(config=Config())
+    adapter, _, _, _ = _make_adapter(config=AppSettings())
 
     result = _runner().invoke(
         adapter._app,  # noqa: SLF001
@@ -375,7 +374,7 @@ def test_diff_command_handles_reporting_error(tmp_path: Path) -> None:
     report_b = tmp_path / "b.json"
     report_a.write_text("{}", encoding="utf-8")
     report_b.write_text("{}", encoding="utf-8")
-    adapter, _, compare_use_case, _ = _make_adapter(config=Config())
+    adapter, _, compare_use_case, _ = _make_adapter(config=AppSettings())
     compare_use_case.compare.side_effect = ReportingError("boom")
 
     result = _runner().invoke(

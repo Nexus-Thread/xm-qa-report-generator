@@ -1,10 +1,13 @@
 """Utility functions for CLI command handling."""
 
+import dataclasses
+
 import typer
 
 from qa_report_generator.adapters.input.cli_adapter.formatters import ConsoleFormatter
 from qa_report_generator.adapters.input.cli_adapter.types import OutputVerbosity
-from qa_report_generator.config import Config, PreprocessingProfile
+from qa_report_generator.application.dtos import AppSettings
+from qa_report_generator.config import PROFILE_DEFAULTS, PreprocessingProfile
 
 
 def resolve_verbosity(*, verbose: bool, quiet: bool, formatter: ConsoleFormatter) -> OutputVerbosity:
@@ -32,24 +35,36 @@ def resolve_verbosity(*, verbose: bool, quiet: bool, formatter: ConsoleFormatter
     return OutputVerbosity.NORMAL
 
 
-def apply_profile(profile: str | None, config: Config, formatter: ConsoleFormatter) -> None:
+def apply_profile(profile: str | None, config: AppSettings, formatter: ConsoleFormatter) -> AppSettings:
     """Apply preprocessing profile to configuration.
 
     Args:
         profile: Profile name to apply
-        config: Configuration object to modify
+        config: Settings to derive new values from
         formatter: Console formatter for error messages
+
+    Returns:
+        New AppSettings with profile defaults applied.
 
     Raises:
         typer.Exit: If profile is invalid
 
     """
     if not profile:
-        return
+        return config
 
     try:
-        config.preprocessing_profile = PreprocessingProfile(profile)
-        config.apply_profile_defaults()
+        p = PreprocessingProfile(profile)
     except ValueError as exc:
         formatter.print_error(f"❌ Invalid preprocessing profile: {profile}")
         raise typer.Exit(code=1) from exc
+
+    d = PROFILE_DEFAULTS[p]
+    return dataclasses.replace(
+        config,
+        preprocessing_profile=p.value,
+        max_output_lines_per_failure=d["max_output_lines_per_failure"],
+        enable_failure_grouping=d["enable_failure_grouping"],
+        failure_clustering_threshold=d["failure_clustering_threshold"],
+        max_failures_for_detailed_prompt=d["max_failures_for_detailed_prompt"],
+    )

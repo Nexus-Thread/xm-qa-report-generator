@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from qa_report_generator.adapters.input.env import EnvSettingsAdapter, load_config_from_env, load_settings_from_env
+from qa_report_generator.adapters.input.env import EnvSettingsAdapter, load_settings_from_env
 from qa_report_generator.adapters.input.env import adapter as env_adapter_module
 from qa_report_generator.application.dtos import AppSettings
 from qa_report_generator.config import EnvSettings, PreprocessingProfile
@@ -39,23 +39,6 @@ def test_load_settings_from_env_returns_env_settings_instance() -> None:
     settings = load_settings_from_env()
 
     assert isinstance(settings, EnvSettings)
-
-
-# ---------------------------------------------------------------------------
-# load_config_from_env (backward-compat alias)
-# ---------------------------------------------------------------------------
-
-
-def test_load_config_from_env_is_alias_for_load_settings_from_env(monkeypatch: pytest.MonkeyPatch) -> None:
-    """load_config_from_env should return the same result as load_settings_from_env."""
-    monkeypatch.setenv("PREPROCESSING_PROFILE", PreprocessingProfile.BALANCED.value)
-
-    via_alias = load_config_from_env()
-    via_primary = load_settings_from_env()
-
-    # Both calls produce equivalent objects with the same field values.
-    assert via_alias.preprocessing_profile == via_primary.preprocessing_profile
-    assert via_alias.log_level == via_primary.log_level
 
 
 # ---------------------------------------------------------------------------

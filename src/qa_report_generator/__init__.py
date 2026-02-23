@@ -14,7 +14,6 @@ Key features:
 Quick start:
     >>> from pathlib import Path
     >>> from qa_report_generator import (
-    ...     Config,
     ...     EnvironmentMeta,
     ...     LLMAdapter,
     ...     LLMAdapterConfig,
@@ -22,7 +21,8 @@ Quick start:
     ...     PytestJsonParser,
     ...     ReportGenerationService,
     ... )
-    >>> config = Config()
+    >>> from qa_report_generator.adapters.input.env import EnvSettingsAdapter
+    >>> config = EnvSettingsAdapter().load()
     >>> service = ReportGenerationService(
     ...     parser=PytestJsonParser(),
     ...     writer=MarkdownReportWriter(config),
@@ -56,7 +56,6 @@ __version__ = "0.1.0"
 from qa_report_generator.adapters import CliAdapter, LLMAdapter, MarkdownReportWriter, PytestJsonParser
 from qa_report_generator.adapters.output.narrative import LLMAdapterConfig
 from qa_report_generator.application import ReportGenerationService
-from qa_report_generator.config import Config
 from qa_report_generator.domain import (
     Duration,
     EnvironmentMeta,
@@ -70,7 +69,6 @@ from qa_report_generator.domain import (
 
 __all__ = [
     "CliAdapter",
-    "Config",
     "Duration",
     "EnvironmentMeta",
     "Failure",

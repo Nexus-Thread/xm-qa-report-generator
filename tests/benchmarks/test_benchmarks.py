@@ -11,8 +11,8 @@ pytest.importorskip("pytest_benchmark")
 from qa_report_generator.adapters.output.parsers import PytestJsonParser
 from qa_report_generator.adapters.output.persistence.markdown_writer import MarkdownReportWriter
 from qa_report_generator.adapters.output.persistence.markdown_writer.serializers import build_llm_facts_payload
+from qa_report_generator.application.dtos import AppSettings
 from qa_report_generator.application.use_cases import ReportGenerationService
-from qa_report_generator.config import Config
 from qa_report_generator.domain.analytics.orchestrator import AnalyticsOrchestrator
 from qa_report_generator.domain.models import EnvironmentMeta, Failure, ReportFacts, RunMetrics, TestOutput
 from qa_report_generator.domain.value_objects import Duration, TestIdentifier
@@ -116,7 +116,7 @@ def test_benchmark_llm_payload_serialization(benchmark: BenchmarkFixture) -> Non
 def test_benchmark_report_generation_use_case(benchmark: BenchmarkFixture, fixture_report_path: Path) -> None:
     """Benchmark report generation without LLM."""
     parser = PytestJsonParser()
-    writer = MarkdownReportWriter(Config())
+    writer = MarkdownReportWriter(AppSettings())
     service = ReportGenerationService(parser=parser, writer=writer)
 
     benchmark(

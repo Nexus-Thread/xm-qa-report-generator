@@ -29,8 +29,3 @@ def load_settings_from_env() -> EnvSettings:
     settings.apply_profile_defaults()
     LOGGER.debug("Configuration loaded from environment (profile=%s)", settings.preprocessing_profile)
     return settings
-
-
-def load_config_from_env() -> EnvSettings:
-    """Backward-compatible alias for load_settings_from_env."""
-    return load_settings_from_env()

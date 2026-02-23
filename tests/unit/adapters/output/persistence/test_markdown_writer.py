@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 from unittest.mock import Mock
 
 from qa_report_generator.adapters.output.persistence.markdown_writer import MarkdownReportWriter
-from qa_report_generator.config import Config
+from qa_report_generator.application.dtos import AppSettings
 from qa_report_generator.domain.models import EnvironmentMeta, Failure, ReportFacts, RunMetrics, TestOutput
 from qa_report_generator.domain.value_objects import Duration, SectionType, TestIdentifier
 from qa_report_generator.templates import PromptTemplate
@@ -74,7 +74,7 @@ def test_save_reports_writes_files(tmp_path: Path, monkeypatch: pytest.MonkeyPat
         "qa_report_generator.adapters.output.persistence.markdown_writer.adapter.PromptLoader.load_default",
         Mock(return_value=_make_prompt_template()),
     )
-    writer = MarkdownReportWriter(Config())
+    writer = MarkdownReportWriter(AppSettings())
 
     summary_path, signoff_path = writer.save_reports(facts, tmp_path)
 
@@ -91,7 +91,7 @@ def test_render_summary_includes_sections(monkeypatch: pytest.MonkeyPatch, tmp_p
         "qa_report_generator.adapters.output.persistence.markdown_writer.adapter.PromptLoader.load_default",
         Mock(return_value=_make_prompt_template()),
     )
-    writer = MarkdownReportWriter(Config())
+    writer = MarkdownReportWriter(AppSettings())
 
     summary_path, _ = writer.save_reports(facts, tmp_path, narrative_generator=None)
     content = summary_path.read_text(encoding="utf-8")
@@ -112,7 +112,7 @@ def test_render_signoff_includes_critical_failures(monkeypatch: pytest.MonkeyPat
         "qa_report_generator.adapters.output.persistence.markdown_writer.adapter.PromptLoader.load_default",
         Mock(return_value=_make_prompt_template()),
     )
-    writer = MarkdownReportWriter(Config())
+    writer = MarkdownReportWriter(AppSettings())
 
     _, signoff_path = writer.save_reports(facts, tmp_path, narrative_generator=None)
     content = signoff_path.read_text(encoding="utf-8")
@@ -131,7 +131,7 @@ def test_render_failures_truncates_output(tmp_path: Path, monkeypatch: pytest.Mo
         "qa_report_generator.adapters.output.persistence.markdown_writer.adapter.PromptLoader.load_default",
         Mock(return_value=_make_prompt_template()),
     )
-    writer = MarkdownReportWriter(Config(max_output_lines_per_failure=1))
+    writer = MarkdownReportWriter(AppSettings(max_output_lines_per_failure=1))
 
     summary_path, _ = writer.save_reports(facts, tmp_path, narrative_generator=None)
     content = summary_path.read_text(encoding="utf-8")
@@ -149,7 +149,7 @@ def test_generate_sections_parallel_uses_narrative_generator(monkeypatch: pytest
         "qa_report_generator.adapters.output.persistence.markdown_writer.adapter.PromptLoader.load_default",
         Mock(return_value=_make_prompt_template()),
     )
-    writer = MarkdownReportWriter(Config())
+    writer = MarkdownReportWriter(AppSettings())
 
     writer.save_reports(facts, tmp_path, narrative_generator=generator)
 
@@ -162,7 +162,7 @@ def test_save_reports_reload_prompt_template(tmp_path: Path, monkeypatch: pytest
     loader_mock = Mock(return_value=_make_prompt_template())
     monkeypatch.setattr("qa_report_generator.adapters.output.persistence.markdown_writer.adapter.PromptLoader.load_default", loader_mock)
     monkeypatch.setattr("qa_report_generator.adapters.output.persistence.markdown_writer.adapter.PromptLoader.load_from_file", loader_mock)
-    writer = MarkdownReportWriter(Config())
+    writer = MarkdownReportWriter(AppSettings())
     prompt_path = tmp_path / "custom.yaml"
     prompt_path.write_text("x: y", encoding="utf-8")
 

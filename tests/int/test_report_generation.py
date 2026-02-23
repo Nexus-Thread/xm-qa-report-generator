@@ -8,8 +8,8 @@ from unittest.mock import Mock
 
 from qa_report_generator.adapters.output.parsers import PytestJsonParser
 from qa_report_generator.adapters.output.persistence.markdown_writer import MarkdownReportWriter
+from qa_report_generator.application.dtos import AppSettings
 from qa_report_generator.application.use_cases import ReportGenerationService
-from qa_report_generator.config import Config
 from qa_report_generator.domain.models import EnvironmentMeta
 from qa_report_generator.templates import PromptTemplate
 
@@ -78,7 +78,7 @@ def test_report_generation_end_to_end(tmp_path: Path, monkeypatch: pytest.Monkey
     report_path = tmp_path / "report.json"
     _write_pytest_report(report_path)
     output_dir = tmp_path / "out"
-    config = Config()
+    config = AppSettings()
     parser = PytestJsonParser()
     writer = MarkdownReportWriter(config)
     narrative = _make_narrative_generator()
@@ -107,7 +107,7 @@ def test_report_generation_without_llm(tmp_path: Path, monkeypatch: pytest.Monke
     report_path = tmp_path / "report.json"
     _write_pytest_report(report_path)
     output_dir = tmp_path / "out"
-    config = Config()
+    config = AppSettings()
     parser = PytestJsonParser()
 
     monkeypatch.setattr(
