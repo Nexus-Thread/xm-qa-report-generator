@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import pytest
 
-from qa_report_generator.adapters.input.env import EnvSettingsAdapter, load_settings_from_env
+from qa_report_generator.adapters.input.env import EnvSettings, EnvSettingsAdapter, load_settings_from_env
 from qa_report_generator.adapters.input.env import adapter as env_adapter_module
 from qa_report_generator.application.dtos import AppSettings
-from qa_report_generator.config import EnvSettings, PreprocessingProfile
+from qa_report_generator.config import PreprocessingProfile
 from qa_report_generator.domain.exceptions import ConfigurationError
 
 # ---------------------------------------------------------------------------

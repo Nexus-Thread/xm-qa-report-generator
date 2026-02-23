@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from qa_report_generator.config import EnvSettings, PreprocessingProfile
+from qa_report_generator.adapters.input.env import EnvSettings
+from qa_report_generator.config import PreprocessingProfile
 
 
 def test_profile_defaults_apply_when_fields_unset() -> None:

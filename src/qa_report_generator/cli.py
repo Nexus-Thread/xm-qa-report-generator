@@ -14,7 +14,7 @@ from qa_report_generator.application.use_cases import (
     ReportGenerationService,
     ReportValidationService,
 )
-from qa_report_generator.logging_config import setup_logging
+from qa_report_generator.config import setup_logging
 from qa_report_generator.plugins import discover_plugins
 
 
