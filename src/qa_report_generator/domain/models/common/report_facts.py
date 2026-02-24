@@ -12,9 +12,9 @@ from qa_report_generator.domain.analytics.models import (
     TestPattern,
     TestSmell,
 )
-from qa_report_generator.domain.models.environment import EnvironmentMeta
-from qa_report_generator.domain.models.failure import Failure
-from qa_report_generator.domain.models.metrics import RunMetrics
+from qa_report_generator.domain.models.common.environment import EnvironmentMeta
+from qa_report_generator.domain.models.common.failure import Failure
+from qa_report_generator.domain.models.common.metrics import RunMetrics
 
 
 class ReportFacts(BaseModel):

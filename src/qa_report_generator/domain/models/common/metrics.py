@@ -4,8 +4,8 @@ from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-from qa_report_generator.domain.models.failure import Failure
-from qa_report_generator.domain.models.test_case import TestCaseResult
+from qa_report_generator.domain.models.common.failure import Failure
+from qa_report_generator.domain.models.common.test_case import TestCaseResult
 from qa_report_generator.domain.value_objects import Duration, FailureSeverity, PassRate
 
 if TYPE_CHECKING:

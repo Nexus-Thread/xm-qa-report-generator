@@ -2,7 +2,9 @@
 
 from pydantic import BaseModel, Field
 
-from qa_report_generator.domain.models.test_output import TestOutput
+# TestOutput is a pytest-specific model; the `output` field is only populated
+# by the pytest parser. k6 failures always have output=None.
+from qa_report_generator.domain.models.pytest.test_output import TestOutput
 from qa_report_generator.domain.value_objects import Duration, TestIdentifier
 
 
@@ -13,7 +15,10 @@ class Failure(BaseModel):
     message: str = Field(min_length=1, description="Error or failure message")
     type: str | None = Field(None, description="Exception type (e.g., AssertionError)")
     duration: Duration | None = Field(None, description="Test execution time")
-    output: TestOutput | None = Field(None, description="Captured output streams")
+    output: TestOutput | None = Field(
+        None,
+        description="Captured output streams — populated by the pytest parser only; None for k6 results",
+    )
 
     @property
     def test_name(self) -> str:
