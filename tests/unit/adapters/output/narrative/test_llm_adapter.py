@@ -57,7 +57,8 @@ def test_generate_success() -> None:
 
 
 def test_generate_empty_system_prompt() -> None:
-    adapter = _make_adapter(Mock())
+    client = Mock()
+    adapter = _make_adapter(client)
 
     result = adapter.generate(
         SectionPrompt(SectionType.KEY_OBSERVATIONS, " "),
@@ -65,10 +66,12 @@ def test_generate_empty_system_prompt() -> None:
     )
 
     assert result is None
+    client.create_chat_completion.assert_not_called()
 
 
 def test_generate_empty_user_prompt() -> None:
-    adapter = _make_adapter(Mock())
+    client = Mock()
+    adapter = _make_adapter(client)
 
     result = adapter.generate(
         SectionPrompt(SectionType.KEY_OBSERVATIONS, "system"),
@@ -76,6 +79,7 @@ def test_generate_empty_user_prompt() -> None:
     )
 
     assert result is None
+    client.create_chat_completion.assert_not_called()
 
 
 def test_generate_invalid_response_shape_returns_none() -> None:
