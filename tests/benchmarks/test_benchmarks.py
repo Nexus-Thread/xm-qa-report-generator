@@ -117,12 +117,13 @@ def test_benchmark_report_generation_use_case(benchmark: BenchmarkFixture, fixtu
     """Benchmark report generation without LLM."""
     parser = PytestJsonParser()
     writer = MarkdownReportWriter(AppSettings())
-    service = ReportGenerationService(parser=parser, writer=writer)
+    service = ReportGenerationService(parsers={"pytest": parser}, writer=writer)
 
     benchmark(
         service.generate,
         report_path=fixture_report_path,
         output_dir=fixture_report_path.parent,
         environment=EnvironmentMeta(env="bench", build=None, commit=None, target_url=None),
+        report_format="pytest",
         enable_llm=False,
     )

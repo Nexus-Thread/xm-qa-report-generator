@@ -28,6 +28,7 @@ class GenerateReportsUseCase(ABC):
         report_path: Path,
         output_dir: Path,
         environment: EnvironmentMeta,
+        report_format: str,
         max_failures: int | None = 20,
         enable_llm: bool = True,
         regenerate_narratives: bool = False,
@@ -39,7 +40,7 @@ class CompareReportsUseCase(ABC):
     """Report comparison use case interface."""
 
     @abstractmethod
-    def compare(self, report_a: Path, report_b: Path) -> ReportDiff:
+    def compare(self, report_a: Path, report_b: Path, report_format: str) -> ReportDiff:
         """Compare two test reports and return diff summary."""
 
 
@@ -47,5 +48,5 @@ class ValidateReportUseCase(ABC):
     """Validate a report input and return parsed metrics."""
 
     @abstractmethod
-    def validate_report(self, report_path: Path) -> RunMetrics:
+    def validate_report(self, report_path: Path, report_format: str) -> RunMetrics:
         """Validate report structure by parsing it."""

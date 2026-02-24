@@ -23,6 +23,7 @@ class ReportFacts(BaseModel):
     metrics: RunMetrics = Field(description="Test run metrics and results")
     environment: EnvironmentMeta = Field(description="Environment metadata")
     input_files: list[str] = Field(description="Source files processed")
+    source_format: str = Field(default="pytest", description="Report source format identifier (e.g. pytest, k6)")
     timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC), description="Report generation time")
     patterns: list[TestPattern] = Field(default_factory=list, description="Detected failure patterns")
     health_metrics: HealthMetrics | None = Field(default=None, description="Aggregated test suite health metrics")
@@ -121,6 +122,7 @@ class ReportFacts(BaseModel):
             ],
             "environment": self.environment.model_dump(),
             "input_files": self.input_files,
+            "source_format": self.source_format,
             "timestamp": self.timestamp_iso,
         }
 

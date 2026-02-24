@@ -62,8 +62,8 @@ def test_diff_reports_end_to_end(tmp_path) -> None:  # noqa: ANN001
     )
 
     parser = PytestJsonParser()
-    service = ReportComparisonService(parser)
-    diff = service.compare(previous_path, current_path)
+    service = ReportComparisonService({"pytest": parser})
+    diff = service.compare(previous_path, current_path, report_format="pytest")
 
     assert {item.name for item in diff.regressions} == {"test_ok"}
     assert {item.name for item in diff.new_failures} == {"test_new"}

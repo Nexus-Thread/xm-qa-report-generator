@@ -6,7 +6,7 @@ from qa_report_generator.adapters.input.cli_adapter import CliAdapter
 from qa_report_generator.adapters.input.env import EnvSettingsAdapter
 from qa_report_generator.adapters.output.narrative import NarrativeAdapter, NarrativeAdapterConfig
 from qa_report_generator.adapters.output.narrative.openai import OpenAIClientSettings, build_client
-from qa_report_generator.adapters.output.parsers import PytestJsonParser
+from qa_report_generator.adapters.output.parsers import K6JsonParser, PytestJsonParser
 from qa_report_generator.adapters.output.persistence.cache import FileReportCache
 from qa_report_generator.adapters.output.persistence.markdown_writer import MarkdownReportWriter
 from qa_report_generator.application.use_cases import (
@@ -45,7 +45,10 @@ def create_cli_adapter() -> CliAdapter:
     discover_plugins(config.plugin_modules)
 
     # Create output adapters (driven side)
-    parser = PytestJsonParser()
+    parsers = {
+        "pytest": PytestJsonParser(),
+        "k6": K6JsonParser(),
+    }
     writer = MarkdownReportWriter(config)  # Handles prompts (business logic)
 
     # Build OpenAI transport and narrative adapter explicitly
@@ -62,14 +65,14 @@ def create_cli_adapter() -> CliAdapter:
 
     # Create use case with dependencies
     report_use_case = ReportGenerationService(
-        parser=parser,
+        parsers=parsers,
         writer=writer,
         narrative_generator=narrative_generator,
         failure_clustering_threshold=config.failure_clustering_threshold,
         report_cache=cache,
     )
-    compare_use_case = ReportComparisonService(parser)
-    validate_use_case = ReportValidationService(parser)
+    compare_use_case = ReportComparisonService(parsers)
+    validate_use_case = ReportValidationService(parsers)
 
     # Create and return CLI adapter (driving side)
     return CliAdapter(

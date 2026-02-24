@@ -88,11 +88,12 @@ def test_report_generation_end_to_end(tmp_path: Path, monkeypatch: pytest.Monkey
         Mock(return_value=_make_prompt_template()),
     )
 
-    service = ReportGenerationService(parser, writer, narrative)
+    service = ReportGenerationService({"pytest": parser}, writer, narrative)
     result = service.generate(
         report_path=report_path,
         output_dir=output_dir,
         environment=EnvironmentMeta(env="test", build="1", commit=None, target_url=None),
+        report_format="pytest",
         enable_llm=True,
     )
 
@@ -117,11 +118,12 @@ def test_report_generation_without_llm(tmp_path: Path, monkeypatch: pytest.Monke
 
     writer = MarkdownReportWriter(config)
 
-    service = ReportGenerationService(parser, writer, narrative_generator=None)
+    service = ReportGenerationService({"pytest": parser}, writer, narrative_generator=None)
     result = service.generate(
         report_path=report_path,
         output_dir=output_dir,
         environment=EnvironmentMeta(env="test", build="1", commit=None, target_url=None),
+        report_format="pytest",
         enable_llm=False,
     )
 

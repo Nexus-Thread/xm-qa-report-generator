@@ -80,6 +80,7 @@ class InputValidator:
         json_report: Path,
         out: Path,
         enable_llm: bool,
+        report_format: str,
         verbosity: OutputVerbosity,
     ) -> None:
         """Perform dry-run validation without generating reports.
@@ -104,7 +105,7 @@ class InputValidator:
         # Validate JSON structure by parsing
         self._formatter.print_verbose("  Parsing JSON structure...", verbosity)
         try:
-            metrics = self._validate_report_use_case.validate_report(json_report)
+            metrics = self._validate_report_use_case.validate_report(json_report, report_format)
             self._formatter.print_success(
                 f"✅ JSON structure is valid (found {metrics.total} test cases)",
                 verbosity,

@@ -24,6 +24,16 @@ from .serializers import build_llm_facts_payload
 logger = logging.getLogger(__name__)
 
 
+_SUMMARY_TITLES: dict[str, str] = {
+    "pytest": "Pytest Run Summary",
+    "k6": "K6 Load Test Summary",
+}
+_SIGNOFF_TITLES: dict[str, str] = {
+    "pytest": "QA Sign-Off Report",
+    "k6": "K6 Performance Sign-Off Report",
+}
+
+
 def render_pytest_summary(  # noqa: PLR0913
     facts: ReportFacts,
     narrative_generator: NarrativeGenerator | None,
@@ -33,7 +43,7 @@ def render_pytest_summary(  # noqa: PLR0913
     enable_failure_grouping: bool,
     max_detailed_failures: int,
 ) -> str:
-    """Render pytest run summary report.
+    """Render test run summary report.
 
     Args:
         facts: Test run facts
@@ -51,7 +61,8 @@ def render_pytest_summary(  # noqa: PLR0913
     md_parts = []
 
     # Header
-    md_parts.append("# Pytest Run Summary\n")
+    title = _SUMMARY_TITLES.get(facts.source_format, _SUMMARY_TITLES["pytest"])
+    md_parts.append(f"# {title}\n")
     md_parts.append(f"*Generated: {facts.timestamp_iso}*\n")
 
     # Quick stats card
@@ -124,7 +135,8 @@ def render_signoff_report(  # noqa: PLR0913
     md_parts = []
 
     # Header
-    md_parts.append("# QA Sign-Off Report\n")
+    title = _SIGNOFF_TITLES.get(facts.source_format, _SIGNOFF_TITLES["pytest"])
+    md_parts.append(f"# {title}\n")
     md_parts.append(f"*Generated: {facts.timestamp_iso}*\n")
 
     # Deterministic: Run Facts

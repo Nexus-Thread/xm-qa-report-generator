@@ -5,6 +5,13 @@ from enum import StrEnum
 from pathlib import Path
 
 
+class ReportFormat(StrEnum):
+    """Supported input report formats."""
+
+    PYTEST = "pytest"
+    K6 = "k6"
+
+
 @dataclass(frozen=True)
 class ReportOptions:
     """Options for report generation."""
@@ -18,6 +25,7 @@ class ReportOptions:
     max_failures: int | None
     enable_llm: bool
     regenerate_narratives: bool
+    report_format: str
 
 
 @dataclass(frozen=True)

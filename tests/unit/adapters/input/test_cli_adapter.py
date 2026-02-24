@@ -277,6 +277,7 @@ def test_generate_no_llm_disables_llm_flag(tmp_path: Path) -> None:
     assert result.exit_code == 0
     _, kwargs = generate_use_case.generate.call_args
     assert kwargs["enable_llm"] is False
+    assert kwargs["report_format"] == "pytest"
 
 
 def test_generate_max_failures_minus_one_disables_limit(tmp_path: Path) -> None:
@@ -302,6 +303,58 @@ def test_generate_max_failures_minus_one_disables_limit(tmp_path: Path) -> None:
     assert result.exit_code == 0
     _, kwargs = generate_use_case.generate.call_args
     assert kwargs["max_failures"] is None
+
+
+def test_generate_format_k6_passes_format_to_use_case(tmp_path: Path) -> None:
+    """--format k6 should pass report_format='k6' to the use case."""
+    report_path = tmp_path / "report.json"
+    report_path.write_text("{}", encoding="utf-8")
+    adapter, generate_use_case, _, _ = _make_adapter(config=AppSettings())
+    generate_use_case.generate.return_value = _make_generation_result(tmp_path)
+
+    result = _runner().invoke(
+        adapter._app,  # noqa: SLF001
+        [
+            "generate",
+            "--json-report",
+            str(report_path),
+            "--out",
+            str(tmp_path / "out"),
+            "--format",
+            "k6",
+        ],
+    )
+
+    assert result.exit_code == 0
+    _, kwargs = generate_use_case.generate.call_args
+    assert kwargs["report_format"] == "k6"
+
+
+def test_diff_format_k6_passes_format_to_compare(tmp_path: Path) -> None:
+    """Diff --format k6 should pass report_format='k6' to the compare use case."""
+    report_a = tmp_path / "a.json"
+    report_b = tmp_path / "b.json"
+    report_a.write_text("{}", encoding="utf-8")
+    report_b.write_text("{}", encoding="utf-8")
+    adapter, _, compare_use_case, _ = _make_adapter(config=AppSettings())
+    compare_use_case.compare.return_value = Mock(new_failures=[], fixed_tests=[], regressions=[])
+
+    result = _runner().invoke(
+        adapter._app,  # noqa: SLF001
+        [
+            "diff",
+            "--report-a",
+            str(report_a),
+            "--report-b",
+            str(report_b),
+            "--format",
+            "k6",
+        ],
+    )
+
+    assert result.exit_code == 0
+    _, kwargs = compare_use_case.compare.call_args
+    assert kwargs["report_format"] == "k6"
 
 
 def test_validate_config_command() -> None:

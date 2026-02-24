@@ -14,6 +14,7 @@ from qa_report_generator.adapters.input.cli_adapter.progress import ProgressTrac
 from qa_report_generator.adapters.input.cli_adapter.types import (
     GenerationResult,
     OutputVerbosity,
+    ReportFormat,
     ReportOptions,
 )
 from qa_report_generator.adapters.input.cli_adapter.utils import apply_profile, resolve_verbosity
@@ -64,7 +65,7 @@ class CommandHandler:
             Path,
             typer.Option(
                 "--report-a",
-                help="Path to first pytest-json-report JSON file",
+                help="Path to first report JSON file",
                 exists=True,
                 file_okay=True,
                 dir_okay=False,
@@ -74,16 +75,23 @@ class CommandHandler:
             Path,
             typer.Option(
                 "--report-b",
-                help="Path to second pytest-json-report JSON file",
+                help="Path to second report JSON file",
                 exists=True,
                 file_okay=True,
                 dir_okay=False,
             ),
         ],
+        report_fmt: Annotated[
+            ReportFormat,
+            typer.Option(
+                "--format",
+                help="Input report format (pytest or k6)",
+            ),
+        ] = ReportFormat.PYTEST,
     ) -> None:
-        """Compare two pytest JSON reports and summarize differences."""
+        """Compare two test reports and summarize differences."""
         try:
-            diff = self._compare_use_case.compare(report_a, report_b)
+            diff = self._compare_use_case.compare(report_a, report_b, report_format=report_fmt.value)
             self._render_diff(diff)
         except ReportingError as e:
             suggestion = f"\n💡 Suggestion: {e.suggestion}" if e.suggestion else ""
@@ -193,8 +201,15 @@ class CommandHandler:
                 help="Preprocessing profile preset (minimal, balanced, detailed)",
             ),
         ] = None,
+        report_fmt: Annotated[
+            ReportFormat,
+            typer.Option(
+                "--format",
+                help="Input report format (pytest or k6)",
+            ),
+        ] = ReportFormat.PYTEST,
     ) -> None:
-        """Generate pytest summary and QA sign-off reports."""
+        """Generate test summary and QA sign-off reports."""
         verbosity = resolve_verbosity(verbose=verbose, quiet=quiet, formatter=self._formatter)
         self._config = apply_profile(profile, self._config, self._formatter)
         options = self._build_report_options(
@@ -207,6 +222,7 @@ class CommandHandler:
             max_failures=max_failures,
             no_llm=no_llm,
             regenerate_narratives=regenerate_narratives,
+            report_format=report_fmt.value,
         )
 
         # Handle dry-run mode
@@ -215,6 +231,7 @@ class CommandHandler:
                 json_report=options.json_report,
                 out=options.out,
                 enable_llm=options.enable_llm,
+                report_format=options.report_format,
                 verbosity=verbosity,
             )
             return
@@ -310,6 +327,7 @@ class CommandHandler:
         max_failures: int,
         no_llm: bool,
         regenerate_narratives: bool,
+        report_format: str,
     ) -> ReportOptions:
         """Build report options from CLI flags."""
         return ReportOptions(
@@ -322,6 +340,7 @@ class CommandHandler:
             max_failures=None if max_failures == -1 else max_failures,
             enable_llm=not no_llm,
             regenerate_narratives=regenerate_narratives,
+            report_format=report_format,
         )
 
     def _build_environment_meta(self, options: ReportOptions) -> EnvironmentMeta:
@@ -406,6 +425,7 @@ class CommandHandler:
                 report_path=options.json_report,
                 output_dir=options.out,
                 environment=environment,
+                report_format=options.report_format,
                 max_failures=options.max_failures,
                 enable_llm=options.enable_llm,
                 regenerate_narratives=options.regenerate_narratives,

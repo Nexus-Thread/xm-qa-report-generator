@@ -3,6 +3,7 @@
 import logging
 import time
 from collections import defaultdict
+from collections.abc import Mapping
 from pathlib import Path
 
 from qa_report_generator.application.dtos import SectionPrompt
@@ -22,7 +23,7 @@ from qa_report_generator.application.strategies import PromptStrategySelector
 from qa_report_generator.domain.analytics.models import ReportDiff
 from qa_report_generator.domain.analytics.orchestrator import AnalyticsOrchestrator
 from qa_report_generator.domain.analytics.report_diff import diff_runs
-from qa_report_generator.domain.exceptions import ParseError, ReportingError
+from qa_report_generator.domain.exceptions import ConfigurationError, ParseError, ReportingError
 from qa_report_generator.domain.models import EnvironmentMeta, ReportFacts, RunMetrics
 from qa_report_generator.domain.value_objects import SectionType
 
@@ -80,7 +81,7 @@ class ReportGenerationService(GenerateReportsUseCase):
 
     def __init__(  # noqa: PLR0913
         self,
-        parser: ReportParser,
+        parsers: Mapping[str, ReportParser],
         writer: ReportWriter,
         narrative_generator: NarrativeGenerator | None = None,
         prompt_strategy_selector: PromptStrategySelector | None = None,
@@ -88,7 +89,7 @@ class ReportGenerationService(GenerateReportsUseCase):
         report_cache: ReportCache | None = None,
     ) -> None:
         """Initialize the report generation service."""
-        self._parser = parser
+        self._parsers = parsers
         self._writer = writer
         self._narrative_generator = narrative_generator
         self._prompt_strategy_selector = prompt_strategy_selector or PromptStrategySelector()
@@ -101,6 +102,7 @@ class ReportGenerationService(GenerateReportsUseCase):
         report_path: Path,
         output_dir: Path,
         environment: EnvironmentMeta,
+        report_format: str,
         max_failures: int | None = 20,
         enable_llm: bool = True,
         regenerate_narratives: bool = False,
@@ -111,6 +113,7 @@ class ReportGenerationService(GenerateReportsUseCase):
             report_path: Path to test report file
             output_dir: Directory to save generated reports
             environment: Environment metadata
+            report_format: Source report format identifier (e.g. "pytest", "k6")
             max_failures: Maximum number of failures to include in reports
                 (set to None to disable limiting)
             enable_llm: Whether to enable LLM-generated narrative sections
@@ -120,21 +123,25 @@ class ReportGenerationService(GenerateReportsUseCase):
             ReportGenerationResult with output paths and timing metrics
 
         Raises:
+            ConfigurationError: If the requested report_format is not registered
             ParseError: If input report parsing fails
             ReportingError: If report generation fails
 
         """
+        parser = self._get_parser(report_format)
         start_time = time.time()
         logger.info(
-            "Starting report generation workflow: input=%s, output=%s, llm_enabled=%s",
+            "Starting report generation workflow: input=%s, output=%s, format=%s, llm_enabled=%s",
             report_path,
             output_dir,
+            report_format,
             enable_llm,
         )
 
         try:
             logger.debug("Step 1: Parsing input report")
             metrics, input_files, parse_duration = self._load_or_parse_metrics(
+                parser=parser,
                 report_path=report_path,
                 environment=environment,
                 regenerate_narratives=regenerate_narratives,
@@ -146,6 +153,7 @@ class ReportGenerationService(GenerateReportsUseCase):
                 metrics=limited_metrics,
                 environment=environment,
                 input_files=input_files,
+                report_format=report_format,
             )
 
             narrative_generator, timed_narrative_generator = self._prepare_narrative_generator(
@@ -167,25 +175,16 @@ class ReportGenerationService(GenerateReportsUseCase):
             write_duration = time.time() - write_start
             logger.debug("Report writing completed in %.2f seconds", write_duration)
 
-        except ParseError as e:
-            # Re-raise domain exceptions with additional context
-            logger.exception(
-                "Report generation failed during parsing: input=%s, error=%s",
-                report_path,
-                e,
-            )
+        except (ConfigurationError, ParseError):
             raise
         except ReportingError:
-            # Re-raise other domain exceptions (PersistenceError, ConfigurationError, etc.)
-            # without wrapping so callers retain the specific type
             raise
         except Exception as e:
-            # Wrap unexpected errors in domain exception with context
             msg = f"Failed to generate reports from {report_path}: {type(e).__name__}: {e}"
             logger.exception("Report generation failed: %s", msg)
             raise ReportingError(
                 msg,
-                suggestion="Check that the input file is a valid pytest-json-report JSON file and the output directory is writable.",
+                suggestion="Check that the input file matches the selected format and the output directory is writable.",
             ) from e
         else:
             total_duration = time.time() - start_time
@@ -219,9 +218,27 @@ class ReportGenerationService(GenerateReportsUseCase):
                 total_duration=total_duration,
             )
 
+    def _get_parser(self, report_format: str) -> ReportParser:
+        """Resolve parser for the given format.
+
+        Args:
+            report_format: Format identifier
+
+        Raises:
+            ConfigurationError: If format is not registered
+
+        """
+        parser = self._parsers.get(report_format)
+        if parser is None:
+            available = ", ".join(sorted(self._parsers.keys()))
+            msg = f"Unknown report format '{report_format}'. Registered formats: {available}"
+            raise ConfigurationError(msg, suggestion=f"Use one of: {available}")
+        return parser
+
     def _load_or_parse_metrics(
         self,
         *,
+        parser: ReportParser,
         report_path: Path,
         environment: EnvironmentMeta,
         regenerate_narratives: bool,
@@ -239,7 +256,7 @@ class ReportGenerationService(GenerateReportsUseCase):
                 )
             return metrics, input_files, 0.0
 
-        metrics = self._parser.parse(report_path)
+        metrics = parser.parse(report_path)
         input_files = [str(report_path)]
         parse_duration = time.time() - parse_start
         if self._report_cache:
@@ -271,14 +288,16 @@ class ReportGenerationService(GenerateReportsUseCase):
         metrics: RunMetrics,
         environment: EnvironmentMeta,
         input_files: list[str],
+        report_format: str,
     ) -> ReportFacts:
         logger.debug("Step 2: Building report facts")
-        return self._analytics_orchestrator.build_report_facts(
+        facts = self._analytics_orchestrator.build_report_facts(
             metrics=metrics,
             environment=environment,
             input_files=input_files,
             failure_clustering_threshold=self._failure_clustering_threshold,
         )
+        return facts.model_copy(update={"source_format": report_format})
 
     def _prepare_narrative_generator(
         self,
@@ -300,24 +319,38 @@ class ReportGenerationService(GenerateReportsUseCase):
 class ReportComparisonService(CompareReportsUseCase):
     """Compare reports and return a diff summary."""
 
-    def __init__(self, parser: ReportParser) -> None:
+    def __init__(self, parsers: Mapping[str, ReportParser]) -> None:
         """Initialize the comparison service."""
-        self._parser = parser
+        self._parsers = parsers
 
-    def compare(self, report_a: Path, report_b: Path) -> ReportDiff:
+    def compare(self, report_a: Path, report_b: Path, report_format: str) -> ReportDiff:
         """Compare two reports and return a diff summary."""
-        metrics_a = self._parser.parse(report_a)
-        metrics_b = self._parser.parse(report_b)
+        parser = self._get_parser(report_format)
+        metrics_a = parser.parse(report_a)
+        metrics_b = parser.parse(report_b)
         return diff_runs(metrics_a, metrics_b)
+
+    def _get_parser(self, report_format: str) -> ReportParser:
+        parser = self._parsers.get(report_format)
+        if parser is None:
+            available = ", ".join(sorted(self._parsers.keys()))
+            msg = f"Unknown report format '{report_format}'. Registered formats: {available}"
+            raise ConfigurationError(msg, suggestion=f"Use one of: {available}")
+        return parser
 
 
 class ReportValidationService(ValidateReportUseCase):
     """Validate a report by parsing it through the configured parser."""
 
-    def __init__(self, parser: ReportParser) -> None:
+    def __init__(self, parsers: Mapping[str, ReportParser]) -> None:
         """Initialize the validation service."""
-        self._parser = parser
+        self._parsers = parsers
 
-    def validate_report(self, report_path: Path) -> RunMetrics:
+    def validate_report(self, report_path: Path, report_format: str) -> RunMetrics:
         """Validate report structure and return parsed metrics."""
-        return self._parser.parse(report_path)
+        parser = self._parsers.get(report_format)
+        if parser is None:
+            available = ", ".join(sorted(self._parsers.keys()))
+            msg = f"Unknown report format '{report_format}'. Registered formats: {available}"
+            raise ConfigurationError(msg, suggestion=f"Use one of: {available}")
+        return parser.parse(report_path)
