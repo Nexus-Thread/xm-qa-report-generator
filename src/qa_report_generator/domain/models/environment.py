@@ -13,9 +13,8 @@ class EnvironmentMeta(BaseModel):
 
     @field_validator("env", "build", "commit", "target_url")
     @classmethod
-    def normalize_optional_fields(cls, v: str | None) -> str | None:
-        """Trim whitespace and convert empty strings to None."""
+    def _normalize(cls, v: str | None) -> str | None:
+        """Strip whitespace and convert empty strings to None."""
         if v is None:
             return None
-        cleaned = v.strip()
-        return cleaned or None
+        return v.strip() or None

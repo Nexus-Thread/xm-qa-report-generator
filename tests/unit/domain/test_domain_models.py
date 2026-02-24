@@ -22,6 +22,26 @@ def test_test_output_normalizes_empty_and_trailing_whitespace() -> None:
     assert output.log is None
 
 
+def test_environment_meta_defaults_to_all_none() -> None:
+    """All fields default to None when omitted."""
+    meta = EnvironmentMeta()
+
+    assert meta.env is None
+    assert meta.build is None
+    assert meta.commit is None
+    assert meta.target_url is None
+
+
+def test_environment_meta_preserves_valid_values() -> None:
+    """Clean, non-empty values are returned unchanged."""
+    meta = EnvironmentMeta(env="staging", build="123", commit="abc123", target_url="https://example.com")
+
+    assert meta.env == "staging"
+    assert meta.build == "123"
+    assert meta.commit == "abc123"
+    assert meta.target_url == "https://example.com"
+
+
 def test_environment_meta_trims_and_nulls_empty_values() -> None:
     """Ensure optional environment metadata is normalized."""
     meta = EnvironmentMeta(env=" staging ", build=" ", commit=None, target_url="")
