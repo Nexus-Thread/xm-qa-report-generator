@@ -4,7 +4,8 @@ from pathlib import Path
 
 from qa_report_generator.adapters.input.cli_adapter import CliAdapter
 from qa_report_generator.adapters.input.env import EnvSettingsAdapter
-from qa_report_generator.adapters.output.narrative import LLMAdapter, LLMAdapterConfig
+from qa_report_generator.adapters.output.narrative import LLMAdapterConfig, NarrativeAdapter
+from qa_report_generator.adapters.output.narrative.openai import build_client
 from qa_report_generator.adapters.output.parsers import PytestJsonParser
 from qa_report_generator.adapters.output.persistence.cache import FileReportCache
 from qa_report_generator.adapters.output.persistence.markdown_writer import MarkdownReportWriter
@@ -62,7 +63,8 @@ def create_cli_adapter() -> CliAdapter:
     # Create output adapters (driven side)
     parser = PytestJsonParser()
     writer = MarkdownReportWriter(config)  # Handles prompts (business logic)
-    narrative_generator = LLMAdapter(llm_config)  # Pure technical adapter
+    llm_client = build_client(llm_config)  # Build OpenAI transport explicitly
+    narrative_generator = NarrativeAdapter(llm_config, client=llm_client)
     cache = FileReportCache(Path(".cache"))
 
     # Create use case with dependencies

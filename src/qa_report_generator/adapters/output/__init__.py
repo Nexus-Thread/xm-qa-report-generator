@@ -10,12 +10,12 @@ Categories:
 - **persistence/**: Report writing/storage adapters (e.g., markdown writer)
 """
 
-from qa_report_generator.adapters.output.narrative import LLMAdapter
+from qa_report_generator.adapters.output.narrative import NarrativeAdapter
 from qa_report_generator.adapters.output.parsers import PytestJsonParser
 from qa_report_generator.adapters.output.persistence import MarkdownReportWriter
 
 __all__ = [
-    "LLMAdapter",
     "MarkdownReportWriter",
+    "NarrativeAdapter",
     "PytestJsonParser",
 ]

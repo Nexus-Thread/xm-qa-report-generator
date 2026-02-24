@@ -1,4 +1,4 @@
-"""Unit tests for the LLMAdapter narrative adapter."""
+"""Unit tests for the NarrativeAdapter."""
 
 from __future__ import annotations
 
@@ -8,11 +8,11 @@ from unittest.mock import Mock
 import pytest
 from openai import APIConnectionError, APIError, APITimeoutError, AuthenticationError, RateLimitError
 
-from qa_report_generator.adapters.output.narrative import LLMAdapter, LLMAdapterConfig
+from qa_report_generator.adapters.output.narrative import LLMAdapterConfig, NarrativeAdapter
 from qa_report_generator.domain.value_objects import SectionType
 
 
-def _make_adapter(client: Mock, **overrides: Any) -> LLMAdapter:
+def _make_adapter(client: Mock, **overrides: Any) -> NarrativeAdapter:
     defaults = {
         "llm_model": "test-model",
         "llm_base_url": "http://test",
@@ -25,7 +25,7 @@ def _make_adapter(client: Mock, **overrides: Any) -> LLMAdapter:
     }
     defaults.update(overrides)
     config = LLMAdapterConfig(**defaults)
-    return LLMAdapter(config, client=client)
+    return NarrativeAdapter(config, client=client)
 
 
 def _make_response(content: str) -> Mock:
@@ -46,7 +46,7 @@ def _make_openai_error(error_cls: type[Exception], message: str) -> Exception:
 
 def test_generate_success(caplog: pytest.LogCaptureFixture) -> None:
     client = Mock()
-    client.create_completion.return_value = _make_response("hello")
+    client.create_chat_completion.return_value = _make_response("hello")
     adapter = _make_adapter(client)
     adapter.tokenizer = Mock()
     adapter.tokenizer.encode.return_value = list(range(12))
@@ -60,14 +60,12 @@ def test_generate_success(caplog: pytest.LogCaptureFixture) -> None:
         )
 
     assert result == "hello"
-    client.create_completion.assert_called_once_with(
+    client.create_chat_completion.assert_called_once_with(
         model="test-model",
         messages=[
             {"role": "system", "content": "system"},
             {"role": "user", "content": "user"},
         ],
-        temperature=0.2,
-        reasoning_effort=None,
     )
     adapter.tokenizer.encode.assert_any_call("system")
     adapter.tokenizer.encode.assert_any_call("user")
@@ -75,7 +73,7 @@ def test_generate_success(caplog: pytest.LogCaptureFixture) -> None:
 
 def test_logs_token_usage_at_info(caplog: pytest.LogCaptureFixture) -> None:
     client = Mock()
-    client.create_completion.return_value = _make_response("ok")
+    client.create_chat_completion.return_value = _make_response("ok")
     adapter = _make_adapter(client)
     adapter.tokenizer = Mock()
     adapter.tokenizer.encode.return_value = list(range(10))
@@ -94,7 +92,7 @@ def test_logs_token_usage_at_info(caplog: pytest.LogCaptureFixture) -> None:
 
 def test_warns_on_high_token_usage(caplog: pytest.LogCaptureFixture) -> None:
     client = Mock()
-    client.create_completion.return_value = _make_response("ok")
+    client.create_chat_completion.return_value = _make_response("ok")
     adapter = _make_adapter(client)
     adapter.tokenizer = Mock()
     adapter.tokenizer.encode.return_value = list(range(9000))
@@ -113,7 +111,7 @@ def test_warns_on_high_token_usage(caplog: pytest.LogCaptureFixture) -> None:
 def test_skips_token_logging_when_disabled(caplog: pytest.LogCaptureFixture) -> None:
     """Verify token encoding is skipped when log level is above INFO."""
     client = Mock()
-    client.create_completion.return_value = _make_response("ok")
+    client.create_chat_completion.return_value = _make_response("ok")
     adapter = _make_adapter(client)
     adapter.tokenizer = Mock()
     adapter.tokenizer.encode.return_value = list(range(10))
@@ -158,7 +156,7 @@ def test_generate_empty_user_prompt() -> None:
 
 def test_generate_invalid_response_shape_returns_none() -> None:
     client = Mock()
-    client.create_completion.return_value = Mock(spec=[])
+    client.create_chat_completion.return_value = Mock(spec=[])
     adapter = _make_adapter(client)
 
     result = adapter.generate(
@@ -182,7 +180,7 @@ def test_generate_invalid_response_shape_returns_none() -> None:
 )
 def test_generate_openai_errors_return_none(error_cls: type[Exception]) -> None:
     client = Mock()
-    client.create_completion.side_effect = _make_openai_error(error_cls, "boom")
+    client.create_chat_completion.side_effect = _make_openai_error(error_cls, "boom")
     adapter = _make_adapter(client)
 
     result = adapter.generate(

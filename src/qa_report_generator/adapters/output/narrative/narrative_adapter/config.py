@@ -1,4 +1,4 @@
-"""Technical configuration for the LLM adapter."""
+"""Technical configuration for the narrative adapter."""
 
 import warnings
 
@@ -8,7 +8,7 @@ LOW_TIMEOUT_WARNING_THRESHOLD = 30.0
 
 
 class LLMAdapterConfig(BaseModel):
-    """Technical configuration for the LLM adapter."""
+    """Technical configuration for the narrative adapter."""
 
     model_config = ConfigDict(extra="ignore")
 

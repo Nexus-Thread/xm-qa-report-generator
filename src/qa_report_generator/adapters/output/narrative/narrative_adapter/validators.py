@@ -1,4 +1,4 @@
-"""Input validation utilities for LLM adapter."""
+"""Input validation utilities for the narrative adapter."""
 
 from qa_report_generator.domain.exceptions import GenerationError
 

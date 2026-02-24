@@ -8,13 +8,8 @@ from typing import Protocol
 import httpx
 from openai import OpenAI
 
-from qa_report_generator.adapters.output.narrative.openai.constants import (
-    DEFAULT_BACKOFF_SECONDS,
-    DEFAULT_MAX_RETRIES,
-    DEFAULT_TIMEOUT_SECONDS,
-    DEFAULT_VERIFY_SSL,
-)
-from qa_report_generator.adapters.output.narrative.openai.transport import OpenAIClient
+from .constants import DEFAULT_BACKOFF_SECONDS, DEFAULT_MAX_RETRIES, DEFAULT_TIMEOUT_SECONDS, DEFAULT_VERIFY_SSL
+from .transport import OpenAIClient
 
 
 class OpenAIClientSettingsProtocol(Protocol):

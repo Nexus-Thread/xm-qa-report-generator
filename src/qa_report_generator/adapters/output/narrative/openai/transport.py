@@ -6,10 +6,9 @@ import logging
 import time
 from typing import TYPE_CHECKING, Protocol, cast
 
-from openai import APIConnectionError, APIError, APITimeoutError, AuthenticationError, RateLimitError
+from openai import APIError
 
-from qa_report_generator.adapters.output.narrative.openai.constants import DEFAULT_BACKOFF_SECONDS, DEFAULT_MAX_RETRIES
-from qa_report_generator.domain.exceptions import GenerationError, LLMConnectionError, LLMTimeoutError
+from .constants import DEFAULT_BACKOFF_SECONDS, DEFAULT_MAX_RETRIES
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -25,8 +24,8 @@ class _ChatCompletionsProtocol(Protocol):
         *,
         model: str,
         messages: list[dict[str, str]],
-        temperature: float | None = None,
-        reasoning_effort: str | None = None,
+        temperature: float,
+        response_format: dict[str, str] | None = None,
     ) -> object:
         """Create a completion response from the SDK."""
 
@@ -64,66 +63,86 @@ class OpenAIClient:
         self._backoff_seconds = backoff_seconds
         self._sleep = sleep
 
-    def create_completion(
+    def create_json_completion(
         self,
         *,
         model: str,
         messages: list[dict[str, str]],
-        temperature: float | None,
-        reasoning_effort: str | None,
     ) -> object:
-        """Create a chat completion."""
-        for attempt in range(self._max_retries + 1):
-            try:
-                return self._chat_completions_create(model, messages, temperature, reasoning_effort)
-            except APITimeoutError as err:
-                if attempt >= self._max_retries:
-                    msg = f"LLM request timed out after {self._max_retries + 1} attempts (model: {model})"
-                    raise LLMTimeoutError(msg) from err
-                self._sleep(self._backoff_seconds * (2**attempt))
-            except APIConnectionError as err:
-                if attempt >= self._max_retries:
-                    msg = f"Cannot connect to LLM service after {self._max_retries + 1} attempts"
-                    raise LLMConnectionError(msg) from err
-                self._sleep(self._backoff_seconds * (2**attempt))
-            except (RateLimitError, AuthenticationError, APIError) as err:
-                if attempt >= self._max_retries:
-                    msg = "LLM request failed after retries"
-                    raise GenerationError(msg) from err
-                self._sleep(self._backoff_seconds * (2**attempt))
+        """Create a JSON-formatted chat completion."""
+        return self._create_completion(
+            model=model,
+            messages=messages,
+            response_format={"type": "json_object"},
+        )
 
-        msg = "Unreachable retry state"
-        raise RuntimeError(msg)
+    def create_chat_completion(
+        self,
+        *,
+        model: str,
+        messages: list[dict[str, str]],
+    ) -> object:
+        """Create a plain chat completion without enforced response format."""
+        return self._create_completion(
+            model=model,
+            messages=messages,
+            response_format=None,
+        )
+
+    def _create_completion(
+        self,
+        model: str,
+        messages: list[dict[str, str]],
+        *,
+        response_format: dict[str, str] | None,
+    ) -> object:
+        """Invoke the SDK chat completions API with optional JSON format and retry logic."""
+        for attempt in range(self._max_retries):
+            try:
+                return self._chat_completions_create(model, messages, response_format=response_format)
+            except APIError:
+                if attempt >= self._max_retries - 1:
+                    LOGGER.exception(
+                        "OpenAI completion failed after retries",
+                        extra={
+                            "component": self.__class__.__name__,
+                            "model": model,
+                            "max_retries": self._max_retries,
+                        },
+                    )
+                    raise
+                delay = self._backoff_seconds * (2**attempt)
+                LOGGER.warning(
+                    "OpenAI completion failed, retrying",
+                    extra={
+                        "component": self.__class__.__name__,
+                        "model": model,
+                        "attempt": attempt + 1,
+                        "max_retries": self._max_retries,
+                        "retry_delay_seconds": delay,
+                    },
+                )
+                self._sleep(delay)
+
+        message = "Unreachable retry state"
+        raise RuntimeError(message)
 
     def _chat_completions_create(
         self,
         model: str,
         messages: list[dict[str, str]],
-        temperature: float | None,
-        reasoning_effort: str | None,
+        *,
+        response_format: dict[str, str] | None,
     ) -> object:
-        LOGGER.debug("OpenAI completion request", extra={"component": self.__class__.__name__, "model": model})
-        if temperature is None and reasoning_effort is None:
+        if response_format is not None:
             return self._sdk_client.chat.completions.create(
                 model=model,
                 messages=messages,
+                temperature=0,
+                response_format=response_format,
             )
-        if reasoning_effort is None:
-            return self._sdk_client.chat.completions.create(
-                model=model,
-                messages=messages,
-                temperature=temperature,
-            )
-        if temperature is None:
-            return self._sdk_client.chat.completions.create(
-                model=model,
-                messages=messages,
-                reasoning_effort=reasoning_effort,
-            )
-
         return self._sdk_client.chat.completions.create(
             model=model,
             messages=messages,
-            temperature=temperature,
-            reasoning_effort=reasoning_effort,
+            temperature=0,
         )

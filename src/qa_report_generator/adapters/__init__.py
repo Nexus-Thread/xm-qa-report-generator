@@ -12,13 +12,13 @@ ensuring clean separation between business logic and infrastructure concerns.
 """
 
 from qa_report_generator.adapters.input.cli_adapter import CliAdapter
-from qa_report_generator.adapters.output.narrative import LLMAdapter
+from qa_report_generator.adapters.output.narrative import NarrativeAdapter
 from qa_report_generator.adapters.output.parsers import PytestJsonParser
 from qa_report_generator.adapters.output.persistence.markdown_writer import MarkdownReportWriter
 
 __all__ = [
     "CliAdapter",
-    "LLMAdapter",
     "MarkdownReportWriter",
+    "NarrativeAdapter",
     "PytestJsonParser",
 ]

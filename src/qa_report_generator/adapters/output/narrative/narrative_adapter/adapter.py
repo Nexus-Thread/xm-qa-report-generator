@@ -1,18 +1,13 @@
-"""Large Language Model adapter for generating narrative report sections."""
+"""Narrative generation adapter using an OpenAI-compatible LLM transport."""
 
 import logging
 
 import tiktoken
 from openai import APIConnectionError, APIError, APITimeoutError, AuthenticationError
 
-from qa_report_generator.adapters.output.narrative.llm_adapter.config import LLMAdapterConfig
-from qa_report_generator.adapters.output.narrative.llm_adapter.validators import validate_prompt
-from qa_report_generator.adapters.output.narrative.openai import (
-    OpenAIClientProtocol,
-    OpenAIResponseError,
-    build_client,
-    extract_message_content,
-)
+from qa_report_generator.adapters.output.narrative.narrative_adapter.config import LLMAdapterConfig
+from qa_report_generator.adapters.output.narrative.narrative_adapter.validators import validate_prompt
+from qa_report_generator.adapters.output.narrative.openai import OpenAIClientProtocol, OpenAIResponseError, extract_message_content
 from qa_report_generator.application.ports.output import NarrativeGenerator
 from qa_report_generator.domain.exceptions import GenerationError, LLMConnectionError, LLMInitializationError, LLMTimeoutError
 from qa_report_generator.domain.value_objects import SectionType
@@ -22,41 +17,26 @@ LOGGER = logging.getLogger(__name__)
 TOKEN_WARNING_THRESHOLD = 8000
 
 
-class LLMAdapter(NarrativeGenerator):
-    """Adapter for LLM-based narrative generation via OpenAI-compatible APIs."""
+class NarrativeAdapter(NarrativeGenerator):
+    """Adapter that fulfils the NarrativeGenerator port via an OpenAI-compatible transport."""
 
-    def __init__(self, config: LLMAdapterConfig, client: OpenAIClientProtocol | None = None) -> None:
-        """Initialize the LLM adapter with technical configuration."""
+    def __init__(self, config: LLMAdapterConfig, client: OpenAIClientProtocol) -> None:
+        """Initialize the narrative adapter with a pre-built transport client."""
         self.model = config.llm_model
         self.base_url = config.llm_base_url
         self.timeout = config.llm_timeout
         self.temperature = config.llm_temperature
         self.reasoning_effort = config.llm_reasoning_effort
+        self.client = client
 
-        try:
-            self.client = client or build_client(config)
-            LOGGER.info(
-                "LLM initialized: base_url=%s, model=%s, timeout=%.1fs, temperature=%s, reasoning_effort=%s",
-                self.base_url,
-                self.model,
-                self.timeout,
-                self.temperature,
-                self.reasoning_effort,
-            )
-        except AuthenticationError as err:
-            msg = "Authentication failed for LLM service"
-            LOGGER.exception("LLM initialization failed: %s", msg)
-            raise LLMInitializationError(
-                msg,
-                suggestion="Check your LLM_API_KEY environment variable. For local services, use 'not-needed' as the API key.",
-            ) from err
-        except Exception as err:
-            msg = f"Failed to initialize LLM client: {type(err).__name__}: {err}"
-            LOGGER.exception("LLM initialization failed: %s", msg)
-            raise LLMInitializationError(
-                msg,
-                suggestion="Verify the configuration is correct and the service is running. Check LOG_LEVEL=DEBUG for more details.",
-            ) from err
+        LOGGER.info(
+            "NarrativeAdapter initialized: base_url=%s, model=%s, timeout=%.1fs, temperature=%s, reasoning_effort=%s",
+            self.base_url,
+            self.model,
+            self.timeout,
+            self.temperature,
+            self.reasoning_effort,
+        )
 
         try:
             self.tokenizer = tiktoken.get_encoding("cl100k_base")
@@ -69,19 +49,17 @@ class LLMAdapter(NarrativeGenerator):
             ) from err
 
     def generate(self, section_type: SectionType, system_prompt: str, user_prompt: str) -> str | None:
-        """Generate a narrative section using an LLM."""
+        """Generate a narrative section using the configured LLM transport."""
         try:
             system_prompt_clean = validate_prompt(system_prompt, "system_prompt")
             user_prompt_clean = validate_prompt(user_prompt, "user_prompt")
             self._log_token_usage(section_type, system_prompt_clean, user_prompt_clean)
-            response = self.client.create_completion(
+            response = self.client.create_chat_completion(
                 model=self.model,
                 messages=[
                     {"role": "system", "content": system_prompt_clean},
                     {"role": "user", "content": user_prompt_clean},
                 ],
-                temperature=self.temperature,
-                reasoning_effort=self.reasoning_effort,
             )
             return extract_message_content(response)
         except OpenAIResponseError as err:
