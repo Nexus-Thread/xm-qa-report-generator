@@ -15,10 +15,10 @@ LOGGER = logging.getLogger(__name__)
 
 
 class NarrativeAdapter(NarrativeGenerator):
-    """Adapter that fulfils the NarrativeGenerator port via an OpenAI-compatible transport."""
+    """Generates narrative sections using an OpenAI-compatible LLM transport."""
 
     def __init__(self, config: NarrativeAdapterConfig, client: OpenAIClientProtocol) -> None:
-        """Initialize the narrative adapter with a pre-built transport client."""
+        """Initialize with a config and transport client."""
         self.model = config.llm_model
         self.client = client
 

@@ -7,7 +7,7 @@ def validate_prompt(prompt: str, prompt_name: str) -> str:
     """Validate and normalize a prompt string.
 
     Args:
-        prompt: The prompt to validate
+        prompt: Prompt to validate
         prompt_name: Name for error messages
 
     Returns:
