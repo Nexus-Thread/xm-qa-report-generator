@@ -5,7 +5,7 @@ import logging
 import tiktoken
 from openai import APIConnectionError, APIError, APITimeoutError, AuthenticationError
 
-from qa_report_generator.adapters.output.narrative.narrative_adapter.config import LLMAdapterConfig
+from qa_report_generator.adapters.output.narrative.narrative_adapter.config import NarrativeAdapterConfig
 from qa_report_generator.adapters.output.narrative.narrative_adapter.validators import validate_prompt
 from qa_report_generator.adapters.output.narrative.openai import OpenAIClientProtocol, OpenAIResponseError, extract_message_content
 from qa_report_generator.application.ports.output import NarrativeGenerator
@@ -20,23 +20,12 @@ TOKEN_WARNING_THRESHOLD = 8000
 class NarrativeAdapter(NarrativeGenerator):
     """Adapter that fulfils the NarrativeGenerator port via an OpenAI-compatible transport."""
 
-    def __init__(self, config: LLMAdapterConfig, client: OpenAIClientProtocol) -> None:
+    def __init__(self, config: NarrativeAdapterConfig, client: OpenAIClientProtocol) -> None:
         """Initialize the narrative adapter with a pre-built transport client."""
         self.model = config.llm_model
-        self.base_url = config.llm_base_url
-        self.timeout = config.llm_timeout
-        self.temperature = config.llm_temperature
-        self.reasoning_effort = config.llm_reasoning_effort
         self.client = client
 
-        LOGGER.info(
-            "NarrativeAdapter initialized: base_url=%s, model=%s, timeout=%.1fs, temperature=%s, reasoning_effort=%s",
-            self.base_url,
-            self.model,
-            self.timeout,
-            self.temperature,
-            self.reasoning_effort,
-        )
+        LOGGER.info("NarrativeAdapter initialized: model=%s", self.model)
 
         try:
             self.tokenizer = tiktoken.get_encoding("cl100k_base")

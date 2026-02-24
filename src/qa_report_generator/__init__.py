@@ -15,29 +15,27 @@ Quick start:
     >>> from pathlib import Path
     >>> from qa_report_generator import (
     ...     EnvironmentMeta,
-    ...     LLMAdapterConfig,
     ...     MarkdownReportWriter,
     ...     NarrativeAdapter,
+    ...     NarrativeAdapterConfig,
     ...     PytestJsonParser,
     ...     ReportGenerationService,
     ... )
     >>> from qa_report_generator.adapters.input.env import EnvSettingsAdapter
-    >>> from qa_report_generator.adapters.output.narrative.openai import build_client
+    >>> from qa_report_generator.adapters.output.narrative.openai import OpenAIClientSettings, build_client
     >>> config = EnvSettingsAdapter().load()
-    >>> llm_config = LLMAdapterConfig(
-    ...     llm_model=config.llm_model,
-    ...     llm_base_url=config.llm_base_url,
-    ...     llm_api_key=config.llm_api_key,
-    ...     llm_temperature=config.llm_temperature,
-    ...     llm_reasoning_effort=config.llm_reasoning_effort,
-    ...     llm_timeout=config.llm_timeout,
-    ...     llm_max_retries=config.llm_max_retries,
-    ...     llm_retry_backoff_factor=config.llm_retry_backoff_factor,
+    >>> narrative_config = NarrativeAdapterConfig(llm_model=config.llm_model)
+    >>> openai_settings = OpenAIClientSettings(
+    ...     base_url=config.llm_base_url,
+    ...     api_key=config.llm_api_key,
+    ...     max_retries=config.llm_max_retries,
+    ...     backoff_seconds=config.llm_retry_backoff_factor,
+    ...     timeout_seconds=config.llm_timeout,
     ... )
     >>> service = ReportGenerationService(
     ...     parser=PytestJsonParser(),
     ...     writer=MarkdownReportWriter(config),
-    ...     narrative_generator=NarrativeAdapter(llm_config, client=build_client(llm_config)),
+    ...     narrative_generator=NarrativeAdapter(narrative_config, client=build_client(openai_settings)),
     ... )
     >>> result = service.generate(
     ...     report_path=Path("pytest_report.json"),
@@ -54,7 +52,7 @@ CLI usage:
 __version__ = "0.1.0"
 
 from qa_report_generator.adapters import CliAdapter, MarkdownReportWriter, NarrativeAdapter, PytestJsonParser
-from qa_report_generator.adapters.output.narrative import LLMAdapterConfig
+from qa_report_generator.adapters.output.narrative import NarrativeAdapterConfig
 from qa_report_generator.application import ReportGenerationService
 from qa_report_generator.domain import (
     Duration,
@@ -72,9 +70,9 @@ __all__ = [
     "Duration",
     "EnvironmentMeta",
     "Failure",
-    "LLMAdapterConfig",
     "MarkdownReportWriter",
     "NarrativeAdapter",
+    "NarrativeAdapterConfig",
     "PassRate",
     "PytestJsonParser",
     "ReportFacts",

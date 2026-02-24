@@ -4,12 +4,11 @@ from pathlib import Path
 
 from qa_report_generator.adapters.input.cli_adapter import CliAdapter
 from qa_report_generator.adapters.input.env import EnvSettingsAdapter
-from qa_report_generator.adapters.output.narrative import LLMAdapterConfig, NarrativeAdapter
-from qa_report_generator.adapters.output.narrative.openai import build_client
+from qa_report_generator.adapters.output.narrative import NarrativeAdapter, NarrativeAdapterConfig
+from qa_report_generator.adapters.output.narrative.openai import OpenAIClientSettings, build_client
 from qa_report_generator.adapters.output.parsers import PytestJsonParser
 from qa_report_generator.adapters.output.persistence.cache import FileReportCache
 from qa_report_generator.adapters.output.persistence.markdown_writer import MarkdownReportWriter
-from qa_report_generator.application.dtos import AppSettings
 from qa_report_generator.application.use_cases import (
     ReportComparisonService,
     ReportGenerationService,
@@ -17,20 +16,6 @@ from qa_report_generator.application.use_cases import (
 )
 from qa_report_generator.config import setup_logging
 from qa_report_generator.plugins import discover_plugins
-
-
-def _build_llm_adapter_config(config: AppSettings) -> LLMAdapterConfig:
-    """Build technical LLM adapter settings from application config."""
-    return LLMAdapterConfig(
-        llm_model=config.llm_model,
-        llm_base_url=config.llm_base_url,
-        llm_api_key=config.llm_api_key,
-        llm_temperature=config.llm_temperature,
-        llm_reasoning_effort=config.llm_reasoning_effort,
-        llm_timeout=config.llm_timeout,
-        llm_max_retries=config.llm_max_retries,
-        llm_retry_backoff_factor=config.llm_retry_backoff_factor,
-    )
 
 
 def create_cli_adapter() -> CliAdapter:
@@ -52,7 +37,6 @@ def create_cli_adapter() -> CliAdapter:
     """
     # Load configuration directly from environment (composition root — infrastructure layer)
     config = EnvSettingsAdapter().load()
-    llm_config = _build_llm_adapter_config(config)
 
     # Setup logging based on business configuration
     setup_logging(config)
@@ -63,8 +47,17 @@ def create_cli_adapter() -> CliAdapter:
     # Create output adapters (driven side)
     parser = PytestJsonParser()
     writer = MarkdownReportWriter(config)  # Handles prompts (business logic)
-    llm_client = build_client(llm_config)  # Build OpenAI transport explicitly
-    narrative_generator = NarrativeAdapter(llm_config, client=llm_client)
+
+    # Build OpenAI transport and narrative adapter explicitly
+    narrative_config = NarrativeAdapterConfig(llm_model=config.llm_model)
+    openai_settings = OpenAIClientSettings(
+        base_url=config.llm_base_url,
+        api_key=config.llm_api_key,
+        max_retries=config.llm_max_retries,
+        backoff_seconds=config.llm_retry_backoff_factor,
+        timeout_seconds=config.llm_timeout,
+    )
+    narrative_generator = NarrativeAdapter(narrative_config, client=build_client(openai_settings))
     cache = FileReportCache(Path(".cache"))
 
     # Create use case with dependencies

@@ -8,23 +8,14 @@ from unittest.mock import Mock
 import pytest
 from openai import APIConnectionError, APIError, APITimeoutError, AuthenticationError, RateLimitError
 
-from qa_report_generator.adapters.output.narrative import LLMAdapterConfig, NarrativeAdapter
+from qa_report_generator.adapters.output.narrative import NarrativeAdapter, NarrativeAdapterConfig
 from qa_report_generator.domain.value_objects import SectionType
 
 
 def _make_adapter(client: Mock, **overrides: Any) -> NarrativeAdapter:
-    defaults = {
-        "llm_model": "test-model",
-        "llm_base_url": "http://test",
-        "llm_api_key": "not-needed",
-        "llm_temperature": 0.2,
-        "llm_reasoning_effort": None,
-        "llm_timeout": 30.0,
-        "llm_max_retries": 1,
-        "llm_retry_backoff_factor": 2.0,
-    }
+    defaults = {"llm_model": "test-model"}
     defaults.update(overrides)
-    config = LLMAdapterConfig(**defaults)
+    config = NarrativeAdapterConfig(**defaults)
     return NarrativeAdapter(config, client=client)
 
 
