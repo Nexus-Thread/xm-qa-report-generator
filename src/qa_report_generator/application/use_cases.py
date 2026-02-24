@@ -5,6 +5,7 @@ import time
 from collections import defaultdict
 from pathlib import Path
 
+from qa_report_generator.application.dtos import SectionPrompt
 from qa_report_generator.application.ports.input import (
     CompareReportsUseCase,
     GenerateReportsUseCase,
@@ -38,28 +39,26 @@ class TimedNarrativeGenerator(NarrativeGenerator):
 
     def generate(
         self,
-        section_type: SectionType,
-        system_prompt: str,
+        section_prompt: SectionPrompt,
         user_prompt: str,
     ) -> str | None:
         """Generate a narrative section and record duration."""
         start_time = time.time()
         try:
             return self._delegate.generate(
-                section_type=section_type,
-                system_prompt=system_prompt,
+                section_prompt=section_prompt,
                 user_prompt=user_prompt,
             )
         finally:
             duration = time.time() - start_time
-            self._durations[section_type] += duration
+            self._durations[section_prompt.section_type] += duration
             logger.info(
                 "LLM section timing: section=%s duration=%.2fs",
-                section_type.value,
+                section_prompt.section_type.value,
                 duration,
                 extra={
                     "extra_fields": {
-                        "section": section_type.value,
+                        "section": section_prompt.section_type.value,
                         "duration_seconds": round(duration, 2),
                     },
                 },

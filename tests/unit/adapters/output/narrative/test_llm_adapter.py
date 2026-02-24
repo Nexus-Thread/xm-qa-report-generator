@@ -9,6 +9,7 @@ import pytest
 from openai import APIConnectionError, APIError, APITimeoutError, AuthenticationError, RateLimitError
 
 from qa_report_generator.adapters.output.narrative import NarrativeAdapter, NarrativeAdapterConfig
+from qa_report_generator.application.dtos import SectionPrompt
 from qa_report_generator.domain.value_objects import SectionType
 
 
@@ -45,8 +46,7 @@ def test_generate_success(caplog: pytest.LogCaptureFixture) -> None:
     # Enable INFO logging to trigger token encoding
     with caplog.at_level("INFO"):
         result = adapter.generate(
-            SectionType.EXECUTIVE_SUMMARY,
-            system_prompt="system",
+            SectionPrompt(SectionType.EXECUTIVE_SUMMARY, "system"),
             user_prompt="user",
         )
 
@@ -71,8 +71,7 @@ def test_logs_token_usage_at_info(caplog: pytest.LogCaptureFixture) -> None:
 
     with caplog.at_level("INFO"):
         adapter.generate(
-            SectionType.EXECUTIVE_SUMMARY,
-            system_prompt="system",
+            SectionPrompt(SectionType.EXECUTIVE_SUMMARY, "system"),
             user_prompt="user",
         )
 
@@ -91,8 +90,7 @@ def test_warns_on_high_token_usage(caplog: pytest.LogCaptureFixture) -> None:
     # Need INFO level to enable token encoding, but we're checking for WARNING
     with caplog.at_level("INFO"):
         adapter.generate(
-            SectionType.EXECUTIVE_SUMMARY,
-            system_prompt="system",
+            SectionPrompt(SectionType.EXECUTIVE_SUMMARY, "system"),
             user_prompt="user",
         )
 
@@ -110,8 +108,7 @@ def test_skips_token_logging_when_disabled(caplog: pytest.LogCaptureFixture) -> 
     # Set log level to ERROR (higher than INFO) - token logging should be skipped
     with caplog.at_level("ERROR"):
         adapter.generate(
-            SectionType.EXECUTIVE_SUMMARY,
-            system_prompt="system",
+            SectionPrompt(SectionType.EXECUTIVE_SUMMARY, "system"),
             user_prompt="user",
         )
 
@@ -125,8 +122,7 @@ def test_generate_empty_system_prompt() -> None:
     adapter = _make_adapter(Mock())
 
     result = adapter.generate(
-        SectionType.KEY_OBSERVATIONS,
-        system_prompt=" ",
+        SectionPrompt(SectionType.KEY_OBSERVATIONS, " "),
         user_prompt="user",
     )
 
@@ -137,8 +133,7 @@ def test_generate_empty_user_prompt() -> None:
     adapter = _make_adapter(Mock())
 
     result = adapter.generate(
-        SectionType.KEY_OBSERVATIONS,
-        system_prompt="system",
+        SectionPrompt(SectionType.KEY_OBSERVATIONS, "system"),
         user_prompt="",
     )
 
@@ -151,8 +146,7 @@ def test_generate_invalid_response_shape_returns_none() -> None:
     adapter = _make_adapter(client)
 
     result = adapter.generate(
-        SectionType.RISK_ASSESSMENT,
-        system_prompt="system",
+        SectionPrompt(SectionType.RISK_ASSESSMENT, "system"),
         user_prompt="user",
     )
 
@@ -175,8 +169,7 @@ def test_generate_openai_errors_return_none(error_cls: type[Exception]) -> None:
     adapter = _make_adapter(client)
 
     result = adapter.generate(
-        SectionType.RISK_ASSESSMENT,
-        system_prompt="system",
+        SectionPrompt(SectionType.RISK_ASSESSMENT, "system"),
         user_prompt="user",
     )
 

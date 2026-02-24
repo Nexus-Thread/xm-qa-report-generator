@@ -4,6 +4,7 @@ import json
 import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
+from qa_report_generator.application.dtos import SectionPrompt
 from qa_report_generator.application.ports.output import NarrativeGenerator
 from qa_report_generator.domain.exceptions import PersistenceError
 from qa_report_generator.domain.models import ReportFacts
@@ -235,8 +236,7 @@ def generate_sections_parallel(  # noqa: PLR0913
         future_to_section = {
             executor.submit(
                 narrative_generator.generate,
-                section_type,
-                system_prompt,
+                SectionPrompt(section_type=section_type, system_prompt=system_prompt),
                 prompt_template.get_section_prompt(section_type, facts_json=facts_json),
             ): section_type
             for section_type in section_types

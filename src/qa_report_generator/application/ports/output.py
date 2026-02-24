@@ -3,8 +3,8 @@
 from abc import ABC, abstractmethod
 from pathlib import Path
 
+from qa_report_generator.application.dtos import SectionPrompt
 from qa_report_generator.domain.models import EnvironmentMeta, ReportFacts, RunMetrics
-from qa_report_generator.domain.value_objects import SectionType
 
 
 class ReportParser(ABC):
@@ -21,8 +21,7 @@ class NarrativeGenerator(ABC):
     @abstractmethod
     def generate(
         self,
-        section_type: SectionType,
-        system_prompt: str,
+        section_prompt: SectionPrompt,
         user_prompt: str,
     ) -> str | None:
         """Generate narrative content for a report section."""
