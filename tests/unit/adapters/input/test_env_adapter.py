@@ -34,6 +34,14 @@ def test_load_settings_from_env_raises_configuration_error(monkeypatch: pytest.M
         load_settings_from_env()
 
 
+def test_load_settings_from_env_raises_on_invalid_log_format(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Env loader should raise ConfigurationError for an unrecognised log format."""
+    monkeypatch.setenv("LOG_FORMAT", "xml")
+
+    with pytest.raises(ConfigurationError):
+        load_settings_from_env()
+
+
 def test_load_settings_from_env_returns_env_settings_instance() -> None:
     """load_settings_from_env should return an EnvSettings instance."""
     settings = load_settings_from_env()

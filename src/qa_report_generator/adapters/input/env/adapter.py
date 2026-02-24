@@ -6,7 +6,7 @@ from qa_report_generator.application.dtos import AppSettings
 
 from .settings import load_settings_from_env
 
-__all__ = ["EnvSettingsAdapter", "load_settings_from_env"]
+__all__ = ["EnvSettingsAdapter"]
 
 
 class EnvSettingsAdapter:
@@ -16,10 +16,11 @@ class EnvSettingsAdapter:
         """Load and map environment settings to AppSettings DTO.
 
         Returns:
-            Immutable AppSettings populated from the current environment.
+            Immutable AppSettings populated from the current environment
 
         """
         settings = load_settings_from_env()
+        profile = settings.preprocessing_profile.value if settings.preprocessing_profile else None
         return AppSettings(
             log_level=settings.log_level,
             log_format=settings.log_format,
@@ -37,6 +38,6 @@ class EnvSettingsAdapter:
             enable_failure_grouping=settings.enable_failure_grouping,
             failure_clustering_threshold=settings.failure_clustering_threshold,
             max_failures_for_detailed_prompt=settings.max_failures_for_detailed_prompt,
-            preprocessing_profile=(settings.preprocessing_profile.value if settings.preprocessing_profile is not None else None),
+            preprocessing_profile=profile,
             plugin_modules=tuple(settings.plugin_modules),
         )

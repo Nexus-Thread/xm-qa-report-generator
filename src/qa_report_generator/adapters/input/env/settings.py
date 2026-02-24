@@ -12,14 +12,7 @@ LOGGER = logging.getLogger(__name__)
 
 
 class EnvSettings(BaseSettings):
-    """Business-level application configuration loaded from environment variables or .env file.
-
-    Example:
-        >>> config = EnvSettings()
-        >>> config.log_level
-        'INFO'
-
-    """
+    """Application configuration loaded from environment variables or a .env file."""
 
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -135,10 +128,7 @@ class EnvSettings(BaseSettings):
             v: Log level to validate
 
         Returns:
-            Validated log level in uppercase.
-
-        Raises:
-            ValueError: If log level is not recognized.
+            Validated log level in uppercase
 
         """
         v = v.upper()
@@ -157,10 +147,7 @@ class EnvSettings(BaseSettings):
             v: Log format to validate
 
         Returns:
-            Validated log format in lowercase.
-
-        Raises:
-            ValueError: If log format is not recognized.
+            Validated log format in lowercase
 
         """
         v = v.lower()
@@ -175,6 +162,8 @@ class EnvSettings(BaseSettings):
         if self.preprocessing_profile is None:
             return
 
+        # Intentional post-init mutation: BaseSettings is not frozen, so setattr
+        # is safe here. Fields already set by the user are preserved.
         for field_name, value in PROFILE_DEFAULTS[self.preprocessing_profile].items():
             if field_name not in self.model_fields_set:
                 setattr(self, field_name, value)
