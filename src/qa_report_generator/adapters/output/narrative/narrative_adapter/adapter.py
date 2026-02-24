@@ -9,7 +9,6 @@ from qa_report_generator.adapters.output.narrative.narrative_adapter.validators 
 from qa_report_generator.adapters.output.narrative.openai import OpenAIClientProtocol, OpenAIResponseError, extract_message_content
 from qa_report_generator.application.dtos import SectionPrompt
 from qa_report_generator.application.ports.output import NarrativeGenerator
-from qa_report_generator.domain.exceptions import GenerationError
 
 LOGGER = logging.getLogger(__name__)
 
@@ -41,6 +40,6 @@ class NarrativeAdapter(NarrativeGenerator):
         except OpenAIResponseError as err:
             LOGGER.warning("LLM returned invalid response for section '%s': %s", section_label, err)
             return None
-        except (GenerationError, APIError) as err:
+        except APIError as err:
             LOGGER.warning("LLM generation failed for section '%s': %s", section_label, err)
             return None

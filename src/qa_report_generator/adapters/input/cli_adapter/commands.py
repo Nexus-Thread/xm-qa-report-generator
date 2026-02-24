@@ -86,7 +86,8 @@ class CommandHandler:
             diff = self._compare_use_case.compare(report_a, report_b)
             self._render_diff(diff)
         except ReportingError as e:
-            self._formatter.print_error(f"❌ Error ({e.error_code}): {e}")
+            suggestion = f"\n💡 Suggestion: {e.suggestion}" if e.suggestion else ""
+            self._formatter.print_error(f"❌ {e}{suggestion}")
             raise typer.Exit(code=1) from e
         except Exception as e:
             self._formatter.print_error(f"❌ Error: {e}")
@@ -240,7 +241,8 @@ class CommandHandler:
             )
 
         except ReportingError as e:
-            self._formatter.print_error(f"❌ Error ({e.error_code}): {e}")
+            suggestion = f"\n💡 Suggestion: {e.suggestion}" if e.suggestion else ""
+            self._formatter.print_error(f"❌ {e}{suggestion}")
             raise typer.Exit(code=1) from e
         except Exception as e:
             self._formatter.print_error(f"❌ Error: {e}")

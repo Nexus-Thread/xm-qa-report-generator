@@ -54,8 +54,7 @@ class PromptTemplate:
             Formatted prompt string with variables interpolated
 
         Raises:
-            KeyError: If section type not found in templates
-            ValueError: If required variable is missing during interpolation
+            ConfigurationError: If section type not found or a required variable is missing
 
         """
         # Convert SectionType enum to string key for lookup
@@ -64,7 +63,10 @@ class PromptTemplate:
         if section_key not in self.section_prompts:
             msg = f"No prompt template found for section type: {section_type}"
             logger.error(msg)
-            raise KeyError(msg)
+            raise ConfigurationError(
+                msg,
+                suggestion="Ensure the prompt template file includes a prompt for every SectionType value.",
+            )
 
         prompt_template = self.section_prompts[section_key]
 
@@ -74,7 +76,10 @@ class PromptTemplate:
         except KeyError as e:
             msg = f"Missing required variable for prompt interpolation: {e}"
             logger.exception(msg)
-            raise ValueError(msg) from e
+            raise ConfigurationError(
+                msg,
+                suggestion="Check that all required template variables are passed when calling get_section_prompt.",
+            ) from e
 
 
 class PromptLoader:

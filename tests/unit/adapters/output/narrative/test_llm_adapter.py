@@ -10,6 +10,7 @@ from openai import APIConnectionError, APIError, APITimeoutError, Authentication
 
 from qa_report_generator.adapters.output.narrative import NarrativeAdapter, NarrativeAdapterConfig
 from qa_report_generator.application.dtos import SectionPrompt
+from qa_report_generator.domain.exceptions import ConfigurationError
 from qa_report_generator.domain.value_objects import SectionType
 
 
@@ -60,12 +61,12 @@ def test_generate_empty_system_prompt() -> None:
     client = Mock()
     adapter = _make_adapter(client)
 
-    result = adapter.generate(
-        SectionPrompt(SectionType.KEY_OBSERVATIONS, " "),
-        user_prompt="user",
-    )
+    with pytest.raises(ConfigurationError, match="system_prompt cannot be empty"):
+        adapter.generate(
+            SectionPrompt(SectionType.KEY_OBSERVATIONS, " "),
+            user_prompt="user",
+        )
 
-    assert result is None
     client.create_chat_completion.assert_not_called()
 
 
@@ -73,12 +74,12 @@ def test_generate_empty_user_prompt() -> None:
     client = Mock()
     adapter = _make_adapter(client)
 
-    result = adapter.generate(
-        SectionPrompt(SectionType.KEY_OBSERVATIONS, "system"),
-        user_prompt="",
-    )
+    with pytest.raises(ConfigurationError, match="user_prompt cannot be empty"):
+        adapter.generate(
+            SectionPrompt(SectionType.KEY_OBSERVATIONS, "system"),
+            user_prompt="",
+        )
 
-    assert result is None
     client.create_chat_completion.assert_not_called()
 
 

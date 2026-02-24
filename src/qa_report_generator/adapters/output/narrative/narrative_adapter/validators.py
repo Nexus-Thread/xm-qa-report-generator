@@ -1,6 +1,6 @@
 """Input validation utilities for the narrative adapter."""
 
-from qa_report_generator.domain.exceptions import GenerationError
+from qa_report_generator.domain.exceptions import ConfigurationError
 
 
 def validate_prompt(prompt: str, prompt_name: str) -> str:
@@ -14,12 +14,12 @@ def validate_prompt(prompt: str, prompt_name: str) -> str:
         Stripped prompt string
 
     Raises:
-        GenerationError: If prompt is empty or whitespace-only
+        ConfigurationError: If prompt is empty or whitespace-only
 
     """
     if not prompt or not prompt.strip():
         msg = f"{prompt_name} cannot be empty"
-        raise GenerationError(
+        raise ConfigurationError(
             msg,
             suggestion="Ensure prompts are populated with template content before calling the adapter.",
         )

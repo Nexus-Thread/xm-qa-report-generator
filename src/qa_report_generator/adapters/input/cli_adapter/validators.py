@@ -114,7 +114,8 @@ class InputValidator:
                 verbosity,
             )
         except ReportingError as e:
-            self._formatter.print_error(f"❌ Failed to parse JSON ({e.error_code}): {e}")
+            suggestion = f"\n💡 Suggestion: {e.suggestion}" if e.suggestion else ""
+            self._formatter.print_error(f"❌ Failed to parse JSON: {e}{suggestion}")
             raise typer.Exit(code=1) from e
         except Exception as e:
             self._formatter.print_error(f"❌ Failed to parse JSON: {e}")

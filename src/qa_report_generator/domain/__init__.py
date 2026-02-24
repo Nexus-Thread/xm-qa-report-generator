@@ -2,8 +2,12 @@
 
 # Exceptions - Domain-specific errors
 from qa_report_generator.domain.exceptions import (
+    ConfigurationError,
     GenerationError,
     ParseError,
+    ParseFileNotFoundError,
+    ParseInvalidFormatError,
+    ParseInvalidJsonError,
     PersistenceError,
     ReportingError,
 )
@@ -33,6 +37,7 @@ from qa_report_generator.domain.value_objects import (
 )
 
 __all__ = [
+    "ConfigurationError",
     "Duration",
     "EnvironmentMeta",
     "Failure",
@@ -42,6 +47,9 @@ __all__ = [
     "GenerationError",
     "OutputTruncator",
     "ParseError",
+    "ParseFileNotFoundError",
+    "ParseInvalidFormatError",
+    "ParseInvalidJsonError",
     "PassRate",
     "PersistenceError",
     "ReportFacts",

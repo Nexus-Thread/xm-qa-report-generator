@@ -175,6 +175,10 @@ class ReportGenerationService(GenerateReportsUseCase):
                 e,
             )
             raise
+        except ReportingError:
+            # Re-raise other domain exceptions (PersistenceError, ConfigurationError, etc.)
+            # without wrapping so callers retain the specific type
+            raise
         except Exception as e:
             # Wrap unexpected errors in domain exception with context
             msg = f"Failed to generate reports from {report_path}: {type(e).__name__}: {e}"

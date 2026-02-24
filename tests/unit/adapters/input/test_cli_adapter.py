@@ -161,7 +161,7 @@ def test_generate_creates_output_directory(tmp_path: Path) -> None:
 
 
 def test_generate_handles_reporting_error(tmp_path: Path) -> None:
-    """Reporting errors should be rendered with error code and exit 1."""
+    """Reporting errors should be rendered with the error message and exit 1."""
     report_path = tmp_path / "report.json"
     report_path.write_text("{}", encoding="utf-8")
     adapter, generate_use_case, _, _ = _make_adapter(config=AppSettings())
@@ -180,7 +180,7 @@ def test_generate_handles_reporting_error(tmp_path: Path) -> None:
 
     assert result.exit_code == 1
     output = result.stdout + result.stderr
-    assert "ERR_UNKNOWN" in output
+    assert "boom" in output
 
 
 def test_generate_resolves_verbosity_flags(tmp_path: Path) -> None:
@@ -390,4 +390,4 @@ def test_diff_command_handles_reporting_error(tmp_path: Path) -> None:
 
     assert result.exit_code == 1
     output = result.stdout + result.stderr
-    assert "ERR_UNKNOWN" in output
+    assert "boom" in output
