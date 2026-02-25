@@ -97,9 +97,10 @@ class PassRate(BaseModel):
 class TestIdentifier(BaseModel):
     """Unique identifier for a test case."""
 
+    __test__ = False
+
     name: str = Field(min_length=1, description="Test method/function name")
     suite: str = Field(min_length=1, description="Test suite or module path")
-    __test__ = False
 
     @property
     def full_name(self) -> str:
