@@ -15,6 +15,7 @@ from qa_report_generator.domain.analytics.models import (
 from qa_report_generator.domain.models.common.environment import EnvironmentMeta
 from qa_report_generator.domain.models.common.failure import Failure
 from qa_report_generator.domain.models.common.metrics import RunMetrics
+from qa_report_generator.domain.models.k6.context import K6ReportContext
 
 
 class ReportFacts(BaseModel):
@@ -33,6 +34,10 @@ class ReportFacts(BaseModel):
     )
     quality_score: QualityScore | None = Field(default=None, description="Overall test suite quality score")
     test_smells: list[TestSmell] = Field(default_factory=list, description="Detected test smells")
+    k6_context: K6ReportContext | None = Field(
+        default=None,
+        description="k6-specific check and threshold breakdown; None for non-k6 formats",
+    )
 
     @property
     def timestamp_iso(self) -> str:
@@ -124,6 +129,7 @@ class ReportFacts(BaseModel):
             "input_files": self.input_files,
             "source_format": self.source_format,
             "timestamp": self.timestamp_iso,
+            "k6_context": self.k6_context.model_dump() if self.k6_context else None,
         }
 
 
@@ -132,6 +138,7 @@ ReportFacts.model_rebuild(
         "Failure": Failure,
         "FailureCluster": FailureCluster,
         "HealthMetrics": HealthMetrics,
+        "K6ReportContext": K6ReportContext,
         "QualityScore": QualityScore,
         "TestSmell": TestSmell,
         "TestPattern": TestPattern,

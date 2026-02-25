@@ -3,16 +3,18 @@
 from abc import ABC, abstractmethod
 from pathlib import Path
 
-from qa_report_generator.application.dtos import SectionPrompt
+from qa_report_generator.application.dtos.parsed_report import ParsedReport
+from qa_report_generator.application.dtos.section_prompt import SectionPrompt
 from qa_report_generator.domain.models import EnvironmentMeta, ReportFacts, RunMetrics
+from qa_report_generator.domain.models.k6.context import K6ReportContext
 
 
 class ReportParser(ABC):
     """Parse test reports from various sources."""
 
     @abstractmethod
-    def parse(self, filepath: Path) -> RunMetrics:
-        """Parse test report file and extract metrics."""
+    def parse(self, filepath: Path) -> ParsedReport:
+        """Parse test report file and extract metrics and format-specific context."""
 
 
 class NarrativeGenerator(ABC):
@@ -48,7 +50,7 @@ class ReportCache(ABC):
     def load_cached_facts(
         self,
         report_path: Path,
-    ) -> tuple[RunMetrics, EnvironmentMeta, list[str]] | None:
+    ) -> tuple[RunMetrics, K6ReportContext | None, EnvironmentMeta, list[str]] | None:
         """Load cached facts for a report path."""
 
     @abstractmethod
@@ -58,5 +60,6 @@ class ReportCache(ABC):
         metrics: RunMetrics,
         environment: EnvironmentMeta,
         input_files: list[str],
+        k6_context: K6ReportContext | None = None,
     ) -> None:
         """Persist parsed facts for later regeneration."""

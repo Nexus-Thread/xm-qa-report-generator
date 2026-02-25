@@ -71,12 +71,23 @@ def _make_summary_payload() -> dict:
     }
 
 
+def test_parse_returns_parsed_report(tmp_path: Path) -> None:
+    """parse() should return a ParsedReport with metrics and k6_context set."""
+    path = tmp_path / "summary.json"
+    _write_json(path, _make_summary_payload())
+
+    parsed = K6JsonParser().parse(path)
+
+    assert parsed.metrics is not None
+    assert parsed.k6_context is not None
+
+
 def test_parse_happy_path_counts(tmp_path: Path) -> None:
     """Parser should map checks and thresholds to correct total/passed/failed counts."""
     path = tmp_path / "summary.json"
     _write_json(path, _make_summary_payload())
 
-    metrics = K6JsonParser().parse(path)
+    metrics = K6JsonParser().parse(path).metrics
 
     # 3 checks + 2 thresholds = 5 total
     assert metrics.total == 5
@@ -88,12 +99,30 @@ def test_parse_happy_path_counts(tmp_path: Path) -> None:
     assert metrics.total == metrics.passed + metrics.failed + metrics.skipped + metrics.errors
 
 
+def test_parse_k6_context_breakdown(tmp_path: Path) -> None:
+    """K6ReportContext should carry the check/threshold split separately from RunMetrics counters."""
+    path = tmp_path / "summary.json"
+    _write_json(path, _make_summary_payload())
+
+    k6_context = K6JsonParser().parse(path).k6_context
+
+    assert k6_context is not None
+    # 3 checks: 2 passing (response<500ms, token valid), 1 failing (status is 200)
+    assert k6_context.checks_total == 3
+    assert k6_context.checks_passed == 2
+    assert k6_context.checks_failed == 1
+    # 2 thresholds: 1 passing (p(95)<500), 1 violated (avg<200)
+    assert k6_context.thresholds_total == 2
+    assert k6_context.thresholds_passed == 1
+    assert k6_context.thresholds_failed == 1
+
+
 def test_parse_duration_from_state(tmp_path: Path) -> None:
     """Parser should extract duration from state.testRunDurationMs."""
     path = tmp_path / "summary.json"
     _write_json(path, _make_summary_payload())
 
-    metrics = K6JsonParser().parse(path)
+    metrics = K6JsonParser().parse(path).metrics
 
     assert metrics.duration == Duration(seconds=30.0)
 
@@ -103,7 +132,7 @@ def test_parse_failures_include_failed_check(tmp_path: Path) -> None:
     path = tmp_path / "summary.json"
     _write_json(path, _make_summary_payload())
 
-    metrics = K6JsonParser().parse(path)
+    metrics = K6JsonParser().parse(path).metrics
 
     check_failures = [f for f in metrics.failures if f.type == "CheckFailure"]
     assert len(check_failures) == 1
@@ -117,7 +146,7 @@ def test_parse_failures_include_threshold_violation(tmp_path: Path) -> None:
     path = tmp_path / "summary.json"
     _write_json(path, _make_summary_payload())
 
-    metrics = K6JsonParser().parse(path)
+    metrics = K6JsonParser().parse(path).metrics
 
     threshold_failures = [f for f in metrics.failures if f.type == "ThresholdViolation"]
     assert len(threshold_failures) == 1
@@ -131,7 +160,7 @@ def test_parse_test_results_include_all_checks_and_thresholds(tmp_path: Path) ->
     path = tmp_path / "summary.json"
     _write_json(path, _make_summary_payload())
 
-    metrics = K6JsonParser().parse(path)
+    metrics = K6JsonParser().parse(path).metrics
 
     assert len(metrics.test_results) == 5  # 3 checks + 2 thresholds
     statuses = {r.test_name: r.status for r in metrics.test_results}
@@ -147,7 +176,7 @@ def test_parse_nested_group_suite_name(tmp_path: Path) -> None:
     path = tmp_path / "summary.json"
     _write_json(path, _make_summary_payload())
 
-    metrics = K6JsonParser().parse(path)
+    metrics = K6JsonParser().parse(path).metrics
 
     suites = {r.test_name: r.suite for r in metrics.test_results}
     assert suites["token valid"] == "auth"
@@ -163,7 +192,9 @@ def test_parse_no_checks_no_thresholds(tmp_path: Path) -> None:
     path = tmp_path / "summary.json"
     _write_json(path, payload)
 
-    metrics = K6JsonParser().parse(path)
+    parsed = K6JsonParser().parse(path)
+    metrics = parsed.metrics
+    k6_context = parsed.k6_context
 
     assert metrics.total == 0
     assert metrics.passed == 0
@@ -171,6 +202,10 @@ def test_parse_no_checks_no_thresholds(tmp_path: Path) -> None:
     assert metrics.failures == []
     assert metrics.test_results == []
     assert metrics.duration is None
+
+    assert k6_context is not None
+    assert k6_context.checks_total == 0
+    assert k6_context.thresholds_total == 0
 
 
 def test_parse_duration_fallback_to_iter_duration(tmp_path: Path) -> None:
@@ -185,7 +220,7 @@ def test_parse_duration_fallback_to_iter_duration(tmp_path: Path) -> None:
     path = tmp_path / "summary.json"
     _write_json(path, payload)
 
-    metrics = K6JsonParser().parse(path)
+    metrics = K6JsonParser().parse(path).metrics
 
     # 1000ms * 50 / 1000 = 50s
     assert metrics.duration == Duration(seconds=50.0)

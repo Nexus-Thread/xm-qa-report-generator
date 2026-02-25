@@ -25,6 +25,7 @@ from qa_report_generator.domain.analytics.orchestrator import AnalyticsOrchestra
 from qa_report_generator.domain.analytics.report_diff import diff_runs
 from qa_report_generator.domain.exceptions import ConfigurationError, ParseError, ReportingError
 from qa_report_generator.domain.models import EnvironmentMeta, ReportFacts, RunMetrics
+from qa_report_generator.domain.models.k6.context import K6ReportContext
 from qa_report_generator.domain.value_objects import SectionType
 
 logger = logging.getLogger(__name__)
@@ -140,7 +141,7 @@ class ReportGenerationService(GenerateReportsUseCase):
 
         try:
             logger.debug("Step 1: Parsing input report")
-            metrics, input_files, parse_duration = self._load_or_parse_metrics(
+            metrics, k6_context, input_files, parse_duration = self._load_or_parse_metrics(
                 parser=parser,
                 report_path=report_path,
                 environment=environment,
@@ -151,6 +152,7 @@ class ReportGenerationService(GenerateReportsUseCase):
             limited_metrics = self._limit_failures(metrics, max_failures)
             facts = self._build_report_facts(
                 metrics=limited_metrics,
+                k6_context=k6_context,
                 environment=environment,
                 input_files=input_files,
                 report_format=report_format,
@@ -242,31 +244,32 @@ class ReportGenerationService(GenerateReportsUseCase):
         report_path: Path,
         environment: EnvironmentMeta,
         regenerate_narratives: bool,
-    ) -> tuple[RunMetrics, list[str], float]:
+    ) -> tuple[RunMetrics, K6ReportContext | None, list[str], float]:
         parse_start = time.time()
         cached_facts = None
         if regenerate_narratives and self._report_cache:
             cached_facts = self._report_cache.load_cached_facts(report_path)
 
         if cached_facts:
-            metrics, cached_environment, input_files = cached_facts
+            metrics, k6_context, cached_environment, input_files = cached_facts
             if cached_environment != environment:
                 logger.warning(
                     "Cached environment differs from current run; using cached facts for regeneration.",
                 )
-            return metrics, input_files, 0.0
+            return metrics, k6_context, input_files, 0.0
 
-        metrics = parser.parse(report_path)
+        parsed = parser.parse(report_path)
         input_files = [str(report_path)]
         parse_duration = time.time() - parse_start
         if self._report_cache:
             self._report_cache.save_cached_facts(
                 report_path=report_path,
-                metrics=metrics,
+                metrics=parsed.metrics,
                 environment=environment,
                 input_files=input_files,
+                k6_context=parsed.k6_context,
             )
-        return metrics, input_files, parse_duration
+        return parsed.metrics, parsed.k6_context, input_files, parse_duration
 
     def _limit_failures(self, metrics: RunMetrics, max_failures: int | None) -> RunMetrics:
         if max_failures is None:
@@ -286,6 +289,7 @@ class ReportGenerationService(GenerateReportsUseCase):
         self,
         *,
         metrics: RunMetrics,
+        k6_context: K6ReportContext | None,
         environment: EnvironmentMeta,
         input_files: list[str],
         report_format: str,
@@ -296,6 +300,8 @@ class ReportGenerationService(GenerateReportsUseCase):
             environment=environment,
             input_files=input_files,
             failure_clustering_threshold=self._failure_clustering_threshold,
+            source_format=report_format,
+            k6_context=k6_context,
         )
         return facts.model_copy(update={"source_format": report_format})
 
@@ -326,9 +332,9 @@ class ReportComparisonService(CompareReportsUseCase):
     def compare(self, report_a: Path, report_b: Path, report_format: str) -> ReportDiff:
         """Compare two reports and return a diff summary."""
         parser = self._get_parser(report_format)
-        metrics_a = parser.parse(report_a)
-        metrics_b = parser.parse(report_b)
-        return diff_runs(metrics_a, metrics_b)
+        parsed_a = parser.parse(report_a)
+        parsed_b = parser.parse(report_b)
+        return diff_runs(parsed_a.metrics, parsed_b.metrics)
 
     def _get_parser(self, report_format: str) -> ReportParser:
         parser = self._parsers.get(report_format)
@@ -353,4 +359,4 @@ class ReportValidationService(ValidateReportUseCase):
             available = ", ".join(sorted(self._parsers.keys()))
             msg = f"Unknown report format '{report_format}'. Registered formats: {available}"
             raise ConfigurationError(msg, suggestion=f"Use one of: {available}")
-        return parser.parse(report_path)
+        return parser.parse(report_path).metrics

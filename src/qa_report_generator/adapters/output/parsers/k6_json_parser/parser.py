@@ -5,6 +5,7 @@ import logging
 from pathlib import Path
 from typing import Any
 
+from qa_report_generator.application.dtos.parsed_report import ParsedReport
 from qa_report_generator.application.ports.output import ReportParser
 from qa_report_generator.domain.exceptions import (
     ParseError,
@@ -13,6 +14,7 @@ from qa_report_generator.domain.exceptions import (
     ParseInvalidJsonError,
 )
 from qa_report_generator.domain.models import Failure, RunMetrics, TestCaseResult
+from qa_report_generator.domain.models.k6.context import K6ReportContext
 from qa_report_generator.domain.value_objects import Duration, TestIdentifier, TestStatus
 
 LOGGER = logging.getLogger(__name__)
@@ -26,14 +28,14 @@ _ROOT_SUITE = "root"
 class K6JsonParser(ReportParser):
     """Adapter for parsing k6 summary JSON export files (`--summary-export`)."""
 
-    def parse(self, filepath: Path) -> RunMetrics:
+    def parse(self, filepath: Path) -> ParsedReport:
         """Parse k6 summary JSON file and extract test metrics.
 
         Args:
             filepath: Path to k6 summary JSON file produced by --summary-export
 
         Returns:
-            RunMetrics mapping checks and thresholds to test results
+            ParsedReport containing RunMetrics and K6ReportContext breakdown
 
         Raises:
             ParseError: If file does not exist or JSON is malformed
@@ -73,7 +75,7 @@ class K6JsonParser(ReportParser):
             ) from exc
 
         try:
-            return self._build_metrics(data)
+            metrics, k6_context = self._build_metrics(data)
         except Exception as exc:
             msg = f"Failed to parse k6 report data: {exc}"
             LOGGER.exception("Parse failed during data extraction: %s", msg)
@@ -82,12 +84,14 @@ class K6JsonParser(ReportParser):
                 suggestion="Ensure the JSON file matches k6 --summary-export format with 'metrics' and 'root_group'.",
             ) from exc
 
+        return ParsedReport(metrics=metrics, k6_context=k6_context)
+
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
 
-    def _build_metrics(self, data: dict[str, Any]) -> RunMetrics:
-        """Build RunMetrics from parsed k6 summary data."""
+    def _build_metrics(self, data: dict[str, Any]) -> tuple[RunMetrics, K6ReportContext]:
+        """Build RunMetrics and K6ReportContext from parsed k6 summary data."""
         metrics_raw: dict[str, Any] = data.get("metrics", {})
         root_group: dict[str, Any] = data.get("root_group", {})
 
@@ -108,13 +112,25 @@ class K6JsonParser(ReportParser):
         failed = failing_checks + failing_thresholds
 
         LOGGER.info(
-            "Parse completed: %d checks, %d thresholds, %d failures extracted",
+            "Parse completed: %d checks (%d passed, %d failed), %d thresholds (%d passed, %d violated)",
             len(checks_with_suite),
+            passing_checks,
+            failing_checks,
             len(thresholds),
-            len(failures),
+            passing_thresholds,
+            failing_thresholds,
         )
 
-        return RunMetrics(
+        k6_context = K6ReportContext(
+            checks_total=len(checks_with_suite),
+            checks_passed=passing_checks,
+            checks_failed=failing_checks,
+            thresholds_total=len(thresholds),
+            thresholds_passed=passing_thresholds,
+            thresholds_failed=failing_thresholds,
+        )
+
+        run_metrics = RunMetrics(
             total=total,
             passed=passed,
             failed=failed,
@@ -124,6 +140,8 @@ class K6JsonParser(ReportParser):
             failures=failures,
             test_results=test_results,
         )
+
+        return run_metrics, k6_context
 
     def _collect_checks(
         self,

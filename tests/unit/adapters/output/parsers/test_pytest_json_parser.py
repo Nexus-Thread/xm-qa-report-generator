@@ -71,7 +71,7 @@ def test_parse_happy_path_includes_failures_and_outputs(tmp_path: Path) -> None:
     report_path = tmp_path / "report.json"
     _write_json(report_path, _make_report_payload())
 
-    metrics = PytestJsonParser().parse(report_path)
+    metrics = PytestJsonParser().parse(report_path).metrics
 
     assert metrics.total == 3
     assert metrics.failed == 1
@@ -98,7 +98,7 @@ def test_parse_collects_test_results(tmp_path: Path) -> None:
     report_path = tmp_path / "report.json"
     _write_json(report_path, _make_report_payload())
 
-    metrics = PytestJsonParser().parse(report_path)
+    metrics = PytestJsonParser().parse(report_path).metrics
 
     assert len(metrics.test_results) == 3
     statuses = {result.test_name: result.status for result in metrics.test_results}
@@ -151,7 +151,7 @@ def test_parse_unknown_outcome_defaults_to_error(tmp_path: Path) -> None:
     payload["summary"]["error"] = 1
     _write_json(report_path, payload)
 
-    metrics = PytestJsonParser().parse(report_path)
+    metrics = PytestJsonParser().parse(report_path).metrics
 
     statuses = {result.test_name: result.status for result in metrics.test_results}
     assert statuses["test_unknown"] == TestStatus.ERROR
@@ -184,7 +184,7 @@ def test_parse_error_outcome_creates_failure(tmp_path: Path) -> None:
     }
     _write_json(report_path, payload)
 
-    metrics = PytestJsonParser().parse(report_path)
+    metrics = PytestJsonParser().parse(report_path).metrics
 
     assert len(metrics.failures) == 1
     failure = metrics.failures[0]

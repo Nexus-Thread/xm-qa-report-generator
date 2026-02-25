@@ -37,7 +37,7 @@ def test_cache_roundtrip(tmp_path: Path) -> None:
     cached = cache.load_cached_facts(report_path)
 
     assert cached is not None
-    cached_metrics, cached_env, cached_inputs = cached
+    cached_metrics, _k6_context, cached_env, cached_inputs = cached
     assert cached_metrics.total == metrics.total
     assert cached_env.env == environment.env
     assert cached_inputs == [str(report_path)]

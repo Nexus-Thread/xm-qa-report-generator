@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING
 from qa_report_generator.application.ports.output import ReportCache
 from qa_report_generator.domain.exceptions import PersistenceError
 from qa_report_generator.domain.models import EnvironmentMeta, RunMetrics
+from qa_report_generator.domain.models.k6.context import K6ReportContext
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +27,7 @@ class FileReportCache(ReportCache):
     def load_cached_facts(
         self,
         report_path: Path,
-    ) -> tuple[RunMetrics, EnvironmentMeta, list[str]] | None:
+    ) -> tuple[RunMetrics, K6ReportContext | None, EnvironmentMeta, list[str]] | None:
         """Load cached facts for a report path."""
         cache_path = self._cache_path(report_path)
         if not cache_path.exists():
@@ -38,13 +39,15 @@ class FileReportCache(ReportCache):
             metrics = RunMetrics.model_validate(payload["metrics"])
             environment = EnvironmentMeta.model_validate(payload["environment"])
             input_files = list(payload.get("input_files", []))
+            k6_context_data = payload.get("k6_context")
+            k6_context = K6ReportContext.model_validate(k6_context_data) if k6_context_data else None
         except Exception as exc:
             msg = f"Failed to load cached facts from {cache_path}: {exc}"
             logger.exception("Cache load failed: %s", msg)
             raise PersistenceError(msg) from exc
         else:
             logger.info("Cache hit for report: %s", report_path)
-            return metrics, environment, input_files
+            return metrics, k6_context, environment, input_files
 
     def save_cached_facts(
         self,
@@ -52,6 +55,7 @@ class FileReportCache(ReportCache):
         metrics: RunMetrics,
         environment: EnvironmentMeta,
         input_files: list[str],
+        k6_context: K6ReportContext | None = None,
     ) -> None:
         """Persist parsed facts for later regeneration."""
         cache_path = self._cache_path(report_path)
@@ -59,6 +63,7 @@ class FileReportCache(ReportCache):
             "metrics": metrics.model_dump(),
             "environment": environment.model_dump(),
             "input_files": input_files,
+            "k6_context": k6_context.model_dump() if k6_context else None,
         }
 
         try:

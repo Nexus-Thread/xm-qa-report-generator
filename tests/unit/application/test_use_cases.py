@@ -8,6 +8,7 @@ from unittest.mock import Mock
 
 import pytest
 
+from qa_report_generator.application.dtos import ParsedReport
 from qa_report_generator.application.use_cases import (
     ReportComparisonService,
     ReportGenerationService,
@@ -30,9 +31,13 @@ def _make_metrics() -> RunMetrics:
     )
 
 
+def _make_parsed_report() -> ParsedReport:
+    return ParsedReport(metrics=_make_metrics())
+
+
 def _make_parsers() -> dict[str, Any]:
     parser = Mock()
-    parser.parse.return_value = _make_metrics()
+    parser.parse.return_value = _make_parsed_report()
     return {"pytest": parser}
 
 
@@ -125,7 +130,7 @@ def test_report_generation_tags_source_format_on_facts() -> None:
 def test_comparison_service_dispatches_to_correct_parser() -> None:
     """CompareReportsUseCase should use the parser matching report_format."""
     pytest_parser = Mock()
-    pytest_parser.parse.return_value = _make_metrics()
+    pytest_parser.parse.return_value = _make_parsed_report()
     k6_parser = Mock()
 
     parsers: dict[str, Any] = {"pytest": pytest_parser, "k6": k6_parser}
@@ -146,13 +151,13 @@ def test_comparison_service_unknown_format_raises_error() -> None:
 def test_validation_service_dispatches_to_correct_parser() -> None:
     """ValidateReportUseCase should use the parser matching report_format."""
     parser = Mock()
-    parser.parse.return_value = _make_metrics()
+    parser.parse.return_value = _make_parsed_report()
     service = ReportValidationService({"pytest": parser})
 
     result = service.validate_report(Path("r.json"), report_format="pytest")
 
     parser.parse.assert_called_once_with(Path("r.json"))
-    assert result == _make_metrics()
+    assert result == _make_parsed_report().metrics
 
 
 def test_validation_service_unknown_format_raises_error() -> None:

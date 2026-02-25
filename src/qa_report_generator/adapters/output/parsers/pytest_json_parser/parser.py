@@ -5,6 +5,7 @@ import logging
 from pathlib import Path
 from typing import Any
 
+from qa_report_generator.application.dtos.parsed_report import ParsedReport
 from qa_report_generator.application.ports.output import ReportParser
 from qa_report_generator.domain.exceptions import (
     ParseError,
@@ -21,14 +22,14 @@ logger = logging.getLogger(__name__)
 class PytestJsonParser(ReportParser):
     """Adapter for parsing pytest-json-report JSON files."""
 
-    def parse(self, filepath: Path) -> RunMetrics:
+    def parse(self, filepath: Path) -> ParsedReport:
         """Parse pytest-json-report JSON file and extract test metrics.
 
         Args:
             filepath: Path to .pytest-report.json file
 
         Returns:
-            RunMetrics with extracted data including test outputs
+            ParsedReport with extracted metrics (k6_context is always None for pytest)
 
         Raises:
             ParseError: If file doesn't exist or JSON is malformed
@@ -102,15 +103,17 @@ class PytestJsonParser(ReportParser):
                 len(failures),
             )
 
-            return RunMetrics(
-                total=total,
-                passed=passed,
-                failed=failed,
-                skipped=skipped,
-                errors=errors,
-                duration=duration,
-                failures=failures,
-                test_results=test_results,
+            return ParsedReport(
+                metrics=RunMetrics(
+                    total=total,
+                    passed=passed,
+                    failed=failed,
+                    skipped=skipped,
+                    errors=errors,
+                    duration=duration,
+                    failures=failures,
+                    test_results=test_results,
+                )
             )
         except Exception as e:
             msg = f"Failed to parse report data: {e}"
