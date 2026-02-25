@@ -7,7 +7,6 @@ from typing import NewType
 
 from pydantic import BaseModel, Field, field_validator
 
-# Type aliases to prevent primitive obsession
 TestName = NewType("TestName", str)
 SuiteName = NewType("SuiteName", str)
 
@@ -15,11 +14,12 @@ SuiteName = NewType("SuiteName", str)
 class TestStatus(StrEnum):
     """Possible outcomes of a test execution."""
 
+    __test__ = False
+
     PASSED = "passed"
     FAILED = "failed"
     SKIPPED = "skipped"
     ERROR = "error"
-    __test__ = False
 
 
 class SectionType(StrEnum):

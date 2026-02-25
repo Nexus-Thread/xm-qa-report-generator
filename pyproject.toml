@@ -33,11 +33,9 @@ qa-report-generator = "qa_report_generator.cli:main"
 
 [dependency-groups]
 dev = [
-    "hypothesis>=6.151.9",
     "mypy>=1.15.0",
     "pre-commit>=4.5.1",
     "pytest>=9.0.2",
-    "pytest-benchmark>=4.0.0",
     "pytest-cov>=7.0.0",
     "pytest-json-report>=1.5.0",
     "pytest-xdist>=3.8.0",
