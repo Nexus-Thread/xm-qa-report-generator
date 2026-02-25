@@ -2,9 +2,8 @@
 
 from pydantic import BaseModel, Field
 
-# TestOutput is a pytest-specific model; the `output` field is only populated
-# by the pytest parser. k6 failures always have output=None.
-from qa_report_generator.domain.models.pytest.test_output import TestOutput
+# TestOutput is populated by the pytest parser. k6 failures have output=None.
+from qa_report_generator.domain.models.common.test_output import TestOutput
 from qa_report_generator.domain.value_objects import Duration, TestIdentifier
 
 

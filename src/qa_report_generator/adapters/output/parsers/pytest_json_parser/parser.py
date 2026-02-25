@@ -13,7 +13,7 @@ from qa_report_generator.domain.exceptions import (
     ParseInvalidFormatError,
     ParseInvalidJsonError,
 )
-from qa_report_generator.domain.models import Failure, RunMetrics, TestCaseResult, TestOutput
+from qa_report_generator.domain.models.common import Failure, RunMetrics, TestCaseResult, TestOutput
 from qa_report_generator.domain.value_objects import Duration, TestIdentifier, TestStatus
 
 logger = logging.getLogger(__name__)

@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING
 from qa_report_generator.application.ports.output import ReportCache
 from qa_report_generator.domain.exceptions import PersistenceError
 from qa_report_generator.domain.models import EnvironmentMeta, RunMetrics
-from qa_report_generator.domain.models.k6.context import K6ReportContext
+from qa_report_generator.domain.models.k6 import K6ReportContext
 
 logger = logging.getLogger(__name__)
 

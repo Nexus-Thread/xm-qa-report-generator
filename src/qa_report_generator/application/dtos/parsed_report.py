@@ -3,7 +3,7 @@
 from pydantic import BaseModel, Field
 
 from qa_report_generator.domain.models.common.metrics import RunMetrics
-from qa_report_generator.domain.models.k6.context import K6ReportContext
+from qa_report_generator.domain.models.k6 import K6ReportContext
 
 
 class ParsedReport(BaseModel):

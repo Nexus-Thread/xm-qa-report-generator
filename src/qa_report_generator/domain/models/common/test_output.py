@@ -1,10 +1,10 @@
-"""Captured test output model — populated exclusively by the pytest parser."""
+"""Captured test output model."""
 
 from pydantic import BaseModel, Field, field_validator
 
 
 class TestOutput(BaseModel):
-    """Captured output streams from a pytest test execution."""
+    """Captured output streams from a test execution."""
 
     stdout: str | None = Field(None, description="Standard output stream")
     stderr: str | None = Field(None, description="Standard error stream")

@@ -2,7 +2,7 @@
 
 from typing import Any
 
-from qa_report_generator.domain.models import Failure, ReportFacts, TestOutput
+from qa_report_generator.domain.models.common import Failure, ReportFacts, TestOutput
 from qa_report_generator.domain.preprocessors import FailureGroup, OutputTruncator
 
 

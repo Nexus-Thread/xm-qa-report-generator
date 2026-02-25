@@ -4,7 +4,6 @@ Structure
 ---------
 common/   Shared models produced and consumed by all source formats (pytest, k6, …).
 k6/       Models specific to k6 summary reports; not populated by other parsers.
-pytest/   Models specific to pytest JSON reports; not populated by other parsers.
 
 All public names are re-exported here for backward-compatible imports.
 """
@@ -15,17 +14,17 @@ from qa_report_generator.domain.models.common.failure import Failure
 from qa_report_generator.domain.models.common.metrics import RunMetrics
 from qa_report_generator.domain.models.common.report_facts import ReportFacts
 from qa_report_generator.domain.models.common.test_case import TestCaseResult
+from qa_report_generator.domain.models.common.test_output import TestOutput
 
 # --- k6-specific: only populated when parsing k6 summary reports ---
-from qa_report_generator.domain.models.k6.context import K6ReportContext
-
-# --- pytest-specific: only populated when parsing pytest JSON reports ---
-from qa_report_generator.domain.models.pytest.test_output import TestOutput
+from qa_report_generator.domain.models.k6 import K6Check, K6ReportContext, K6Threshold
 
 __all__ = [
     "EnvironmentMeta",
     "Failure",
+    "K6Check",
     "K6ReportContext",
+    "K6Threshold",
     "ReportFacts",
     "RunMetrics",
     "TestCaseResult",

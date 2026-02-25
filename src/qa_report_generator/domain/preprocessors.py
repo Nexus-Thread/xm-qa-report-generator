@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 
 from pydantic import BaseModel, Field
 
-from qa_report_generator.domain.models import Failure, TestOutput
+from qa_report_generator.domain.models.common import Failure, TestOutput
 
 if TYPE_CHECKING:
     from collections.abc import Iterable

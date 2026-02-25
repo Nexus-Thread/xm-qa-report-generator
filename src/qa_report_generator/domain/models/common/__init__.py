@@ -5,6 +5,7 @@ from qa_report_generator.domain.models.common.failure import Failure
 from qa_report_generator.domain.models.common.metrics import RunMetrics
 from qa_report_generator.domain.models.common.report_facts import ReportFacts
 from qa_report_generator.domain.models.common.test_case import TestCaseResult
+from qa_report_generator.domain.models.common.test_output import TestOutput
 
 __all__ = [
     "EnvironmentMeta",
@@ -12,4 +13,5 @@ __all__ = [
     "ReportFacts",
     "RunMetrics",
     "TestCaseResult",
+    "TestOutput",
 ]

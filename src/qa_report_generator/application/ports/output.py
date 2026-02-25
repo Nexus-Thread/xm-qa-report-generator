@@ -6,7 +6,7 @@ from pathlib import Path
 from qa_report_generator.application.dtos.parsed_report import ParsedReport
 from qa_report_generator.application.dtos.section_prompt import SectionPrompt
 from qa_report_generator.domain.models import EnvironmentMeta, ReportFacts, RunMetrics
-from qa_report_generator.domain.models.k6.context import K6ReportContext
+from qa_report_generator.domain.models.k6 import K6ReportContext
 
 
 class ReportParser(ABC):

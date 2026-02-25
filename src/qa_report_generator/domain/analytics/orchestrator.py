@@ -15,7 +15,7 @@ from qa_report_generator.domain.analytics import (
 from qa_report_generator.domain.models import EnvironmentMeta, ReportFacts, RunMetrics
 
 if TYPE_CHECKING:
-    from qa_report_generator.domain.models.k6.context import K6ReportContext
+    from qa_report_generator.domain.models.k6 import K6ReportContext
 
 
 class AnalyticsOrchestrator:
