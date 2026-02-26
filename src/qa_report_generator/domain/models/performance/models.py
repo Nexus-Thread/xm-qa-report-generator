@@ -1,6 +1,6 @@
 """K6-specific domain models for checks, thresholds, and report context."""
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class K6Check(BaseModel):
@@ -44,6 +44,23 @@ class K6ReportContext(BaseModel):
     thresholds_total: int = Field(ge=0, description="Total number of thresholds evaluated")
     thresholds_passed: int = Field(ge=0, description="Number of thresholds that passed")
     thresholds_failed: int = Field(ge=0, description="Number of thresholds that were violated")
+
+    @model_validator(mode="after")
+    def validate_totals(self) -> "K6ReportContext":
+        """Validate check and threshold counters are internally consistent."""
+        if self.checks_passed + self.checks_failed != self.checks_total:
+            msg = (
+                "Invalid k6 check counters: checks_total must equal "
+                "checks_passed + checks_failed"
+            )
+            raise ValueError(msg)
+        if self.thresholds_passed + self.thresholds_failed != self.thresholds_total:
+            msg = (
+                "Invalid k6 threshold counters: thresholds_total must equal "
+                "thresholds_passed + thresholds_failed"
+            )
+            raise ValueError(msg)
+        return self
 
 
 class K6SummaryRow(BaseModel):

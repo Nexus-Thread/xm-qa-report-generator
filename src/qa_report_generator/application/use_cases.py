@@ -29,7 +29,7 @@ from qa_report_generator.domain.analytics.orchestrator import AnalyticsOrchestra
 from qa_report_generator.domain.analytics.report_diff import diff_runs
 from qa_report_generator.domain.exceptions import ConfigurationError, ParseError, ReportingError
 from qa_report_generator.domain.models import EnvironmentMeta, ReportFacts, RunMetrics
-from qa_report_generator.domain.models.k6 import K6ReportContext
+from qa_report_generator.domain.models.performance import K6ReportContext
 from qa_report_generator.domain.value_objects import SectionType
 
 logger = logging.getLogger(__name__)

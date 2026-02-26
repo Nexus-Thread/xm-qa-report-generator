@@ -3,7 +3,7 @@
 Structure
 ---------
 common/   Shared models produced and consumed by all source formats (pytest, k6, …).
-k6/       Models specific to k6 summary reports; not populated by other parsers.
+performance/ Models specific to k6 summary reports; not populated by other parsers.
 
 All public names are re-exported here for backward-compatible imports.
 """
@@ -17,7 +17,7 @@ from qa_report_generator.domain.models.common.test_case import TestCaseResult
 from qa_report_generator.domain.models.common.test_output import TestOutput
 
 # --- k6-specific: only populated when parsing k6 summary reports ---
-from qa_report_generator.domain.models.k6 import K6Check, K6ReportContext, K6SummaryRow, K6Threshold
+from qa_report_generator.domain.models.performance import K6Check, K6ReportContext, K6SummaryRow, K6Threshold
 
 __all__ = [
     "EnvironmentMeta",

@@ -14,8 +14,7 @@ from qa_report_generator.domain.exceptions import (
     ParseInvalidJsonError,
 )
 from qa_report_generator.domain.models import Failure, RunMetrics, TestCaseResult
-from qa_report_generator.domain.models.k6.context import K6ReportContext
-from qa_report_generator.domain.models.k6.models import K6Check, K6Threshold
+from qa_report_generator.domain.models.performance import K6Check, K6ReportContext, K6Threshold
 from qa_report_generator.domain.value_objects import Duration, TestIdentifier, TestStatus
 
 LOGGER = logging.getLogger(__name__)
