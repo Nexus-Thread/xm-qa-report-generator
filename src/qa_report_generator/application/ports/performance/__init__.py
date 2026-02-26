@@ -7,4 +7,4 @@ from qa_report_generator.application.ports.output import (
     ReportWriter,
 )
 
-__all__ = ["ReportParser", "NarrativeGenerator", "ReportWriter", "ReportCache"]
+__all__ = ["NarrativeGenerator", "ReportCache", "ReportParser", "ReportWriter"]

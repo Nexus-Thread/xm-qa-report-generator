@@ -19,6 +19,14 @@ class ReportGenerationResult:
     total_duration: float
 
 
+@dataclass(frozen=True)
+class K6SummaryTableResult:
+    """Consolidated k6 summary table output metadata."""
+
+    output_path: Path
+    rows_count: int
+
+
 class GenerateReportsUseCase(ABC):
     """Report generation use case interface."""
 
@@ -50,3 +58,11 @@ class ValidateReportUseCase(ABC):
     @abstractmethod
     def validate_report(self, report_path: Path, report_format: str) -> RunMetrics:
         """Validate report structure by parsing it."""
+
+
+class GenerateK6SummaryTableUseCase(ABC):
+    """Generate consolidated k6 summary table use case interface."""
+
+    @abstractmethod
+    def generate_k6_summary_table(self, reports_dir: Path, output_path: Path) -> K6SummaryTableResult:
+        """Generate a consolidated markdown table from k6 reports in a directory."""

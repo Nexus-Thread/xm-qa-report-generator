@@ -6,10 +6,12 @@ from qa_report_generator.adapters.input.cli_adapter import CliAdapter
 from qa_report_generator.adapters.input.env import EnvSettingsAdapter
 from qa_report_generator.adapters.output.narrative import NarrativeAdapter, NarrativeAdapterConfig
 from qa_report_generator.adapters.output.narrative.openai import OpenAIClientSettings, build_client
-from qa_report_generator.adapters.output.parsers import K6JsonParser, PytestJsonParser
+from qa_report_generator.adapters.output.parsers import K6JsonParser, K6SummaryTableParser, PytestJsonParser
 from qa_report_generator.adapters.output.persistence.cache import FileReportCache
 from qa_report_generator.adapters.output.persistence.markdown_writer import MarkdownReportWriter
+from qa_report_generator.adapters.output.persistence.performance import K6SummaryTableMarkdownWriter
 from qa_report_generator.application.use_cases import (
+    K6SummaryTableService,
     ReportComparisonService,
     ReportGenerationService,
     ReportValidationService,
@@ -71,12 +73,17 @@ def create_cli_adapter() -> CliAdapter:
         failure_clustering_threshold=config.failure_clustering_threshold,
         report_cache=cache,
     )
+    k6_summary_table_use_case = K6SummaryTableService(
+        parser=K6SummaryTableParser(),
+        writer=K6SummaryTableMarkdownWriter(),
+    )
     compare_use_case = ReportComparisonService(parsers)
     validate_use_case = ReportValidationService(parsers)
 
     # Create and return CLI adapter (driving side)
     return CliAdapter(
         generate_reports_use_case=report_use_case,
+        generate_k6_summary_table_use_case=k6_summary_table_use_case,
         compare_reports_use_case=compare_use_case,
         validate_report_use_case=validate_use_case,
         config=config,

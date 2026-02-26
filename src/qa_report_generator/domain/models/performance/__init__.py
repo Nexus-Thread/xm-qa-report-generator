@@ -13,9 +13,9 @@ from qa_report_generator.domain.models.k6 import K6ReportContext
 __all__ = [
     "EnvironmentMeta",
     "Failure",
+    "K6ReportContext",
     "ReportFacts",
     "RunMetrics",
     "TestCaseResult",
     "TestOutput",
-    "K6ReportContext",
 ]

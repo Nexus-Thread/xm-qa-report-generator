@@ -7,6 +7,7 @@ from qa_report_generator.adapters.input.cli_adapter.commands import CommandHandl
 from qa_report_generator.application.dtos import AppSettings
 from qa_report_generator.application.ports.input import (
     CompareReportsUseCase,
+    GenerateK6SummaryTableUseCase,
     GenerateReportsUseCase,
     ValidateReportUseCase,
 )
@@ -18,6 +19,7 @@ class CliAdapter:
     def __init__(
         self,
         generate_reports_use_case: GenerateReportsUseCase,
+        generate_k6_summary_table_use_case: GenerateK6SummaryTableUseCase,
         compare_reports_use_case: CompareReportsUseCase,
         validate_report_use_case: ValidateReportUseCase,
         config: AppSettings,
@@ -26,6 +28,7 @@ class CliAdapter:
 
         Args:
             generate_reports_use_case: Use case for report generation
+            generate_k6_summary_table_use_case: Use case for consolidated k6 summary table generation
             compare_reports_use_case: Use case for report comparison
             validate_report_use_case: Use case for report input validation
             config: Configuration object
@@ -34,6 +37,7 @@ class CliAdapter:
         self._console = Console()
         self._command_handler = CommandHandler(
             generate_reports_use_case=generate_reports_use_case,
+            generate_k6_summary_table_use_case=generate_k6_summary_table_use_case,
             compare_reports_use_case=compare_reports_use_case,
             validate_report_use_case=validate_report_use_case,
             config=config,
@@ -45,6 +49,7 @@ class CliAdapter:
             add_completion=False,
         )
         self._app.command(name="generate")(self._command_handler.generate_command)
+        self._app.command(name="k6-summary")(self._command_handler.k6_summary_command)
         self._app.command(name="validate-config")(self._command_handler.validate_config_command)
         self._app.command(name="diff")(self._command_handler.diff_command)
 

@@ -22,6 +22,7 @@ from qa_report_generator.adapters.input.cli_adapter.validators import InputValid
 from qa_report_generator.application.dtos import AppSettings
 from qa_report_generator.application.ports.input import (
     CompareReportsUseCase,
+    GenerateK6SummaryTableUseCase,
     GenerateReportsUseCase,
     ValidateReportUseCase,
 )
@@ -33,9 +34,10 @@ from qa_report_generator.domain.models import EnvironmentMeta
 class CommandHandler:
     """Handles CLI command execution."""
 
-    def __init__(
+    def __init__(  # noqa: PLR0913
         self,
         generate_reports_use_case: GenerateReportsUseCase,
+        generate_k6_summary_table_use_case: GenerateK6SummaryTableUseCase,
         compare_reports_use_case: CompareReportsUseCase,
         validate_report_use_case: ValidateReportUseCase,
         config: AppSettings,
@@ -45,6 +47,7 @@ class CommandHandler:
 
         Args:
             generate_reports_use_case: Use case for report generation
+            generate_k6_summary_table_use_case: Use case for consolidated k6 summary table generation
             compare_reports_use_case: Use case for report comparison
             validate_report_use_case: Use case for report input validation
             config: Configuration object
@@ -52,11 +55,50 @@ class CommandHandler:
 
         """
         self._use_case = generate_reports_use_case
+        self._k6_summary_table_use_case = generate_k6_summary_table_use_case
         self._compare_use_case = compare_reports_use_case
         self._config = config
         self._console = console
         self._formatter = ConsoleFormatter(console)
         self._validator = InputValidator(self._formatter, validate_report_use_case)
+
+    def k6_summary_command(
+        self,
+        *,
+        reports_dir: Annotated[
+            Path,
+            typer.Option(
+                "--reports-dir",
+                help="Directory containing k6 summary JSON report files",
+                exists=True,
+                file_okay=False,
+                dir_okay=True,
+            ),
+        ],
+        out_file: Annotated[
+            Path,
+            typer.Option(
+                "--out-file",
+                help="Output markdown file for consolidated summary table",
+            ),
+        ] = Path("out/k6/performance_summary.md"),
+    ) -> None:
+        """Generate consolidated markdown summary table from a directory of k6 reports."""
+        try:
+            result = self._k6_summary_table_use_case.generate_k6_summary_table(
+                reports_dir=reports_dir,
+                output_path=out_file,
+            )
+        except ReportingError as e:
+            suggestion = f"\n💡 Suggestion: {e.suggestion}" if e.suggestion else ""
+            self._formatter.print_error(f"❌ {e}{suggestion}")
+            raise typer.Exit(code=1) from e
+        except Exception as e:
+            self._formatter.print_error(f"❌ Error: {e}")
+            raise typer.Exit(code=1) from e
+        else:
+            self._console.print(f"[green]✅ K6 summary table: {result.output_path}[/green]")
+            self._console.print(f"[dim]Rows: {result.rows_count}[/dim]")
 
     def diff_command(
         self,

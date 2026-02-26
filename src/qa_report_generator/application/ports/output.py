@@ -5,7 +5,7 @@ from pathlib import Path
 
 from qa_report_generator.application.dtos.parsed_report import ParsedReport
 from qa_report_generator.application.dtos.section_prompt import SectionPrompt
-from qa_report_generator.domain.models import EnvironmentMeta, ReportFacts, RunMetrics
+from qa_report_generator.domain.models import EnvironmentMeta, K6SummaryRow, ReportFacts, RunMetrics
 from qa_report_generator.domain.models.k6 import K6ReportContext
 
 
@@ -63,3 +63,19 @@ class ReportCache(ABC):
         k6_context: K6ReportContext | None = None,
     ) -> None:
         """Persist parsed facts for later regeneration."""
+
+
+class K6SummaryParser(ABC):
+    """Parse k6 report files into consolidated summary rows."""
+
+    @abstractmethod
+    def parse_summary_row(self, filepath: Path) -> K6SummaryRow:
+        """Parse a single k6 report file into one summary row."""
+
+
+class K6SummaryWriter(ABC):
+    """Write consolidated k6 summary rows to markdown."""
+
+    @abstractmethod
+    def write_summary_table(self, rows: list[K6SummaryRow], output_path: Path) -> Path:
+        """Write consolidated markdown table and return output path."""

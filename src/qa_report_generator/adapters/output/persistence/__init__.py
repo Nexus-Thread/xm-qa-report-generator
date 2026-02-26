@@ -11,15 +11,18 @@ Currently available:
 """
 
 # Performance persistence adapters (k6)
-from qa_report_generator.adapters.output.persistence.performance import (
-    FileReportCache as PerformanceFileReportCache,
-    MarkdownReportWriter as PerformanceMarkdownReportWriter,
-)
-
 # Functional persistence adapters (pytest)
 from qa_report_generator.adapters.output.persistence.functional import (
     FileReportCache as FunctionalFileReportCache,
+)
+from qa_report_generator.adapters.output.persistence.functional import (
     MarkdownReportWriter as FunctionalMarkdownReportWriter,
+)
+from qa_report_generator.adapters.output.persistence.performance import (
+    FileReportCache as PerformanceFileReportCache,
+)
+from qa_report_generator.adapters.output.persistence.performance import (
+    MarkdownReportWriter as PerformanceMarkdownReportWriter,
 )
 
 # Default to functional for backward compatibility
@@ -28,9 +31,9 @@ MarkdownReportWriter = FunctionalMarkdownReportWriter
 
 __all__ = [
     "FileReportCache",
+    "FunctionalFileReportCache",
+    "FunctionalMarkdownReportWriter",
     "MarkdownReportWriter",
     "PerformanceFileReportCache",
     "PerformanceMarkdownReportWriter",
-    "FunctionalFileReportCache",
-    "FunctionalMarkdownReportWriter",
 ]

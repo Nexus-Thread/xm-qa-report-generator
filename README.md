@@ -178,6 +178,23 @@ python -m qa_report_generator generate \
   --no-llm
 ```
 
+### Generate Consolidated k6 Summary Table
+
+Use this command when you have multiple k6 `--summary-export` JSON files and want one markdown table with service/scenario-level performance outcomes.
+
+```bash
+python -m qa_report_generator k6-summary \
+  --reports-dir k6_example/reports \
+  --out-file out/k6/performance_summary.md
+
+# Or use the installed command
+qa-report-generator k6-summary \
+  --reports-dir k6_example/reports \
+  --out-file out/k6/performance_summary.md
+```
+
+Command output includes the generated file path and number of processed rows.
+
 ### Validate Configuration
 
 Before generating reports, you can validate your configuration:
@@ -235,6 +252,13 @@ This is especially useful for:
 | `--dry-run`               | Validate inputs without generating reports                 | False   |
 | `diff` command            | Compare two pytest JSON reports and show regressions       | -       |
 | `--profile`               | Preprocessing profile preset (minimal, balanced, detailed) | None    |
+
+### k6 Summary Command Options
+
+| Option          | Description                                                  | Default                       |
+| --------------- | ------------------------------------------------------------ | ----------------------------- |
+| `--reports-dir` | Directory containing k6 summary JSON files (required)        | -                             |
+| `--out-file`    | Output markdown file path for consolidated summary table     | `out/k6/performance_summary.md` |
 
 ### CLI Output Modes
 

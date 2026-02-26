@@ -10,6 +10,7 @@ import pytest
 
 from qa_report_generator.application.dtos import ParsedReport
 from qa_report_generator.application.use_cases import (
+    K6SummaryTableService,
     ReportComparisonService,
     ReportGenerationService,
     ReportValidationService,
@@ -165,3 +166,71 @@ def test_validation_service_unknown_format_raises_error() -> None:
     service = ReportValidationService({"pytest": Mock()})
     with pytest.raises(ConfigurationError, match="nope"):
         service.validate_report(Path("r.json"), report_format="nope")
+
+
+def test_k6_summary_table_service_generates_table(tmp_path: Path) -> None:
+    """K6 summary service should parse each JSON report and write one consolidated table."""
+    reports_dir = tmp_path / "reports"
+    reports_dir.mkdir()
+    first = reports_dir / "b-report.json"
+    second = reports_dir / "a-report.json"
+    first.write_text("{}", encoding="utf-8")
+    second.write_text("{}", encoding="utf-8")
+
+    parser = Mock()
+    first_row = Mock(name="first-row")
+    second_row = Mock(name="second-row")
+    parser.parse_summary_row.side_effect = [first_row, second_row]
+    writer = Mock()
+
+    service = K6SummaryTableService(parser=parser, writer=writer)
+    out_file = tmp_path / "out" / "performance_summary.md"
+
+    result = service.generate_k6_summary_table(reports_dir=reports_dir, output_path=out_file)
+
+    assert result.output_path == out_file
+    assert result.rows_count == 2
+    parsed_paths = [call_args.args[0] for call_args in parser.parse_summary_row.call_args_list]
+    assert parsed_paths == [second, first]
+    writer.write_summary_table.assert_called_once_with([first_row, second_row], out_file)
+
+
+def test_k6_summary_table_service_missing_directory_raises_error(tmp_path: Path) -> None:
+    """K6 summary service should reject non-existent directories."""
+    service = K6SummaryTableService(parser=Mock(), writer=Mock())
+    with pytest.raises(ConfigurationError, match="Reports directory not found"):
+        service.generate_k6_summary_table(
+            reports_dir=tmp_path / "missing",
+            output_path=tmp_path / "out" / "summary.md",
+        )
+
+
+def test_k6_summary_table_service_empty_directory_raises_error(tmp_path: Path) -> None:
+    """K6 summary service should reject directories without JSON reports."""
+    reports_dir = tmp_path / "reports"
+    reports_dir.mkdir()
+
+    service = K6SummaryTableService(parser=Mock(), writer=Mock())
+    with pytest.raises(ConfigurationError, match="No JSON report files found"):
+        service.generate_k6_summary_table(
+            reports_dir=reports_dir,
+            output_path=tmp_path / "out" / "summary.md",
+        )
+
+
+def test_k6_summary_table_service_wraps_unexpected_errors(tmp_path: Path) -> None:
+    """K6 summary service should wrap unexpected parser failures into ReportingError."""
+    reports_dir = tmp_path / "reports"
+    reports_dir.mkdir()
+    report_file = reports_dir / "report.json"
+    report_file.write_text("{}", encoding="utf-8")
+
+    parser = Mock()
+    parser.parse_summary_row.side_effect = ValueError("boom")
+    service = K6SummaryTableService(parser=parser, writer=Mock())
+
+    with pytest.raises(ReportingError, match="Failed to generate consolidated k6 summary table"):
+        service.generate_k6_summary_table(
+            reports_dir=reports_dir,
+            output_path=tmp_path / "out" / "summary.md",
+        )

@@ -9,6 +9,7 @@ from unittest.mock import Mock
 import pytest
 
 from qa_report_generator.application.ports.output import NarrativeGenerator, ReportParser, ReportWriter
+from qa_report_generator.application.dtos import ParsedReport
 from qa_report_generator.domain.models import ReportFacts, RunMetrics
 from qa_report_generator.domain.value_objects import Duration
 from qa_report_generator.plugins.registry import (
@@ -25,17 +26,19 @@ if TYPE_CHECKING:
 class DummyParser(ReportParser):
     """Minimal parser implementation for registry testing."""
 
-    def parse(self, filepath: Path) -> RunMetrics:  # pragma: no cover - interface stub
-        """Return an empty RunMetrics object for registry validation."""
+    def parse(self, filepath: Path) -> ParsedReport:  # pragma: no cover - interface stub
+        """Return an empty ParsedReport object for registry validation."""
         _ = filepath
-        return RunMetrics(
-            total=0,
-            passed=0,
-            failed=0,
-            skipped=0,
-            errors=0,
-            duration=Duration(seconds=0.0),
-            failures=[],
+        return ParsedReport(
+            metrics=RunMetrics(
+                total=0,
+                passed=0,
+                failed=0,
+                skipped=0,
+                errors=0,
+                duration=Duration(seconds=0.0),
+                failures=[],
+            )
         )
 
 

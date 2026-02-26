@@ -44,3 +44,21 @@ class K6ReportContext(BaseModel):
     thresholds_total: int = Field(ge=0, description="Total number of thresholds evaluated")
     thresholds_passed: int = Field(ge=0, description="Number of thresholds that passed")
     thresholds_failed: int = Field(ge=0, description="Number of thresholds that were violated")
+
+
+class K6SummaryRow(BaseModel):
+    """Consolidated summary row for a single k6 scenario report."""
+
+    service: str = Field(description="Service code derived from scenario name")
+    scenario: str = Field(description="Scenario identifier")
+    target_load_rps: int = Field(ge=0, description="Configured target load in requests per second")
+    duration_seconds: int = Field(ge=0, description="Configured scenario duration in seconds")
+    thresholds: list[str] = Field(default_factory=list, description="Configured threshold expressions")
+    iterations: int = Field(ge=0, description="Executed iterations count")
+    achieved_rps: float = Field(ge=0.0, description="Observed steady-state iterations per second")
+    latency_med_ms: float = Field(ge=0.0, description="Median latency in milliseconds")
+    latency_p95_ms: float = Field(ge=0.0, description="P95 latency in milliseconds")
+    latency_p99_ms: float = Field(ge=0.0, description="P99 latency in milliseconds")
+    latency_max_ms: float = Field(ge=0.0, description="Maximum latency in milliseconds")
+    error_rate_percent: float = Field(ge=0.0, description="HTTP error rate percentage")
+    outcome_passed: bool = Field(description="Whether all relevant thresholds passed")

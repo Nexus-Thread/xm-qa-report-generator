@@ -9,11 +9,15 @@ from pathlib import Path
 from qa_report_generator.application.dtos import SectionPrompt
 from qa_report_generator.application.ports.input import (
     CompareReportsUseCase,
+    GenerateK6SummaryTableUseCase,
     GenerateReportsUseCase,
+    K6SummaryTableResult,
     ReportGenerationResult,
     ValidateReportUseCase,
 )
 from qa_report_generator.application.ports.output import (
+    K6SummaryParser,
+    K6SummaryWriter,
     NarrativeGenerator,
     ReportCache,
     ReportParser,
@@ -320,6 +324,53 @@ class ReportGenerationService(GenerateReportsUseCase):
         logger.info("LLM narrative generation enabled")
         timed_generator = TimedNarrativeGenerator(self._narrative_generator)
         return timed_generator, timed_generator
+
+
+class K6SummaryTableService(GenerateK6SummaryTableUseCase):
+    """Generate a consolidated markdown summary table from k6 report files."""
+
+    def __init__(self, parser: K6SummaryParser, writer: K6SummaryWriter) -> None:
+        """Initialize k6 summary table service."""
+        self._parser = parser
+        self._writer = writer
+
+    def generate_k6_summary_table(self, reports_dir: Path, output_path: Path) -> K6SummaryTableResult:
+        """Generate consolidated markdown table from all k6 JSON reports in a directory."""
+        if not reports_dir.exists() or not reports_dir.is_dir():
+            msg = f"Reports directory not found: {reports_dir}"
+            raise ConfigurationError(msg, suggestion="Pass an existing directory containing k6 JSON reports")
+
+        report_files = sorted(reports_dir.glob("*.json"))
+        if not report_files:
+            msg = f"No JSON report files found in: {reports_dir}"
+            raise ConfigurationError(msg, suggestion="Ensure the directory contains at least one *.json k6 summary report")
+
+        logger.info(
+            "Starting consolidated k6 summary generation: reports_dir=%s, output=%s, files=%d",
+            reports_dir,
+            output_path,
+            len(report_files),
+        )
+
+        try:
+            rows = [self._parser.parse_summary_row(report_file) for report_file in report_files]
+            self._writer.write_summary_table(rows, output_path)
+        except ReportingError:
+            raise
+        except Exception as exc:
+            msg = f"Failed to generate consolidated k6 summary table: {type(exc).__name__}: {exc}"
+            logger.exception(msg)
+            raise ReportingError(
+                msg,
+                suggestion="Validate k6 report structure and output path permissions.",
+            ) from exc
+
+        logger.info(
+            "Consolidated k6 summary table generated successfully: output=%s rows=%d",
+            output_path,
+            len(rows),
+        )
+        return K6SummaryTableResult(output_path=output_path, rows_count=len(rows))
 
 
 class ReportComparisonService(CompareReportsUseCase):
