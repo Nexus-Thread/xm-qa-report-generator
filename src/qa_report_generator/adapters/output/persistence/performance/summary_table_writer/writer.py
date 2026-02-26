@@ -31,12 +31,15 @@ class K6SummaryTableMarkdownWriter(K6SummaryWriter):
             "Service",
             "Scenario",
             "Duration",
-            "Target load (rps)",
-            "Achieved (steady-state, rps)",
+            "Load expected (rps)",
+            "Load actual (rps)",
+            "Error rate expected (%)",
+            "Error rate actual (%)",
+            "p95 expected (ms)",
+            "p95 actual (ms)",
+            "p99 expected (ms)",
+            "p99 actual (ms)",
             "Outcome",
-            "Error rate",
-            "Latency metrics (ms)",
-            "Target threshold(s)",
             "Comment",
         ]
 
@@ -55,10 +58,32 @@ class K6SummaryTableMarkdownWriter(K6SummaryWriter):
                     self._format_duration(row.duration_seconds),
                     str(row.target_load_rps),
                     self._format_achieved(row.achieved_rps),
+                    self._format_optional_percent(
+                        self._extract_threshold_percent(
+                            row.thresholds,
+                            metric_name="http_req_failed",
+                            prefix="rate<",
+                            multiplier=100.0,
+                        )
+                    ),
+                    self._format_optional_percent(row.error_rate_percent),
+                    self._format_optional_latency(
+                        self._extract_threshold_percent(
+                            row.thresholds,
+                            metric_name="http_req_duration",
+                            prefix="p(95)<",
+                        )
+                    ),
+                    self._format_optional_latency(row.latency_metrics_ms.get("p(95)")),
+                    self._format_optional_latency(
+                        self._extract_threshold_percent(
+                            row.thresholds,
+                            metric_name="http_req_duration",
+                            prefix="p(99)<",
+                        )
+                    ),
+                    self._format_optional_latency(row.latency_metrics_ms.get("p(99)")),
                     "✅ Passed" if row.outcome_passed else "❌ Failed",
-                    f"{row.error_rate_percent:.1f}%",
-                    self._format_latency(row),
-                    self._format_thresholds(row.thresholds),
                     self._format_comment(row.outcome_passed),
                 ]
             )
@@ -78,42 +103,35 @@ class K6SummaryTableMarkdownWriter(K6SummaryWriter):
             return f"{minutes}m"
         return f"{minutes}m{seconds}s"
 
-    def _format_thresholds(self, thresholds: dict[str, list[str]]) -> str:
-        if not thresholds:
-            return "N/A"
-
-        rendered_groups: list[str] = []
-        for metric_name in sorted(thresholds):
-            expressions = thresholds[metric_name]
-            if not expressions:
-                rendered_groups.append(f"{metric_name}: N/A")
-                continue
-
-            rendered_expressions = ", ".join(self._format_threshold(expression) for expression in sorted(expressions))
-            rendered_groups.append(f"{metric_name}: {rendered_expressions}")
-
-        return "; ".join(rendered_groups)
-
-    def _format_threshold(self, expression: str) -> str:
-        if expression.startswith("p(95)<"):
-            return f"p95 < {expression.split('<', 1)[1]}ms"
-        if expression.startswith("p(99)<"):
-            return f"p99 < {expression.split('<', 1)[1]}ms"
-        if expression.startswith("rate<"):
-            rate_percent = float(expression.split("<", 1)[1]) * 100.0
-            rendered = f"{rate_percent:.0f}" if rate_percent.is_integer() else f"{rate_percent:.1f}"
-            return f"rate < {rendered}%"
-        return expression
-
     def _format_achieved(self, achieved_rps: float) -> str:
         return f"{achieved_rps:.2f}"
 
-    def _format_latency(self, row: K6SummaryRow) -> str:
-        if not row.latency_metrics_ms:
-            return "N/A"
+    def _extract_threshold_percent(
+        self,
+        thresholds: dict[str, list[str]],
+        *,
+        metric_name: str,
+        prefix: str,
+        multiplier: float = 1.0,
+    ) -> float | None:
+        for expression in thresholds.get(metric_name, []):
+            if not expression.startswith(prefix):
+                continue
+            try:
+                return float(expression.split("<", 1)[1]) * multiplier
+            except ValueError:
+                return None
+        return None
 
-        parts = [f"{metric_name}={self._format_latency_value(value)}ms" for metric_name, value in sorted(row.latency_metrics_ms.items())]
-        return ", ".join(parts)
+    def _format_optional_percent(self, value: float | None) -> str:
+        if value is None:
+            return "N/A"
+        return f"{value:.1f}"
+
+    def _format_optional_latency(self, value: float | None) -> str:
+        if value is None:
+            return "N/A"
+        return self._format_latency_value(value)
 
     def _format_latency_value(self, value: float) -> str:
         rounded = round(value)

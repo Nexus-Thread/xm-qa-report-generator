@@ -60,18 +60,23 @@ def test_write_summary_table_writes_markdown(tmp_path: Path) -> None:
     content = output_path.read_text(encoding="utf-8")
     assert content.startswith("# Summary")
     assert (
-        "| Service | Scenario | Duration | Target load (rps) | Achieved (steady-state, rps) | "
-        "Outcome | Error rate | Latency metrics (ms) | Target threshold(s) | Comment |" in content
+        "| Service | Scenario | Duration | Load expected (rps) | Load actual (rps) | "
+        "Error rate expected (%) | Error rate actual (%) | p95 expected (ms) | p95 actual (ms) | "
+        "p99 expected (ms) | p99 actual (ms) | Outcome | Comment |" in content
     )
     assert content.index("aaaScenario") < content.index("zzzScenario")
     assert "✅ Passed" in content
     assert "❌ Failed" in content
     assert "39.60" in content
     assert "40.00" in content
-    assert " rps |" not in content
+    assert "10.0" in content
+    assert "3.0" in content
+    assert "100" in content
+    assert "190" in content
+    assert "200" in content
+    assert "255" in content
     assert "iters /" not in content
-    assert "http_req_failed: rate < 10%" in content
-    assert "3.0%" in content
+    assert "rate <" not in content
 
 
 def test_write_summary_table_wraps_os_errors(tmp_path: Path) -> None:
