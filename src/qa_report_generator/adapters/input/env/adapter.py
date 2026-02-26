@@ -1,4 +1,4 @@
-"""Environment configuration adapter: maps EnvSettings to AppSettings DTO."""
+"""Map environment settings to the AppSettings DTO."""
 
 from __future__ import annotations
 
@@ -10,10 +10,10 @@ __all__ = ["EnvSettingsAdapter"]
 
 
 class EnvSettingsAdapter:
-    """Input adapter that loads AppSettings from environment variables."""
+    """Load AppSettings from environment-backed settings."""
 
     def load(self) -> AppSettings:
-        """Load and map environment settings to AppSettings DTO.
+        """Load environment settings and map them to AppSettings DTO.
 
         Returns:
             Immutable AppSettings populated from the current environment

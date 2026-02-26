@@ -124,11 +124,7 @@ class K6SummaryTableParser(K6SummaryParser):
             if scenario_name not in metric_name or not isinstance(metric_data, dict):
                 continue
             thresholds = metric_data.get("thresholds") or {}
-            statuses.extend(
-                bool(threshold_data.get("ok", False))
-                for threshold_data in thresholds.values()
-                if isinstance(threshold_data, dict)
-            )
+            statuses.extend(bool(threshold_data.get("ok", False)) for threshold_data in thresholds.values() if isinstance(threshold_data, dict))
         return bool(statuses) and all(statuses)
 
     def _service_from_scenario(self, scenario_name: str) -> str:

@@ -8,8 +8,8 @@ from unittest.mock import Mock
 
 import pytest
 
-from qa_report_generator.application.ports.output import NarrativeGenerator, ReportParser, ReportWriter
 from qa_report_generator.application.dtos import ParsedReport
+from qa_report_generator.application.ports.output import NarrativeGenerator, ReportParser, ReportWriter
 from qa_report_generator.domain.models import ReportFacts, RunMetrics
 from qa_report_generator.domain.value_objects import Duration
 from qa_report_generator.plugins.registry import (

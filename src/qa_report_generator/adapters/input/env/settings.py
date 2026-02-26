@@ -173,7 +173,7 @@ def load_settings_from_env() -> EnvSettings:
     """Load and validate application configuration from environment variables.
 
     Returns:
-        Validated and profile-defaulted EnvSettings instance.
+        Validated EnvSettings instance with profile defaults applied.
 
     Raises:
         ConfigurationError: If environment variables fail validation.

@@ -35,7 +35,7 @@ def test_load_settings_from_env_raises_configuration_error(monkeypatch: pytest.M
 
 
 def test_load_settings_from_env_raises_on_invalid_log_format(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Env loader should raise ConfigurationError for an unrecognised log format."""
+    """Env loader should raise ConfigurationError for an unrecognized log format."""
     monkeypatch.setenv("LOG_FORMAT", "xml")
 
     with pytest.raises(ConfigurationError):
@@ -76,7 +76,7 @@ def test_env_settings_adapter_maps_all_fields(monkeypatch: pytest.MonkeyPatch) -
 
 
 def test_env_settings_adapter_maps_preprocessing_profile_to_str(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Adapter should demote PreprocessingProfile enum to plain str in AppSettings."""
+    """Adapter should map PreprocessingProfile enum to plain str in AppSettings."""
     stub = EnvSettings(preprocessing_profile=PreprocessingProfile.DETAILED)
     monkeypatch.setattr(env_adapter_module, "load_settings_from_env", lambda: stub)
 
