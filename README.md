@@ -260,6 +260,21 @@ This is especially useful for:
 | `--reports-dir` | Directory containing k6 summary JSON files (required)        | -                             |
 | `--out-file`    | Output markdown file path for consolidated summary table     | `out/k6/performance_summary.md` |
 
+### k6-Only CLI Entrypoint
+
+Use the dedicated k6 CLI when you only need k6 workflows (`generate` and `k6-summary`):
+
+```bash
+# Installed command
+qa-report-generator-k6 generate \
+  --json-report k6_example/reports/report-1.json \
+  --out out/k6
+
+qa-report-generator-k6 k6-summary \
+  --reports-dir k6_example/reports \
+  --out-file out/k6/performance_summary.md
+```
+
 ### CLI Output Modes
 
 The CLI supports three verbosity levels for different use cases:

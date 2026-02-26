@@ -22,6 +22,7 @@ dependencies = [
 
 [project.scripts]
 qa-report-generator = "qa_report_generator.cli:main"
+qa-report-generator-k6 = "qa_report_generator.cli_k6:main"
 
 [project.entry-points."qa_report_generator.parsers"]
 # custom-parser = "your_package.parsers:CustomParser"
