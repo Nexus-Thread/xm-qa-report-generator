@@ -468,6 +468,10 @@ def test_k6_summary_command_invokes_use_case(tmp_path: Path) -> None:
     """k6-summary should call summary-table use case and print output path."""
     reports_dir = tmp_path / "reports"
     reports_dir.mkdir()
+    report_a = reports_dir / "a-report.json"
+    report_b = reports_dir / "b-report.json"
+    report_a.write_text("{}", encoding="utf-8")
+    report_b.write_text("{}", encoding="utf-8")
     out_file = tmp_path / "out" / "performance_summary.md"
 
     adapter, k6_summary_use_case = _make_adapter_with_k6_summary(config=AppSettings())
@@ -489,7 +493,7 @@ def test_k6_summary_command_invokes_use_case(tmp_path: Path) -> None:
     assert "K6 summary table" in output
     assert "Rows: 3" in output
     k6_summary_use_case.generate_k6_summary_table.assert_called_once_with(
-        reports_dir=reports_dir,
+        report_files=[report_a, report_b],
         output_path=out_file,
     )
 
@@ -498,6 +502,8 @@ def test_k6_summary_command_handles_reporting_error(tmp_path: Path) -> None:
     """k6-summary should translate ReportingError to exit code 1."""
     reports_dir = tmp_path / "reports"
     reports_dir.mkdir()
+    report = reports_dir / "report.json"
+    report.write_text("{}", encoding="utf-8")
 
     adapter, k6_summary_use_case = _make_adapter_with_k6_summary(config=AppSettings())
     k6_summary_use_case.generate_k6_summary_table.side_effect = ReportingError("broken summary")

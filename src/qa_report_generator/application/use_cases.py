@@ -334,26 +334,32 @@ class K6SummaryTableService(GenerateK6SummaryTableUseCase):
         self._parser = parser
         self._writer = writer
 
-    def generate_k6_summary_table(self, reports_dir: Path, output_path: Path) -> K6SummaryTableResult:
-        """Generate consolidated markdown table from all k6 JSON reports in a directory."""
-        if not reports_dir.exists() or not reports_dir.is_dir():
-            msg = f"Reports directory not found: {reports_dir}"
-            raise ConfigurationError(msg, suggestion="Pass an existing directory containing k6 JSON reports")
-
-        report_files = sorted(reports_dir.glob("*.json"))
+    def generate_k6_summary_table(self, report_files: list[Path], output_path: Path) -> K6SummaryTableResult:
+        """Generate consolidated markdown table from one or more k6 JSON report files."""
         if not report_files:
-            msg = f"No JSON report files found in: {reports_dir}"
-            raise ConfigurationError(msg, suggestion="Ensure the directory contains at least one *.json k6 summary report")
+            msg = "No k6 report files provided"
+            raise ConfigurationError(msg, suggestion="Provide at least one k6 JSON report file")
+
+        normalized_files = sorted(set(report_files))
+
+        missing_files = [path for path in normalized_files if not path.exists()]
+        if missing_files:
+            msg = f"k6 report file not found: {missing_files[0]}"
+            raise ConfigurationError(msg, suggestion="Check the provided file paths")
+
+        invalid_files = [path for path in normalized_files if not path.is_file()]
+        if invalid_files:
+            msg = f"Invalid k6 report file path (not a file): {invalid_files[0]}"
+            raise ConfigurationError(msg, suggestion="Provide JSON file paths, not directories")
 
         logger.info(
-            "Starting consolidated k6 summary generation: reports_dir=%s, output=%s, files=%d",
-            reports_dir,
+            "Starting consolidated k6 summary generation: output=%s, files=%d",
             output_path,
-            len(report_files),
+            len(normalized_files),
         )
 
         try:
-            rows = [self._parser.parse_summary_row(report_file) for report_file in report_files]
+            rows = [self._parser.parse_summary_row(report_file) for report_file in normalized_files]
             self._writer.write_summary_table(rows, output_path)
         except ReportingError:
             raise

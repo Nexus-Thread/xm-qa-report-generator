@@ -64,5 +64,5 @@ class GenerateK6SummaryTableUseCase(ABC):
     """Generate consolidated k6 summary table use case interface."""
 
     @abstractmethod
-    def generate_k6_summary_table(self, reports_dir: Path, output_path: Path) -> K6SummaryTableResult:
-        """Generate a consolidated markdown table from k6 reports in a directory."""
+    def generate_k6_summary_table(self, report_files: list[Path], output_path: Path) -> K6SummaryTableResult:
+        """Generate a consolidated markdown table from one or more k6 report files."""

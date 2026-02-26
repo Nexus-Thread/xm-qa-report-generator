@@ -253,7 +253,7 @@ This is especially useful for:
 | `diff` command            | Compare two pytest JSON reports and show regressions       | -       |
 | `--profile`               | Preprocessing profile preset (minimal, balanced, detailed) | None    |
 
-### k6 Summary Command Options
+### k6 Summary Command Options (main CLI)
 
 | Option          | Description                                                  | Default                       |
 | --------------- | ------------------------------------------------------------ | ----------------------------- |
@@ -262,16 +262,29 @@ This is especially useful for:
 
 ### k6-Only CLI Entrypoint
 
-Use the dedicated k6 CLI when you only need k6 workflows (`generate` and `k6-summary`):
+Use the dedicated k6 CLI when you only need consolidated k6 summary table generation.
+The `generate` command accepts one or more `--report` inputs, where each input can be:
+
+- a single k6 JSON file
+- multiple repeated file paths
+- a directory containing `*.json` k6 summary files
 
 ```bash
 # Installed command
 qa-report-generator-k6 generate \
-  --json-report k6_example/reports/report-1.json \
-  --out out/k6
+  --report k6_example/reports \
+  --out-file out/k6/performance_summary.md
 
-qa-report-generator-k6 k6-summary \
-  --reports-dir k6_example/reports \
+# Multiple explicit files (repeat --report)
+qa-report-generator-k6 generate \
+  --report k6_example/reports/report-1.json \
+  --report k6_example/reports/report-2.json \
+  --report k6_example/reports/report-3.json \
+  --out-file out/k6/performance_summary.md
+
+# Module entrypoint variant
+python -m qa_report_generator.cli_k6 generate \
+  --report k6_example/reports \
   --out-file out/k6/performance_summary.md
 ```
 

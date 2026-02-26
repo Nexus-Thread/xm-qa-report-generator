@@ -7,7 +7,6 @@ import typer
 from rich.console import Console
 
 from qa_report_generator.adapters.input.cli_adapter.commands import CommandHandler
-from qa_report_generator.adapters.input.cli_adapter.types import ReportFormat
 from qa_report_generator.application.dtos import AppSettings
 from qa_report_generator.application.ports.input import (
     CompareReportsUseCase,
@@ -15,6 +14,7 @@ from qa_report_generator.application.ports.input import (
     GenerateReportsUseCase,
     ValidateReportUseCase,
 )
+from qa_report_generator.domain.exceptions import ReportingError
 
 
 class CliAdapter:
@@ -67,148 +67,87 @@ class K6CliAdapter:
 
     def __init__(
         self,
-        generate_reports_use_case: GenerateReportsUseCase,
         generate_k6_summary_table_use_case: GenerateK6SummaryTableUseCase,
-        compare_reports_use_case: CompareReportsUseCase,
-        validate_report_use_case: ValidateReportUseCase,
-        config: AppSettings,
     ) -> None:
         """Initialize k6-focused CLI adapter."""
         self._console = Console()
-        self._command_handler = CommandHandler(
-            generate_reports_use_case=generate_reports_use_case,
-            generate_k6_summary_table_use_case=generate_k6_summary_table_use_case,
-            compare_reports_use_case=compare_reports_use_case,
-            validate_report_use_case=validate_report_use_case,
-            config=config,
-            console=self._console,
-        )
+        self._k6_summary_table_use_case = generate_k6_summary_table_use_case
 
         self._app = typer.Typer(
-            help="Generate LLM-powered test reports from k6 artifacts",
+            help="Generate consolidated k6 summary tables",
             add_completion=False,
         )
-        self._app.command(name="generate")(self.generate_command)
-        self._app.command(name="k6-summary")(self._command_handler.k6_summary_command)
 
-    def generate_command(  # noqa: PLR0913
+        @self._app.callback()
+        def _k6_callback() -> None:
+            """Run k6-focused CLI commands."""
+
+        self._app.command(name="generate")(self.generate_command)
+
+    def generate_command(
         self,
         *,
-        json_report: Annotated[
-            Path,
+        report: Annotated[
+            list[Path],
             typer.Option(
-                "--json-report",
-                help="Path to k6 JSON summary-export file",
+                "--report",
+                help="k6 JSON file or directory containing k6 JSON files (repeat for multiple inputs)",
                 exists=True,
                 file_okay=True,
-                dir_okay=False,
+                dir_okay=True,
             ),
         ],
-        out: Annotated[
+        out_file: Annotated[
             Path,
             typer.Option(
-                "--out",
-                help="Output directory for reports",
+                "--out-file",
+                help="Output markdown file for consolidated summary table",
             ),
-        ] = Path("out"),
-        env: Annotated[
-            str | None,
-            typer.Option(
-                "--env",
-                help="Environment name (e.g., staging, production)",
-            ),
-        ] = None,
-        build: Annotated[
-            str | None,
-            typer.Option(
-                "--build",
-                help="Build number or ID",
-            ),
-        ] = None,
-        commit: Annotated[
-            str | None,
-            typer.Option(
-                "--commit",
-                help="Git commit hash",
-            ),
-        ] = None,
-        target_url: Annotated[
-            str | None,
-            typer.Option(
-                "--target-url",
-                help="Target application URL",
-            ),
-        ] = None,
-        max_failures: Annotated[
-            int,
-            typer.Option(
-                "--max-failures",
-                help="Maximum number of failures to include (use -1 to disable limiting)",
-                min=-1,
-            ),
-        ] = 20,
-        no_llm: Annotated[
-            bool,
-            typer.Option(
-                "--no-llm",
-                help="Disable LLM narrative generation",
-            ),
-        ] = False,
-        verbose: Annotated[
-            bool,
-            typer.Option(
-                "--verbose",
-                "-v",
-                help="Enable verbose output with detailed progress",
-            ),
-        ] = False,
-        quiet: Annotated[
-            bool,
-            typer.Option(
-                "--quiet",
-                "-q",
-                help="Minimal output (only results and errors)",
-            ),
-        ] = False,
-        dry_run: Annotated[
-            bool,
-            typer.Option(
-                "--dry-run",
-                help="Validate inputs without generating reports",
-            ),
-        ] = False,
-        regenerate_narratives: Annotated[
-            bool,
-            typer.Option(
-                "--regenerate-narratives",
-                help="Reuse cached parsed metrics and regenerate only LLM narratives",
-            ),
-        ] = False,
-        profile: Annotated[
-            str | None,
-            typer.Option(
-                "--profile",
-                help="Preprocessing profile preset (minimal, balanced, detailed)",
-            ),
-        ] = None,
+        ] = Path("out/k6/performance_summary.md"),
     ) -> None:
-        """Generate k6 test summary and QA sign-off reports."""
-        self._command_handler.generate_command(
-            json_report=json_report,
-            out=out,
-            env=env,
-            build=build,
-            commit=commit,
-            target_url=target_url,
-            max_failures=max_failures,
-            no_llm=no_llm,
-            verbose=verbose,
-            quiet=quiet,
-            dry_run=dry_run,
-            regenerate_narratives=regenerate_narratives,
-            profile=profile,
-            report_fmt=ReportFormat.K6,
-        )
+        """Generate consolidated k6 summary table from file(s) or directories."""
+        report_files = self._resolve_report_files(report)
+
+        try:
+            result = self._k6_summary_table_use_case.generate_k6_summary_table(
+                report_files=report_files,
+                output_path=out_file,
+            )
+        except ReportingError as e:
+            suggestion = f"\n💡 Suggestion: {e.suggestion}" if e.suggestion else ""
+            self._console.print(f"[red]❌ {e}{suggestion}[/red]")
+            raise typer.Exit(code=1) from e
+        except Exception as e:
+            self._console.print(f"[red]❌ Error: {e}[/red]")
+            raise typer.Exit(code=1) from e
+        else:
+            self._console.print(f"[green]✅ K6 summary table: {result.output_path}[/green]")
+            self._console.print(f"[dim]Rows: {result.rows_count}[/dim]")
+
+    def _resolve_report_files(self, report_inputs: list[Path]) -> list[Path]:
+        """Resolve report inputs into a de-duplicated file list."""
+        resolved: list[Path] = []
+
+        for report_input in report_inputs:
+            if report_input.is_dir():
+                dir_files = sorted(path for path in report_input.glob("*.json") if path.is_file())
+                if not dir_files:
+                    self._console.print(f"[red]❌ No JSON report files found in directory: {report_input}[/red]")
+                    raise typer.Exit(code=1)
+                resolved.extend(dir_files)
+                continue
+
+            if report_input.is_file():
+                if report_input.suffix.lower() != ".json":
+                    self._console.print(f"[red]❌ Report file must be a JSON file: {report_input}[/red]")
+                    raise typer.Exit(code=1)
+                resolved.append(report_input)
+                continue
+
+            self._console.print(f"[red]❌ Invalid report input: {report_input}[/red]")
+            raise typer.Exit(code=1)
+
+        return sorted(set(resolved))
 
     def run(self) -> None:
         """Run the CLI application."""

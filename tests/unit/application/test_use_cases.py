@@ -186,7 +186,7 @@ def test_k6_summary_table_service_generates_table(tmp_path: Path) -> None:
     service = K6SummaryTableService(parser=parser, writer=writer)
     out_file = tmp_path / "out" / "performance_summary.md"
 
-    result = service.generate_k6_summary_table(reports_dir=reports_dir, output_path=out_file)
+    result = service.generate_k6_summary_table(report_files=[first, second], output_path=out_file)
 
     assert result.output_path == out_file
     assert result.rows_count == 2
@@ -195,25 +195,22 @@ def test_k6_summary_table_service_generates_table(tmp_path: Path) -> None:
     writer.write_summary_table.assert_called_once_with([first_row, second_row], out_file)
 
 
-def test_k6_summary_table_service_missing_directory_raises_error(tmp_path: Path) -> None:
-    """K6 summary service should reject non-existent directories."""
+def test_k6_summary_table_service_missing_report_file_raises_error(tmp_path: Path) -> None:
+    """K6 summary service should reject non-existent report files."""
     service = K6SummaryTableService(parser=Mock(), writer=Mock())
-    with pytest.raises(ConfigurationError, match="Reports directory not found"):
+    with pytest.raises(ConfigurationError, match="k6 report file not found"):
         service.generate_k6_summary_table(
-            reports_dir=tmp_path / "missing",
+            report_files=[tmp_path / "missing.json"],
             output_path=tmp_path / "out" / "summary.md",
         )
 
 
-def test_k6_summary_table_service_empty_directory_raises_error(tmp_path: Path) -> None:
-    """K6 summary service should reject directories without JSON reports."""
-    reports_dir = tmp_path / "reports"
-    reports_dir.mkdir()
-
+def test_k6_summary_table_service_empty_report_list_raises_error(tmp_path: Path) -> None:
+    """K6 summary service should reject empty report file lists."""
     service = K6SummaryTableService(parser=Mock(), writer=Mock())
-    with pytest.raises(ConfigurationError, match="No JSON report files found"):
+    with pytest.raises(ConfigurationError, match="No k6 report files provided"):
         service.generate_k6_summary_table(
-            reports_dir=reports_dir,
+            report_files=[],
             output_path=tmp_path / "out" / "summary.md",
         )
 
@@ -231,6 +228,6 @@ def test_k6_summary_table_service_wraps_unexpected_errors(tmp_path: Path) -> Non
 
     with pytest.raises(ReportingError, match="Failed to generate consolidated k6 summary table"):
         service.generate_k6_summary_table(
-            reports_dir=reports_dir,
+            report_files=[report_file],
             output_path=tmp_path / "out" / "summary.md",
         )
