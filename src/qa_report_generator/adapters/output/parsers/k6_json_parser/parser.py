@@ -13,7 +13,9 @@ from qa_report_generator.domain.exceptions import (
     ParseInvalidFormatError,
     ParseInvalidJsonError,
 )
-from qa_report_generator.domain.models import Failure, K6ReportContext, RunMetrics, TestCaseResult
+from qa_report_generator.domain.models import Failure, RunMetrics, TestCaseResult
+from qa_report_generator.domain.models.k6.context import K6ReportContext
+from qa_report_generator.domain.models.k6.models import K6Check, K6Threshold
 from qa_report_generator.domain.value_objects import Duration, TestIdentifier, TestStatus
 
 LOGGER = logging.getLogger(__name__)
@@ -94,25 +96,25 @@ class K6JsonParser(ReportParser):
         metrics_raw: dict[str, Any] = data.get("metrics", {})
         root_group: dict[str, Any] = data.get("root_group", {})
 
-        checks_with_suite = self._collect_checks(root_group, parent_suite=_ROOT_SUITE)
+        checks = self._collect_checks(root_group, parent_suite=_ROOT_SUITE)
         thresholds = self._collect_thresholds(metrics_raw)
 
-        test_results = self._build_test_results(checks_with_suite, thresholds)
-        failures = self._build_failures(checks_with_suite, thresholds)
+        test_results = self._build_test_results(checks, thresholds)
+        failures = self._build_failures(checks, thresholds)
         duration = self._extract_duration(data)
 
-        passing_checks = sum(1 for check, _ in checks_with_suite if check.get("fails", 0) == 0)
-        failing_checks = sum(1 for check, _ in checks_with_suite if check.get("fails", 0) > 0)
-        passing_thresholds = sum(1 for t in thresholds if t["ok"])
-        failing_thresholds = sum(1 for t in thresholds if not t["ok"])
+        passing_checks = sum(1 for check in checks if not check.is_failed)
+        failing_checks = sum(1 for check in checks if check.is_failed)
+        passing_thresholds = sum(1 for t in thresholds if t.ok)
+        failing_thresholds = sum(1 for t in thresholds if t.is_violated)
 
-        total = len(checks_with_suite) + len(thresholds)
+        total = len(checks) + len(thresholds)
         passed = passing_checks + passing_thresholds
         failed = failing_checks + failing_thresholds
 
         LOGGER.info(
             "Parse completed: %d checks (%d passed, %d failed), %d thresholds (%d passed, %d violated)",
-            len(checks_with_suite),
+            len(checks),
             passing_checks,
             failing_checks,
             len(thresholds),
@@ -121,7 +123,7 @@ class K6JsonParser(ReportParser):
         )
 
         k6_context = K6ReportContext(
-            checks_total=len(checks_with_suite),
+            checks_total=len(checks),
             checks_passed=passing_checks,
             checks_failed=failing_checks,
             thresholds_total=len(thresholds),
@@ -146,7 +148,7 @@ class K6JsonParser(ReportParser):
         self,
         group: dict[str, Any],
         parent_suite: str,
-    ) -> list[tuple[dict[str, Any], str]]:
+    ) -> list[K6Check]:
         """Recursively collect all checks from a k6 group tree.
 
         Args:
@@ -154,65 +156,72 @@ class K6JsonParser(ReportParser):
             parent_suite: Dot-joined suite path from ancestor groups
 
         Returns:
-            List of (check_dict, suite_name) pairs
+            List of K6Check objects
 
         """
         group_name = group.get("name", "")
         suite = (f"{parent_suite}.{group_name}" if parent_suite != _ROOT_SUITE else group_name) if group_name else parent_suite
 
-        result: list[tuple[dict[str, Any], str]] = [(check, suite) for check in group.get("checks", [])]
+        result: list[K6Check] = []
+        for check_data in group.get("checks", []):
+            check = K6Check(
+                name=check_data.get("name", "unknown check"),
+                suite=suite,
+                passes=check_data.get("passes", 0),
+                fails=check_data.get("fails", 0),
+            )
+            result.append(check)
+
         for subgroup in group.get("groups", []):
             result.extend(self._collect_checks(subgroup, parent_suite=suite))
+
         return result
 
-    def _collect_thresholds(self, metrics: dict[str, Any]) -> list[dict[str, Any]]:
+    def _collect_thresholds(self, metrics: dict[str, Any]) -> list[K6Threshold]:
         """Extract threshold entries from the metrics section.
 
         Args:
             metrics: k6 metrics dict
 
         Returns:
-            List of threshold dicts with keys metric_name, expression, ok
+            List of K6Threshold objects
 
         """
-        thresholds: list[dict[str, Any]] = []
+        thresholds: list[K6Threshold] = []
         for metric_name, metric_data in metrics.items():
             for expression, result in metric_data.get("thresholds", {}).items():
-                thresholds.append(
-                    {
-                        "metric_name": metric_name,
-                        "expression": expression,
-                        "ok": bool(result.get("ok", False)),
-                    }
+                threshold = K6Threshold(
+                    metric_name=metric_name,
+                    expression=expression,
+                    ok=bool(result.get("ok", False)),
                 )
+                thresholds.append(threshold)
         return thresholds
 
     def _build_test_results(
         self,
-        checks_with_suite: list[tuple[dict[str, Any], str]],
-        thresholds: list[dict[str, Any]],
+        checks: list[K6Check],
+        thresholds: list[K6Threshold],
     ) -> list[TestCaseResult]:
         """Build TestCaseResult list from checks and thresholds."""
         results: list[TestCaseResult] = []
 
-        for check, suite in checks_with_suite:
-            name = check.get("name", "unknown check")
-            status = TestStatus.PASSED if check.get("fails", 0) == 0 else TestStatus.FAILED
+        for check in checks:
+            status = TestStatus.PASSED if not check.is_failed else TestStatus.FAILED
             results.append(
                 TestCaseResult(
-                    identifier=TestIdentifier(name=name, suite=suite),
+                    identifier=TestIdentifier(name=check.name, suite=check.suite),
                     status=status,
                     duration=None,
                 )
             )
 
         for threshold in thresholds:
-            name = threshold["expression"]
-            suite = f"{_THRESHOLDS_SUITE_PREFIX}/{threshold['metric_name']}"
-            status = TestStatus.PASSED if threshold["ok"] else TestStatus.FAILED
+            suite = f"{_THRESHOLDS_SUITE_PREFIX}/{threshold.metric_name}"
+            status = TestStatus.PASSED if threshold.ok else TestStatus.FAILED
             results.append(
                 TestCaseResult(
-                    identifier=TestIdentifier(name=name, suite=suite),
+                    identifier=TestIdentifier(name=threshold.expression, suite=suite),
                     status=status,
                     duration=None,
                 )
@@ -222,38 +231,32 @@ class K6JsonParser(ReportParser):
 
     def _build_failures(
         self,
-        checks_with_suite: list[tuple[dict[str, Any], str]],
-        thresholds: list[dict[str, Any]],
+        checks: list[K6Check],
+        thresholds: list[K6Threshold],
     ) -> list[Failure]:
         """Build Failure list from failed checks and violated thresholds."""
         failures: list[Failure] = []
 
-        for check, suite in checks_with_suite:
-            fails = check.get("fails", 0)
-            if fails == 0:
+        for check in checks:
+            if not check.is_failed:
                 continue
-            passes = check.get("passes", 0)
-            total_iters = passes + fails
-            name = check.get("name", "unknown check")
-            message = f"Check failed: {fails}/{total_iters} iterations"
+            message = f"Check failed: {check.fails}/{check.total_iterations} iterations"
             failures.append(
                 Failure(
-                    identifier=TestIdentifier(name=name, suite=suite),
+                    identifier=TestIdentifier(name=check.name, suite=check.suite),
                     message=message,
                     type=_CHECK_FAILURE_TYPE,
                 )
             )
 
         for threshold in thresholds:
-            if threshold["ok"]:
+            if not threshold.is_violated:
                 continue
-            metric_name = threshold["metric_name"]
-            expression = threshold["expression"]
-            suite = f"{_THRESHOLDS_SUITE_PREFIX}/{metric_name}"
-            message = f"Threshold violated: {metric_name} {expression}"
+            suite = f"{_THRESHOLDS_SUITE_PREFIX}/{threshold.metric_name}"
+            message = f"Threshold violated: {threshold.metric_name} {threshold.expression}"
             failures.append(
                 Failure(
-                    identifier=TestIdentifier(name=expression, suite=suite),
+                    identifier=TestIdentifier(name=threshold.expression, suite=suite),
                     message=message,
                     type=_THRESHOLD_VIOLATION_TYPE,
                 )
