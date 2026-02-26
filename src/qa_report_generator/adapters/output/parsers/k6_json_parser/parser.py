@@ -162,11 +162,7 @@ class K6JsonParser(ReportParser):
 
         """
         group_name = group.get("name", "")
-        group_path = (
-            (f"{parent_group}.{group_name}" if parent_group != _ROOT_SUITE else group_name)
-            if group_name
-            else parent_group
-        )
+        group_path = (f"{parent_group}.{group_name}" if parent_group != _ROOT_SUITE else group_name) if group_name else parent_group
 
         result: list[K6Check] = []
         for check_data in group.get("checks", []):

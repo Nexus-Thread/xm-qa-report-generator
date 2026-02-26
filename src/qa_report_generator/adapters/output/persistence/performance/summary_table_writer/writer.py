@@ -30,13 +30,13 @@ class K6SummaryTableMarkdownWriter(K6SummaryWriter):
         headers = [
             "Service",
             "Scenario",
-            "Target load (rps)",
             "Duration",
-            "Target threshold(s)",
-            "Achieved (steady-state)",
-            "Latency metrics (ms)",
-            "Error rate",
+            "Target load (rps)",
+            "Achieved (steady-state, rps)",
             "Outcome",
+            "Error rate",
+            "Latency metrics (ms)",
+            "Target threshold(s)",
             "Comment",
         ]
 
@@ -52,13 +52,13 @@ class K6SummaryTableMarkdownWriter(K6SummaryWriter):
                 [
                     row.service,
                     row.scenario,
-                    str(row.target_load_rps),
                     self._format_duration(row.duration_seconds),
-                    self._format_thresholds(row.thresholds),
-                    self._format_achieved(row.achieved_rps, row.iterations, row.duration_seconds),
-                    self._format_latency(row),
-                    f"{row.error_rate_percent:.1f}%",
+                    str(row.target_load_rps),
+                    self._format_achieved(row.achieved_rps),
                     "✅ Passed" if row.outcome_passed else "❌ Failed",
+                    f"{row.error_rate_percent:.1f}%",
+                    self._format_latency(row),
+                    self._format_thresholds(row.thresholds),
                     self._format_comment(row.outcome_passed),
                 ]
             )
@@ -105,10 +105,8 @@ class K6SummaryTableMarkdownWriter(K6SummaryWriter):
             return f"rate < {rendered}%"
         return expression
 
-    def _format_achieved(self, achieved_rps: float, iterations: int, duration_seconds: int) -> str:
-        rounded = round(achieved_rps)
-        prefix = f"{rounded} rps" if abs(achieved_rps - rounded) < 0.0001 else f"~{rounded} rps"
-        return f"{prefix} ({iterations:,} iters / {duration_seconds}s)"
+    def _format_achieved(self, achieved_rps: float) -> str:
+        return f"{achieved_rps:.2f}"
 
     def _format_latency(self, row: K6SummaryRow) -> str:
         if not row.latency_metrics_ms:

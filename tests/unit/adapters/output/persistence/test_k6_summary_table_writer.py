@@ -26,13 +26,18 @@ def _row(
         scenario=scenario,
         target_load_rps=40,
         duration_seconds=900,
-        thresholds=["p(95)<100", "p(99)<200", "rate<0.1"],
+        thresholds={
+            "http_req_duration": ["p(95)<100", "p(99)<200"],
+            "http_req_failed": ["rate<0.1"],
+        },
         iterations=36000,
         achieved_rps=achieved_rps,
-        latency_med_ms=110.0,
-        latency_p95_ms=190.0,
-        latency_p99_ms=255.0,
-        latency_max_ms=1500.0,
+        latency_metrics_ms={
+            "med": 110.0,
+            "p(95)": 190.0,
+            "p(99)": 255.0,
+            "max": 1500.0,
+        },
         error_rate_percent=error_rate_percent,
         outcome_passed=outcome_passed,
     )
@@ -54,11 +59,18 @@ def test_write_summary_table_writes_markdown(tmp_path: Path) -> None:
     assert written == output_path
     content = output_path.read_text(encoding="utf-8")
     assert content.startswith("# Summary")
-    assert "| Service | Scenario | Target load (rps) |" in content
+    assert (
+        "| Service | Scenario | Duration | Target load (rps) | Achieved (steady-state, rps) | "
+        "Outcome | Error rate | Latency metrics (ms) | Target threshold(s) | Comment |" in content
+    )
     assert content.index("aaaScenario") < content.index("zzzScenario")
     assert "✅ Passed" in content
     assert "❌ Failed" in content
-    assert "http_req_failed < 10%" in content
+    assert "39.60" in content
+    assert "40.00" in content
+    assert " rps |" not in content
+    assert "iters /" not in content
+    assert "http_req_failed: rate < 10%" in content
     assert "3.0%" in content
 
 
