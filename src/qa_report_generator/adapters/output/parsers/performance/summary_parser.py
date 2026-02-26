@@ -7,7 +7,11 @@ import re
 from typing import TYPE_CHECKING, Any
 
 from qa_report_generator.application.ports.output import K6SummaryParser
-from qa_report_generator.domain.exceptions import ParseFileNotFoundError, ParseInvalidFormatError, ParseInvalidJsonError
+from qa_report_generator.domain.exceptions import (
+    ParseFileNotFoundError,
+    ParseInvalidFormatError,
+    ParseInvalidJsonError,
+)
 from qa_report_generator.domain.models import K6SummaryRow
 
 if TYPE_CHECKING:
@@ -35,7 +39,7 @@ class K6SummaryTableParser(K6SummaryParser):
         achieved_rps = (iterations / duration_seconds) if duration_seconds > 0 else 0.0
 
         thresholds = self._extract_thresholds(payload.get("execThresholds", {}), scenario_name)
-        latency_values = self._extract_latency(metrics, scenario_name)
+        latency_metrics_ms = self._extract_latency_metrics_ms(metrics, scenario_name)
         error_rate_percent = self._extract_error_rate_percent(metrics, scenario_name)
         outcome_passed = self._extract_outcome(metrics, scenario_name)
 
@@ -47,10 +51,7 @@ class K6SummaryTableParser(K6SummaryParser):
             thresholds=thresholds,
             iterations=iterations,
             achieved_rps=achieved_rps,
-            latency_med_ms=float(latency_values.get("med", 0.0)),
-            latency_p95_ms=float(latency_values.get("p(95)", 0.0)),
-            latency_p99_ms=float(latency_values.get("p(99)", 0.0)),
-            latency_max_ms=float(latency_values.get("max", 0.0)),
+            latency_metrics_ms=latency_metrics_ms,
             error_rate_percent=error_rate_percent,
             outcome_passed=outcome_passed,
         )
@@ -102,40 +103,90 @@ class K6SummaryTableParser(K6SummaryParser):
         seconds = int(match.group(3) or 0)
         return hours * 3600 + minutes * 60 + seconds
 
-    def _extract_thresholds(self, exec_thresholds: dict[str, Any], scenario_name: str) -> list[str]:
-        expressions: list[str] = []
+    def _extract_thresholds(
+        self,
+        exec_thresholds: dict[str, Any],
+        scenario_name: str,
+    ) -> dict[str, list[str]]:
+        threshold_map: dict[str, list[str]] = {}
         for metric_name, threshold_expressions in exec_thresholds.items():
-            if scenario_name in metric_name and isinstance(threshold_expressions, list):
-                expressions.extend([str(expr) for expr in threshold_expressions])
-        return sorted(expressions, key=self._threshold_sort_key)
+            if not self._metric_matches_scenario(metric_name, scenario_name):
+                continue
+            if not isinstance(threshold_expressions, list):
+                continue
 
-    def _extract_latency(self, metrics: dict[str, Any], scenario_name: str) -> dict[str, Any]:
-        latency_metric = metrics.get(f"http_req_duration{{test_name:{scenario_name}}}") or {}
-        return latency_metric.get("values") or {}
+            normalized_metric_name = self._normalize_metric_name(metric_name)
+            threshold_map.setdefault(normalized_metric_name, []).extend(str(expression) for expression in threshold_expressions)
+
+        return {metric_name: sorted(set(expressions)) for metric_name, expressions in sorted(threshold_map.items())}
+
+    def _extract_latency_metrics_ms(
+        self,
+        metrics: dict[str, Any],
+        scenario_name: str,
+    ) -> dict[str, float]:
+        raw_values = self._extract_metric_values(metrics, "http_req_duration", scenario_name)
+        parsed_values: dict[str, float] = {}
+        for metric_name, raw_value in raw_values.items():
+            if not isinstance(metric_name, str) or not metric_name:
+                continue
+            numeric_value = self._coerce_float(raw_value)
+            if numeric_value < 0.0:
+                continue
+            parsed_values[metric_name] = numeric_value
+
+        return {metric_name: parsed_values[metric_name] for metric_name in sorted(parsed_values)}
 
     def _extract_error_rate_percent(self, metrics: dict[str, Any], scenario_name: str) -> float:
-        error_metric = metrics.get(f"http_req_failed{{test_name:{scenario_name}}}") or {}
-        error_values = error_metric.get("values") or {}
-        return float(error_values.get("rate", 0.0)) * 100.0
+        error_values = self._extract_metric_values(metrics, "http_req_failed", scenario_name)
+        return self._coerce_float(error_values.get("rate")) * 100.0
 
     def _extract_outcome(self, metrics: dict[str, Any], scenario_name: str) -> bool:
         statuses: list[bool] = []
         for metric_name, metric_data in metrics.items():
-            if scenario_name not in metric_name or not isinstance(metric_data, dict):
+            if not isinstance(metric_data, dict):
+                continue
+            if not self._metric_matches_scenario(metric_name, scenario_name):
                 continue
             thresholds = metric_data.get("thresholds") or {}
             statuses.extend(bool(threshold_data.get("ok", False)) for threshold_data in thresholds.values() if isinstance(threshold_data, dict))
         return bool(statuses) and all(statuses)
 
+    def _extract_metric_values(
+        self,
+        metrics: dict[str, Any],
+        metric_name: str,
+        scenario_name: str,
+    ) -> dict[str, Any]:
+        for key in self._candidate_metric_keys(metric_name, scenario_name):
+            metric_data = metrics.get(key)
+            if not isinstance(metric_data, dict):
+                continue
+            values = metric_data.get("values")
+            if isinstance(values, dict):
+                return values
+        return {}
+
+    def _candidate_metric_keys(self, metric_name: str, scenario_name: str) -> list[str]:
+        return [
+            f"{metric_name}{{test_name:{scenario_name}}}",
+            metric_name,
+        ]
+
+    def _metric_matches_scenario(self, metric_name: str, scenario_name: str) -> bool:
+        if "test_name:" not in metric_name:
+            return True
+        return f"test_name:{scenario_name}" in metric_name
+
+    def _normalize_metric_name(self, metric_name: str) -> str:
+        return metric_name.split("{", maxsplit=1)[0]
+
+    def _coerce_float(self, value: Any) -> float:
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return 0.0
+
     def _service_from_scenario(self, scenario_name: str) -> str:
         match = re.match(r"([a-z]+)", scenario_name)
         return match.group(1).upper() if match else "N/A"
-
-    def _threshold_sort_key(self, expression: str) -> tuple[int, str]:
-        if expression.startswith("p(95)<"):
-            return (0, expression)
-        if expression.startswith("p(99)<"):
-            return (1, expression)
-        if expression.startswith("rate<"):
-            return (2, expression)
-        return (99, expression)

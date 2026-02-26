@@ -34,7 +34,7 @@ class K6SummaryTableMarkdownWriter(K6SummaryWriter):
             "Duration",
             "Target threshold(s)",
             "Achieved (steady-state)",
-            "Latency (med / p95 / p99 / max)",
+            "Latency metrics (ms)",
             "Error rate",
             "Outcome",
             "Comment",
@@ -78,8 +78,21 @@ class K6SummaryTableMarkdownWriter(K6SummaryWriter):
             return f"{minutes}m"
         return f"{minutes}m{seconds}s"
 
-    def _format_thresholds(self, expressions: list[str]) -> str:
-        return ", ".join(self._format_threshold(expression) for expression in expressions)
+    def _format_thresholds(self, thresholds: dict[str, list[str]]) -> str:
+        if not thresholds:
+            return "N/A"
+
+        rendered_groups: list[str] = []
+        for metric_name in sorted(thresholds):
+            expressions = thresholds[metric_name]
+            if not expressions:
+                rendered_groups.append(f"{metric_name}: N/A")
+                continue
+
+            rendered_expressions = ", ".join(self._format_threshold(expression) for expression in sorted(expressions))
+            rendered_groups.append(f"{metric_name}: {rendered_expressions}")
+
+        return "; ".join(rendered_groups)
 
     def _format_threshold(self, expression: str) -> str:
         if expression.startswith("p(95)<"):
@@ -89,7 +102,7 @@ class K6SummaryTableMarkdownWriter(K6SummaryWriter):
         if expression.startswith("rate<"):
             rate_percent = float(expression.split("<", 1)[1]) * 100.0
             rendered = f"{rate_percent:.0f}" if rate_percent.is_integer() else f"{rate_percent:.1f}"
-            return f"http_req_failed < {rendered}%"
+            return f"rate < {rendered}%"
         return expression
 
     def _format_achieved(self, achieved_rps: float, iterations: int, duration_seconds: int) -> str:
@@ -98,7 +111,17 @@ class K6SummaryTableMarkdownWriter(K6SummaryWriter):
         return f"{prefix} ({iterations:,} iters / {duration_seconds}s)"
 
     def _format_latency(self, row: K6SummaryRow) -> str:
-        return f"{round(row.latency_med_ms)}ms / {round(row.latency_p95_ms)}ms / {round(row.latency_p99_ms)}ms / {round(row.latency_max_ms)}ms"
+        if not row.latency_metrics_ms:
+            return "N/A"
+
+        parts = [f"{metric_name}={self._format_latency_value(value)}ms" for metric_name, value in sorted(row.latency_metrics_ms.items())]
+        return ", ".join(parts)
+
+    def _format_latency_value(self, value: float) -> str:
+        rounded = round(value)
+        if abs(value - rounded) < 0.0001:
+            return str(rounded)
+        return f"{value:.1f}"
 
     def _format_comment(self, outcome_passed: bool) -> str:
         if outcome_passed:

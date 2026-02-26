@@ -2,6 +2,7 @@
 
 import json
 import logging
+import re
 from pathlib import Path
 from typing import Any
 
@@ -14,7 +15,7 @@ from qa_report_generator.domain.exceptions import (
     ParseInvalidJsonError,
 )
 from qa_report_generator.domain.models import Failure, RunMetrics, TestCaseResult
-from qa_report_generator.domain.models.performance import K6Check, K6ReportContext, K6Threshold
+from qa_report_generator.domain.models.performance import K6Check, K6ReportContext, K6ScenarioContext, K6Threshold
 from qa_report_generator.domain.value_objects import Duration, TestIdentifier, TestStatus
 
 LOGGER = logging.getLogger(__name__)
@@ -23,6 +24,8 @@ _CHECK_FAILURE_TYPE = "CheckFailure"
 _THRESHOLD_VIOLATION_TYPE = "ThresholdViolation"
 _THRESHOLDS_SUITE_PREFIX = "thresholds"
 _ROOT_SUITE = "root"
+_SCENARIO_FALLBACK = "default"
+_TEST_NAME_PATTERN = re.compile(r"test_name:([^,}]+)")
 
 
 class K6JsonParser(ReportParser):
@@ -94,9 +97,10 @@ class K6JsonParser(ReportParser):
         """Build RunMetrics and K6ReportContext from parsed k6 summary data."""
         metrics_raw: dict[str, Any] = data.get("metrics", {})
         root_group: dict[str, Any] = data.get("root_group", {})
+        primary_scenario = self._extract_primary_scenario(data)
 
-        checks = self._collect_checks(root_group, parent_suite=_ROOT_SUITE)
-        thresholds = self._collect_thresholds(metrics_raw)
+        checks = self._collect_checks(root_group, parent_group=_ROOT_SUITE, scenario=primary_scenario)
+        thresholds = self._collect_thresholds(metrics_raw, fallback_scenario=primary_scenario)
 
         test_results = self._build_test_results(checks, thresholds)
         failures = self._build_failures(checks, thresholds)
@@ -121,13 +125,10 @@ class K6JsonParser(ReportParser):
             failing_thresholds,
         )
 
+        by_scenario = self._build_scenario_context(checks, thresholds)
+
         k6_context = K6ReportContext(
-            checks_total=len(checks),
-            checks_passed=passing_checks,
-            checks_failed=failing_checks,
-            thresholds_total=len(thresholds),
-            thresholds_passed=passing_thresholds,
-            thresholds_failed=failing_thresholds,
+            by_scenario=by_scenario,
         )
 
         run_metrics = RunMetrics(
@@ -146,41 +147,49 @@ class K6JsonParser(ReportParser):
     def _collect_checks(
         self,
         group: dict[str, Any],
-        parent_suite: str,
+        parent_group: str,
+        scenario: str,
     ) -> list[K6Check]:
         """Recursively collect all checks from a k6 group tree.
 
         Args:
             group: k6 group dict containing 'checks' and 'groups'
-            parent_suite: Dot-joined suite path from ancestor groups
+            parent_group: Dot-joined group path from ancestor groups
+            scenario: Scenario name used to group k6 checks
 
         Returns:
             List of K6Check objects
 
         """
         group_name = group.get("name", "")
-        suite = (f"{parent_suite}.{group_name}" if parent_suite != _ROOT_SUITE else group_name) if group_name else parent_suite
+        group_path = (
+            (f"{parent_group}.{group_name}" if parent_group != _ROOT_SUITE else group_name)
+            if group_name
+            else parent_group
+        )
 
         result: list[K6Check] = []
         for check_data in group.get("checks", []):
             check = K6Check(
                 name=check_data.get("name", "unknown check"),
-                suite=suite,
+                scenario=scenario,
+                group_path=group_path,
                 passes=check_data.get("passes", 0),
                 fails=check_data.get("fails", 0),
             )
             result.append(check)
 
         for subgroup in group.get("groups", []):
-            result.extend(self._collect_checks(subgroup, parent_suite=suite))
+            result.extend(self._collect_checks(subgroup, parent_group=group_path, scenario=scenario))
 
         return result
 
-    def _collect_thresholds(self, metrics: dict[str, Any]) -> list[K6Threshold]:
+    def _collect_thresholds(self, metrics: dict[str, Any], fallback_scenario: str) -> list[K6Threshold]:
         """Extract threshold entries from the metrics section.
 
         Args:
             metrics: k6 metrics dict
+            fallback_scenario: Fallback scenario when metric key has no test_name tag
 
         Returns:
             List of K6Threshold objects
@@ -190,6 +199,7 @@ class K6JsonParser(ReportParser):
         for metric_name, metric_data in metrics.items():
             for expression, result in metric_data.get("thresholds", {}).items():
                 threshold = K6Threshold(
+                    scenario=self._scenario_from_metric_name(metric_name) or fallback_scenario,
                     metric_name=metric_name,
                     expression=expression,
                     ok=bool(result.get("ok", False)),
@@ -209,14 +219,14 @@ class K6JsonParser(ReportParser):
             status = TestStatus.PASSED if not check.is_failed else TestStatus.FAILED
             results.append(
                 TestCaseResult(
-                    identifier=TestIdentifier(name=check.name, suite=check.suite),
+                    identifier=TestIdentifier(name=check.name, suite=check.scenario),
                     status=status,
                     duration=None,
                 )
             )
 
         for threshold in thresholds:
-            suite = f"{_THRESHOLDS_SUITE_PREFIX}/{threshold.metric_name}"
+            suite = threshold.scenario
             status = TestStatus.PASSED if threshold.ok else TestStatus.FAILED
             results.append(
                 TestCaseResult(
@@ -242,7 +252,7 @@ class K6JsonParser(ReportParser):
             message = f"Check failed: {check.fails}/{check.total_iterations} iterations"
             failures.append(
                 Failure(
-                    identifier=TestIdentifier(name=check.name, suite=check.suite),
+                    identifier=TestIdentifier(name=check.name, suite=check.scenario),
                     message=message,
                     type=_CHECK_FAILURE_TYPE,
                 )
@@ -251,7 +261,7 @@ class K6JsonParser(ReportParser):
         for threshold in thresholds:
             if not threshold.is_violated:
                 continue
-            suite = f"{_THRESHOLDS_SUITE_PREFIX}/{threshold.metric_name}"
+            suite = threshold.scenario
             message = f"Threshold violated: {threshold.metric_name} {threshold.expression}"
             failures.append(
                 Failure(
@@ -293,3 +303,55 @@ class K6JsonParser(ReportParser):
             return Duration(seconds=float(avg_ms) * float(count) / 1000.0)
 
         return None
+
+    def _extract_primary_scenario(self, data: dict[str, Any]) -> str:
+        """Extract primary scenario from execScenarios/test_name tags."""
+        exec_scenarios = data.get("execScenarios")
+        if not isinstance(exec_scenarios, dict) or not exec_scenarios:
+            return _SCENARIO_FALLBACK
+
+        scenario_name, scenario_config = next(iter(exec_scenarios.items()))
+        if isinstance(scenario_config, dict):
+            tags = scenario_config.get("tags")
+            if isinstance(tags, dict):
+                test_name = tags.get("test_name")
+                if isinstance(test_name, str) and test_name.strip():
+                    return test_name.strip()
+        return scenario_name if isinstance(scenario_name, str) and scenario_name.strip() else _SCENARIO_FALLBACK
+
+    def _scenario_from_metric_name(self, metric_name: str) -> str | None:
+        """Extract scenario from metric label string."""
+        match = _TEST_NAME_PATTERN.search(metric_name)
+        if not match:
+            return None
+        scenario = match.group(1).strip()
+        return scenario or None
+
+    def _build_scenario_context(
+        self,
+        checks: list[K6Check],
+        thresholds: list[K6Threshold],
+    ) -> dict[str, K6ScenarioContext]:
+        """Build per-scenario check and threshold totals."""
+        scenarios = sorted({check.scenario for check in checks} | {threshold.scenario for threshold in thresholds})
+
+        context: dict[str, K6ScenarioContext] = {}
+        for scenario in scenarios:
+            scenario_checks = [check for check in checks if check.scenario == scenario]
+            scenario_thresholds = [threshold for threshold in thresholds if threshold.scenario == scenario]
+
+            checks_passed = sum(1 for check in scenario_checks if not check.is_failed)
+            checks_failed = sum(1 for check in scenario_checks if check.is_failed)
+            thresholds_passed = sum(1 for threshold in scenario_thresholds if threshold.ok)
+            thresholds_failed = sum(1 for threshold in scenario_thresholds if threshold.is_violated)
+
+            context[scenario] = K6ScenarioContext(
+                checks_total=len(scenario_checks),
+                checks_passed=checks_passed,
+                checks_failed=checks_failed,
+                thresholds_total=len(scenario_thresholds),
+                thresholds_passed=thresholds_passed,
+                thresholds_failed=thresholds_failed,
+            )
+
+        return context
