@@ -1,1 +1,0 @@
-"""Example hook plugins."""
