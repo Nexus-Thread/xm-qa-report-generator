@@ -17,6 +17,7 @@ from .formatters import (
     format_facts_table,
     format_failures,
     format_generated_section,
+    format_k6_scenario_load_model_overview,
     format_quick_stats_card,
 )
 from .serializers import build_llm_facts_payload
@@ -71,6 +72,10 @@ def render_pytest_summary(  # noqa: PLR0913
     # Deterministic: Run Facts
     md_parts.append("## Run Facts\n")
     md_parts.append(format_facts_table(facts))
+
+    if facts.source_format == "k6":
+        md_parts.append("## Scenario & Load Model\n")
+        md_parts.append(format_k6_scenario_load_model_overview(facts))
 
     generated_sections = _generate_llm_sections(
         facts=facts,
@@ -142,6 +147,10 @@ def render_signoff_report(  # noqa: PLR0913
     # Deterministic: Run Facts
     md_parts.append("## Test Results Overview\n")
     md_parts.append(format_facts_table(facts))
+
+    if facts.source_format == "k6":
+        md_parts.append("## Scenario & Load Model\n")
+        md_parts.append(format_k6_scenario_load_model_overview(facts))
 
     # Deterministic: Pass Rate
     pass_rate = facts.metrics.pass_rate

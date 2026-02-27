@@ -42,10 +42,17 @@ class K6SummaryTableParser(K6SummaryParser):
         latency_metrics_ms = self._extract_latency_metrics_ms(metrics, scenario_name)
         error_rate_percent = self._extract_error_rate_percent(metrics, scenario_name)
         outcome_passed = self._extract_outcome(metrics, scenario_name)
+        observed_vus_current, observed_vus_peak = self._extract_observed_vus(metrics)
 
         return K6SummaryRow(
             service=self._service_from_scenario(scenario_name),
             scenario=scenario_name,
+            executor=self._extract_executor(scenario_config),
+            time_unit=self._extract_time_unit(scenario_config),
+            pre_allocated_vus=self._extract_non_negative_int(scenario_config.get("preAllocatedVUs")),
+            max_vus=self._extract_non_negative_int(scenario_config.get("maxVUs")),
+            observed_vus_current=observed_vus_current,
+            observed_vus_peak=observed_vus_peak,
             target_load_rps=target_load_rps,
             duration_seconds=duration_seconds,
             thresholds=thresholds,
@@ -92,6 +99,19 @@ class K6SummaryTableParser(K6SummaryParser):
         if duration_ms is not None:
             return int(float(duration_ms) / 1000)
         return 0
+
+    def _extract_executor(self, scenario_config: dict[str, Any]) -> str:
+        raw_executor = scenario_config.get("executor")
+        if isinstance(raw_executor, str) and raw_executor.strip():
+            return raw_executor.strip()
+        return "unknown"
+
+    def _extract_time_unit(self, scenario_config: dict[str, Any]) -> str | None:
+        raw_time_unit = scenario_config.get("timeUnit")
+        if not isinstance(raw_time_unit, str):
+            return None
+        normalized_time_unit = raw_time_unit.strip()
+        return normalized_time_unit or None
 
     def _parse_duration(self, raw_duration: str) -> int:
         match = _DURATION_PATTERN.fullmatch(raw_duration)
@@ -141,6 +161,21 @@ class K6SummaryTableParser(K6SummaryParser):
         error_values = self._extract_metric_values(metrics, "http_req_failed", scenario_name)
         return self._coerce_float(error_values.get("rate")) * 100.0
 
+    def _extract_observed_vus(self, metrics: dict[str, Any]) -> tuple[int | None, int | None]:
+        vus_values = self._extract_metric_values(metrics, "vus", scenario_name="")
+        vus_max_values = self._extract_metric_values(metrics, "vus_max", scenario_name="")
+
+        observed_vus_current = self._extract_non_negative_int(vus_values.get("value"))
+        observed_vus_peak = self._extract_non_negative_int(vus_values.get("max"))
+        if observed_vus_peak is not None:
+            return observed_vus_current, observed_vus_peak
+
+        fallback_peak = self._extract_non_negative_int(vus_max_values.get("value"))
+        if fallback_peak is not None:
+            return observed_vus_current, fallback_peak
+
+        return observed_vus_current, self._extract_non_negative_int(vus_max_values.get("max"))
+
     def _extract_outcome(self, metrics: dict[str, Any], scenario_name: str) -> bool:
         statuses: list[bool] = []
         for metric_name, metric_data in metrics.items():
@@ -186,6 +221,13 @@ class K6SummaryTableParser(K6SummaryParser):
             return float(value)
         except (TypeError, ValueError):
             return 0.0
+
+    def _extract_non_negative_int(self, value: Any) -> int | None:
+        try:
+            parsed = int(value)
+        except (TypeError, ValueError):
+            return None
+        return parsed if parsed >= 0 else None
 
     def _service_from_scenario(self, scenario_name: str) -> str:
         match = re.match(r"([a-z]+)", scenario_name)

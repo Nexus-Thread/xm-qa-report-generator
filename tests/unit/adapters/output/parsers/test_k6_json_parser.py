@@ -68,6 +68,20 @@ def _make_summary_payload() -> dict:
         "state": {
             "testRunDurationMs": 30000,
         },
+        "execScenarios": {
+            "apiSmoke": {
+                "executor": "constant-arrival-rate",
+                "rate": 40,
+                "timeUnit": "1s",
+                "duration": "30s",
+                "startVUs": 1,
+                "preAllocatedVUs": 10,
+                "maxVUs": 50,
+                "tags": {
+                    "test_name": "apiSmoke",
+                },
+            }
+        },
     }
 
 
@@ -247,3 +261,21 @@ def test_parse_invalid_structure_raises_error(tmp_path: Path) -> None:
     _write_json(path, {"metrics": {}, "root_group": {"checks": "not-a-list", "groups": []}})
     with pytest.raises(ParseInvalidFormatError):
         K6JsonParser().parse(path)
+
+
+def test_parse_extracts_k6_load_model_context(tmp_path: Path) -> None:
+    """Parser should expose scenario load-model details via k6 context."""
+    path = tmp_path / "summary.json"
+    _write_json(path, _make_summary_payload())
+
+    k6_context = K6JsonParser().parse(path).k6_context
+
+    assert k6_context is not None
+    load_model = k6_context.scenario_load_models["apiSmoke"]
+    assert load_model.executor == "constant-arrival-rate"
+    assert load_model.rate == 40
+    assert load_model.time_unit == "1s"
+    assert load_model.duration == "30s"
+    assert load_model.start_vus == 1
+    assert load_model.pre_allocated_vus == 10
+    assert load_model.max_vus == 50

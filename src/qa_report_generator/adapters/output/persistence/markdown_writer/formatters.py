@@ -2,6 +2,7 @@
 
 from qa_report_generator.domain.analytics.models import HealthMetrics
 from qa_report_generator.domain.models import Failure, ReportFacts
+from qa_report_generator.domain.models.performance import K6LoadStage, K6ScenarioContext
 from qa_report_generator.domain.preprocessors import OutputTruncator
 
 
@@ -190,6 +191,47 @@ def format_generated_section(content: str | None) -> str:
     return "*[LLM unavailable - narrative section skipped]*\n"
 
 
+def format_k6_scenario_load_model_overview(facts: ReportFacts) -> str:
+    """Render a scenario and load-model overview table for k6 reports."""
+    k6_context = facts.k6_context
+    if not k6_context or not k6_context.scenario_load_models:
+        return "*No k6 scenario load-model data available.*\n"
+
+    lines = [
+        "| Scenario | Executor | Rate (rps) | Time Unit | Duration | VUs (start/pre/max) | Stages | Checks (pass/fail/total) | Thresholds (pass/fail/total) |",
+        "|---|---|---|---|---|---|---|---|---|",
+    ]
+
+    for scenario_name in sorted(k6_context.scenario_load_models):
+        load_model = k6_context.scenario_load_models[scenario_name]
+        scenario_totals = k6_context.by_scenario.get(scenario_name)
+        checks_summary = _format_scenario_check_totals(scenario_totals)
+        thresholds_summary = _format_scenario_threshold_totals(scenario_totals)
+        lines.append(
+            "| "
+            + " | ".join(
+                [
+                    scenario_name,
+                    load_model.executor,
+                    _format_optional_int(load_model.rate),
+                    _format_optional_text(load_model.time_unit),
+                    _format_optional_text(load_model.duration),
+                    _format_vus_triplet(
+                        load_model.start_vus,
+                        load_model.pre_allocated_vus,
+                        load_model.max_vus,
+                    ),
+                    _format_stages(load_model.stages),
+                    checks_summary,
+                    thresholds_summary,
+                ]
+            )
+            + " |"
+        )
+
+    return "\n".join(lines) + "\n"
+
+
 def _format_failure_entry(index: int, failure: Failure, max_output_lines: int) -> list[str]:
     """Format a single failure entry.
 
@@ -313,3 +355,49 @@ def _count_critical_failures(failures: list[Failure]) -> int:
     """
     critical_types = {"systemerror", "memoryerror", "keyerror"}
     return sum(1 for failure in failures if (failure.type or "").lower() in critical_types)
+
+
+def _format_optional_text(value: str | None) -> str:
+    """Format optional text values with fallback."""
+    if value is None or not value:
+        return "N/A"
+    return value
+
+
+def _format_optional_int(value: int | None) -> str:
+    """Format optional integer values with fallback."""
+    if value is None:
+        return "N/A"
+    return str(value)
+
+
+def _format_vus_triplet(start_vus: int | None, pre_allocated_vus: int | None, max_vus: int | None) -> str:
+    """Format start/pre/max VU values as a compact triplet."""
+    return "/".join(
+        [
+            _format_optional_int(start_vus),
+            _format_optional_int(pre_allocated_vus),
+            _format_optional_int(max_vus),
+        ]
+    )
+
+
+def _format_stages(stages: list[K6LoadStage]) -> str:
+    """Format stage list as duration→target sequence."""
+    if not stages:
+        return "N/A"
+    return ", ".join(f"{stage.duration}→{stage.target}" for stage in stages)
+
+
+def _format_scenario_check_totals(scenario_totals: K6ScenarioContext | None) -> str:
+    """Format scenario check totals summary."""
+    if scenario_totals is None:
+        return "N/A"
+    return f"{scenario_totals.checks_passed}/{scenario_totals.checks_failed}/{scenario_totals.checks_total}"
+
+
+def _format_scenario_threshold_totals(scenario_totals: K6ScenarioContext | None) -> str:
+    """Format scenario threshold totals summary."""
+    if scenario_totals is None:
+        return "N/A"
+    return f"{scenario_totals.thresholds_passed}/{scenario_totals.thresholds_failed}/{scenario_totals.thresholds_total}"

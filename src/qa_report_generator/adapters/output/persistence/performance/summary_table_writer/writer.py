@@ -30,6 +30,10 @@ class K6SummaryTableMarkdownWriter(K6SummaryWriter):
         headers = [
             "Service",
             "Scenario",
+            "Executor",
+            "Time unit",
+            "VUs (pre/max)",
+            "Observed VUs (cur/peak)",
             "Duration",
             "Load expected (rps)",
             "Load actual (rps)",
@@ -55,6 +59,10 @@ class K6SummaryTableMarkdownWriter(K6SummaryWriter):
                 [
                     row.service,
                     row.scenario,
+                    row.executor,
+                    self._format_optional_text(row.time_unit),
+                    self._format_vus_range(row.pre_allocated_vus, row.max_vus),
+                    self._format_vus_range(row.observed_vus_current, row.observed_vus_peak),
                     self._format_duration(row.duration_seconds),
                     str(row.target_load_rps),
                     self._format_achieved(row.achieved_rps),
@@ -92,7 +100,47 @@ class K6SummaryTableMarkdownWriter(K6SummaryWriter):
         )
 
         lines.append("")
+        lines.extend(self._render_scenario_load_model_section(ordered_rows))
         return "\n".join(lines)
+
+    def _render_scenario_load_model_section(self, rows: list[K6SummaryRow]) -> list[str]:
+        lines = ["## Scenario & Load Model", ""]
+
+        if not rows:
+            lines.extend(["*No scenario load-model data available.*", ""])
+            return lines
+
+        headers = [
+            "Scenario",
+            "Executor",
+            "Time unit",
+            "VUs (pre/max)",
+            "Observed VUs (cur/peak)",
+            "Duration",
+            "Target load (rps)",
+        ]
+        lines.append("| " + " | ".join(headers) + " |")
+        lines.append("| " + " | ".join(["---"] * len(headers)) + " |")
+
+        lines.extend(
+            "| "
+            + " | ".join(
+                [
+                    row.scenario,
+                    row.executor,
+                    self._format_optional_text(row.time_unit),
+                    self._format_vus_range(row.pre_allocated_vus, row.max_vus),
+                    self._format_vus_range(row.observed_vus_current, row.observed_vus_peak),
+                    self._format_duration(row.duration_seconds),
+                    str(row.target_load_rps),
+                ]
+            )
+            + " |"
+            for row in rows
+        )
+
+        lines.append("")
+        return lines
 
     def _format_duration(self, duration_seconds: int) -> str:
         minutes, seconds = divmod(duration_seconds, 60)
@@ -105,6 +153,19 @@ class K6SummaryTableMarkdownWriter(K6SummaryWriter):
 
     def _format_achieved(self, achieved_rps: float) -> str:
         return f"{achieved_rps:.2f}"
+
+    def _format_optional_text(self, value: str | None) -> str:
+        if not value:
+            return "N/A"
+        return value
+
+    def _format_vus_range(self, pre_allocated_vus: int | None, max_vus: int | None) -> str:
+        if pre_allocated_vus is None and max_vus is None:
+            return "N/A"
+
+        pre = str(pre_allocated_vus) if pre_allocated_vus is not None else "N/A"
+        max_value = str(max_vus) if max_vus is not None else "N/A"
+        return f"{pre}/{max_value}"
 
     def _extract_threshold_percent(
         self,

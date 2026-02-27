@@ -24,6 +24,12 @@ def _row(
     return K6SummaryRow(
         service="THD",
         scenario=scenario,
+        executor="constant-arrival-rate",
+        time_unit="1s",
+        pre_allocated_vus=100,
+        max_vus=1000,
+        observed_vus_current=6,
+        observed_vus_peak=11,
         target_load_rps=40,
         duration_seconds=900,
         thresholds={
@@ -60,7 +66,7 @@ def test_write_summary_table_writes_markdown(tmp_path: Path) -> None:
     content = output_path.read_text(encoding="utf-8")
     assert content.startswith("# Summary")
     assert (
-        "| Service | Scenario | Duration | Load expected (rps) | Load actual (rps) | "
+        "| Service | Scenario | Executor | Time unit | VUs (pre/max) | Observed VUs (cur/peak) | Duration | Load expected (rps) | Load actual (rps) | "
         "Error rate expected (%) | Error rate actual (%) | p95 expected (ms) | p95 actual (ms) | "
         "p99 expected (ms) | p99 actual (ms) | Outcome | Comment |" in content
     )
@@ -75,6 +81,18 @@ def test_write_summary_table_writes_markdown(tmp_path: Path) -> None:
     assert "190" in content
     assert "200" in content
     assert "255" in content
+    assert "constant-arrival-rate" in content
+    assert "1s" in content
+    assert "100/1000" in content
+    assert "6/11" in content
+    assert "## Scenario & Load Model" in content
+    assert (
+        "| Scenario | Executor | Time unit | VUs (pre/max) | Observed VUs (cur/peak) | Duration | Target load (rps) |"
+        in content
+    )
+    assert "| aaaScenario | constant-arrival-rate | 1s | 100/1000 | 6/11 | 15m | 40 |" in content
+    assert "| zzzScenario | constant-arrival-rate | 1s | 100/1000 | 6/11 | 15m | 40 |" in content
+    assert content.index("## Scenario & Load Model") > content.index("| Service | Scenario")
     assert "iters /" not in content
     assert "rate <" not in content
 

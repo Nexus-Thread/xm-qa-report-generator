@@ -22,8 +22,12 @@ def _make_payload() -> dict:
     return {
         "execScenarios": {
             "thdGetTradingHistory": {
+                "executor": "constant-arrival-rate",
                 "rate": 40,
+                "timeUnit": "1s",
                 "duration": "15m0s",
+                "preAllocatedVUs": 100,
+                "maxVUs": 1000,
             }
         },
         "execThresholds": {
@@ -34,6 +38,17 @@ def _make_payload() -> dict:
             "iterations": {
                 "values": {
                     "count": 36000,
+                }
+            },
+            "vus": {
+                "values": {
+                    "value": 6,
+                    "max": 11,
+                }
+            },
+            "vus_max": {
+                "values": {
+                    "value": 100,
                 }
             },
             "http_req_duration{test_name:thdGetTradingHistory}": {
@@ -69,15 +84,26 @@ def test_parse_summary_row_happy_path(tmp_path: Path) -> None:
 
     assert row.service == "THD"
     assert row.scenario == "thdGetTradingHistory"
+    assert row.executor == "constant-arrival-rate"
+    assert row.time_unit == "1s"
+    assert row.pre_allocated_vus == 100
+    assert row.max_vus == 1000
+    assert row.observed_vus_current == 6
+    assert row.observed_vus_peak == 11
     assert row.target_load_rps == 40
     assert row.duration_seconds == 900
-    assert row.thresholds == ["p(95)<100", "p(99)<200", "rate<0.1"]
+    assert row.thresholds == {
+        "http_req_duration": ["p(95)<100", "p(99)<200"],
+        "http_req_failed": ["rate<0.1"],
+    }
     assert row.iterations == 36000
     assert row.achieved_rps == 40.0
-    assert row.latency_med_ms == 110.0
-    assert row.latency_p95_ms == 190.0
-    assert row.latency_p99_ms == 255.0
-    assert row.latency_max_ms == 1500.0
+    assert row.latency_metrics_ms == {
+        "max": 1500.0,
+        "med": 110.0,
+        "p(95)": 190.0,
+        "p(99)": 255.0,
+    }
     assert row.error_rate_percent == 3.0
     assert row.outcome_passed is False
 

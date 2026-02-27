@@ -59,13 +59,67 @@ class K6ScenarioContext(BaseModel):
         return self
 
 
+class K6LoadStage(BaseModel):
+    """Single k6 load stage configuration."""
+
+    duration: str = Field(min_length=1, description="Stage duration as defined in k6 scenario config")
+    target: int = Field(ge=0, description="Target VUs or iteration rate for this stage")
+
+
+class K6ScenarioLoadModel(BaseModel):
+    """Normalized k6 scenario load-model configuration."""
+
+    executor: str = Field(min_length=1, description="k6 executor type for the scenario")
+    rate: int | None = Field(default=None, ge=0, description="Target arrival rate when configured")
+    time_unit: str | None = Field(default=None, description="k6 time unit used with rate-based executors")
+    duration: str | None = Field(default=None, description="Configured scenario duration")
+    start_vus: int | None = Field(default=None, ge=0, description="Initial VUs when configured")
+    pre_allocated_vus: int | None = Field(default=None, ge=0, description="Pre-allocated VUs for arrival-rate executors")
+    max_vus: int | None = Field(default=None, ge=0, description="Maximum VUs for the scenario")
+    stages: list[K6LoadStage] = Field(default_factory=list, description="Optional ramping stages")
+
+
 class K6ReportContext(BaseModel):
-    """Per-scenario k6 check and threshold breakdown."""
+    """Per-scenario k6 check, threshold, and load-model breakdown."""
 
     by_scenario: dict[str, K6ScenarioContext] = Field(
         default_factory=dict,
         description="Per-scenario check/threshold breakdown keyed by scenario name",
     )
+    scenario_load_models: dict[str, K6ScenarioLoadModel] = Field(
+        default_factory=dict,
+        description="Per-scenario load-model configuration keyed by scenario name",
+    )
+
+    @property
+    def checks_total(self) -> int:
+        """Total checks across all scenarios."""
+        return sum(context.checks_total for context in self.by_scenario.values())
+
+    @property
+    def checks_passed(self) -> int:
+        """Total passing checks across all scenarios."""
+        return sum(context.checks_passed for context in self.by_scenario.values())
+
+    @property
+    def checks_failed(self) -> int:
+        """Total failed checks across all scenarios."""
+        return sum(context.checks_failed for context in self.by_scenario.values())
+
+    @property
+    def thresholds_total(self) -> int:
+        """Total thresholds across all scenarios."""
+        return sum(context.thresholds_total for context in self.by_scenario.values())
+
+    @property
+    def thresholds_passed(self) -> int:
+        """Total passing thresholds across all scenarios."""
+        return sum(context.thresholds_passed for context in self.by_scenario.values())
+
+    @property
+    def thresholds_failed(self) -> int:
+        """Total failed thresholds across all scenarios."""
+        return sum(context.thresholds_failed for context in self.by_scenario.values())
 
 
 class K6SummaryRow(BaseModel):
@@ -73,6 +127,12 @@ class K6SummaryRow(BaseModel):
 
     service: str = Field(description="Service code derived from scenario name")
     scenario: str = Field(description="Scenario identifier")
+    executor: str = Field(default="unknown", min_length=1, description="k6 executor type")
+    time_unit: str | None = Field(default=None, description="k6 time unit for rate-based executors")
+    pre_allocated_vus: int | None = Field(default=None, ge=0, description="Pre-allocated VUs from scenario config")
+    max_vus: int | None = Field(default=None, ge=0, description="Maximum VUs from scenario config")
+    observed_vus_current: int | None = Field(default=None, ge=0, description="Observed current VUs from k6 runtime metrics")
+    observed_vus_peak: int | None = Field(default=None, ge=0, description="Observed peak VUs from k6 runtime metrics")
     target_load_rps: int = Field(ge=0, description="Configured target load in requests per second")
     duration_seconds: int = Field(ge=0, description="Configured scenario duration in seconds")
     thresholds: dict[str, list[str]] = Field(

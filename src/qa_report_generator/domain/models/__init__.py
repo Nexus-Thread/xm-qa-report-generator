@@ -17,14 +17,24 @@ from qa_report_generator.domain.models.common.test_case import TestCaseResult
 from qa_report_generator.domain.models.common.test_output import TestOutput
 
 # --- k6-specific: only populated when parsing k6 summary reports ---
-from qa_report_generator.domain.models.performance import K6Check, K6ReportContext, K6ScenarioContext, K6SummaryRow, K6Threshold
+from qa_report_generator.domain.models.performance import (
+    K6Check,
+    K6LoadStage,
+    K6ReportContext,
+    K6ScenarioContext,
+    K6ScenarioLoadModel,
+    K6SummaryRow,
+    K6Threshold,
+)
 
 __all__ = [
     "EnvironmentMeta",
     "Failure",
     "K6Check",
+    "K6LoadStage",
     "K6ReportContext",
     "K6ScenarioContext",
+    "K6ScenarioLoadModel",
     "K6SummaryRow",
     "K6Threshold",
     "ReportFacts",

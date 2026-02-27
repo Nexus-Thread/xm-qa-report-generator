@@ -15,7 +15,14 @@ from qa_report_generator.domain.exceptions import (
     ParseInvalidJsonError,
 )
 from qa_report_generator.domain.models import Failure, RunMetrics, TestCaseResult
-from qa_report_generator.domain.models.performance import K6Check, K6ReportContext, K6ScenarioContext, K6Threshold
+from qa_report_generator.domain.models.performance import (
+    K6Check,
+    K6LoadStage,
+    K6ReportContext,
+    K6ScenarioContext,
+    K6ScenarioLoadModel,
+    K6Threshold,
+)
 from qa_report_generator.domain.value_objects import Duration, TestIdentifier, TestStatus
 
 LOGGER = logging.getLogger(__name__)
@@ -126,9 +133,11 @@ class K6JsonParser(ReportParser):
         )
 
         by_scenario = self._build_scenario_context(checks, thresholds)
+        scenario_load_models = self._build_scenario_load_models(data)
 
         k6_context = K6ReportContext(
             by_scenario=by_scenario,
+            scenario_load_models=scenario_load_models,
         )
 
         run_metrics = RunMetrics(
@@ -215,7 +224,7 @@ class K6JsonParser(ReportParser):
             status = TestStatus.PASSED if not check.is_failed else TestStatus.FAILED
             results.append(
                 TestCaseResult(
-                    identifier=TestIdentifier(name=check.name, suite=check.scenario),
+                    identifier=TestIdentifier(name=check.name, suite=check.group_path),
                     status=status,
                     duration=None,
                 )
@@ -248,7 +257,7 @@ class K6JsonParser(ReportParser):
             message = f"Check failed: {check.fails}/{check.total_iterations} iterations"
             failures.append(
                 Failure(
-                    identifier=TestIdentifier(name=check.name, suite=check.scenario),
+                    identifier=TestIdentifier(name=check.name, suite=check.group_path),
                     message=message,
                     type=_CHECK_FAILURE_TYPE,
                 )
@@ -307,13 +316,20 @@ class K6JsonParser(ReportParser):
             return _SCENARIO_FALLBACK
 
         scenario_name, scenario_config = next(iter(exec_scenarios.items()))
-        if isinstance(scenario_config, dict):
-            tags = scenario_config.get("tags")
-            if isinstance(tags, dict):
-                test_name = tags.get("test_name")
-                if isinstance(test_name, str) and test_name.strip():
-                    return test_name.strip()
-        return scenario_name if isinstance(scenario_name, str) and scenario_name.strip() else _SCENARIO_FALLBACK
+        if isinstance(scenario_name, str) and isinstance(scenario_config, dict):
+            return self._resolve_scenario_name(scenario_name, scenario_config)
+        return _SCENARIO_FALLBACK
+
+    def _resolve_scenario_name(self, scenario_name: str, scenario_config: dict[str, Any]) -> str:
+        """Resolve scenario display name using tags.test_name when present."""
+        tags = scenario_config.get("tags")
+        if isinstance(tags, dict):
+            test_name = tags.get("test_name")
+            if isinstance(test_name, str) and test_name.strip():
+                return test_name.strip()
+
+        normalized_scenario_name = scenario_name.strip()
+        return normalized_scenario_name or _SCENARIO_FALLBACK
 
     def _scenario_from_metric_name(self, metric_name: str) -> str | None:
         """Extract scenario from metric label string."""
@@ -351,3 +367,69 @@ class K6JsonParser(ReportParser):
             )
 
         return context
+
+    def _build_scenario_load_models(self, data: dict[str, Any]) -> dict[str, K6ScenarioLoadModel]:
+        """Extract per-scenario load model information from execScenarios."""
+        exec_scenarios = data.get("execScenarios")
+        if not isinstance(exec_scenarios, dict):
+            return {}
+
+        models: dict[str, K6ScenarioLoadModel] = {}
+        for scenario_name, scenario_config in exec_scenarios.items():
+            if not isinstance(scenario_name, str) or not isinstance(scenario_config, dict):
+                continue
+            resolved_scenario_name = self._resolve_scenario_name(scenario_name, scenario_config)
+            models[resolved_scenario_name] = self._parse_scenario_load_model(scenario_config)
+
+        return models
+
+    def _parse_scenario_load_model(self, scenario_config: dict[str, Any]) -> K6ScenarioLoadModel:
+        """Parse normalized load-model configuration for one scenario."""
+        executor = scenario_config.get("executor")
+        if not isinstance(executor, str) or not executor.strip():
+            executor = "unknown"
+
+        return K6ScenarioLoadModel(
+            executor=executor,
+            rate=self._to_non_negative_int(scenario_config.get("rate")),
+            time_unit=self._to_non_empty_string(scenario_config.get("timeUnit")),
+            duration=self._to_non_empty_string(scenario_config.get("duration")),
+            start_vus=self._to_non_negative_int(scenario_config.get("startVUs")),
+            pre_allocated_vus=self._to_non_negative_int(scenario_config.get("preAllocatedVUs")),
+            max_vus=self._to_non_negative_int(scenario_config.get("maxVUs")),
+            stages=self._parse_load_stages(scenario_config.get("stages")),
+        )
+
+    def _parse_load_stages(self, raw_stages: Any) -> list[K6LoadStage]:
+        """Parse and normalize k6 stage definitions."""
+        if not isinstance(raw_stages, list):
+            return []
+
+        parsed_stages: list[K6LoadStage] = []
+        for raw_stage in raw_stages:
+            if not isinstance(raw_stage, dict):
+                continue
+
+            duration = self._to_non_empty_string(raw_stage.get("duration"))
+            target = self._to_non_negative_int(raw_stage.get("target"))
+            if duration is None or target is None:
+                continue
+
+            parsed_stages.append(K6LoadStage(duration=duration, target=target))
+
+        return parsed_stages
+
+    def _to_non_empty_string(self, value: Any) -> str | None:
+        """Normalize string-like values to non-empty strings."""
+        if not isinstance(value, str):
+            return None
+        normalized = value.strip()
+        return normalized or None
+
+    def _to_non_negative_int(self, value: Any) -> int | None:
+        """Normalize numeric-like values to non-negative integers."""
+        try:
+            parsed = int(value)
+        except (TypeError, ValueError):
+            return None
+        return parsed if parsed >= 0 else None
