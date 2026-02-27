@@ -30,6 +30,10 @@ def _row(
         max_vus=1000,
         observed_vus_current=6,
         observed_vus_peak=11,
+        total_requests=36120,
+        dropped_iterations=12,
+        checks_passes=36120,
+        checks_fails=0,
         target_load_rps=40,
         duration_seconds=900,
         thresholds={
@@ -39,10 +43,28 @@ def _row(
         iterations=36000,
         achieved_rps=achieved_rps,
         latency_metrics_ms={
+            "min": 60.0,
+            "avg": 130.0,
             "med": 110.0,
             "p(95)": 190.0,
             "p(99)": 255.0,
             "max": 1500.0,
+        },
+        waiting_metrics_ms={
+            "med": 108.0,
+            "p(95)": 188.0,
+            "p(99)": 250.0,
+            "max": 1400.0,
+        },
+        connecting_metrics_ms={
+            "med": 0.0,
+            "p(95)": 0.0,
+            "p(99)": 0.0,
+        },
+        tls_handshaking_metrics_ms={
+            "med": 0.0,
+            "p(95)": 0.0,
+            "p(99)": 0.0,
         },
         error_rate_percent=error_rate_percent,
         outcome_passed=outcome_passed,
@@ -86,13 +108,19 @@ def test_write_summary_table_writes_markdown(tmp_path: Path) -> None:
     assert "100/1000" in content
     assert "6/11" in content
     assert "## Scenario & Load Model" in content
-    assert (
-        "| Scenario | Executor | Time unit | VUs (pre/max) | Observed VUs (cur/peak) | Duration | Target load (rps) |"
-        in content
-    )
+    assert "| Scenario | Executor | Time unit | VUs (pre/max) | Observed VUs (cur/peak) | Duration | Target load (rps) |" in content
     assert "| aaaScenario | constant-arrival-rate | 1s | 100/1000 | 6/11 | 15m | 40 |" in content
     assert "| zzzScenario | constant-arrival-rate | 1s | 100/1000 | 6/11 | 15m | 40 |" in content
     assert content.index("## Scenario & Load Model") > content.index("| Service | Scenario")
+    assert "## Performance Results" in content
+    assert "#### 4.1 Throughput & stability" in content
+    assert "- Total requests: 36120" in content
+    assert "- Dropped iterations: 12" in content
+    assert "#### 4.2 Errors" in content
+    assert "- Checks: 36120 passes, 0 fails" in content
+    assert "#### 4.3 Latency" in content
+    assert "- aaaScenario (http_req_duration{test_name:aaaScenario})" in content
+    assert "Interpretation: *[LLM placeholder" in content
     assert "iters /" not in content
     assert "rate <" not in content
 

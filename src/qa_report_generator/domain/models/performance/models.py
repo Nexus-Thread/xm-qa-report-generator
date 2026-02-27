@@ -133,6 +133,10 @@ class K6SummaryRow(BaseModel):
     max_vus: int | None = Field(default=None, ge=0, description="Maximum VUs from scenario config")
     observed_vus_current: int | None = Field(default=None, ge=0, description="Observed current VUs from k6 runtime metrics")
     observed_vus_peak: int | None = Field(default=None, ge=0, description="Observed peak VUs from k6 runtime metrics")
+    total_requests: int | None = Field(default=None, ge=0, description="Total HTTP requests executed")
+    dropped_iterations: int | None = Field(default=None, ge=0, description="Dropped iterations reported by k6")
+    checks_passes: int | None = Field(default=None, ge=0, description="Passing checks count")
+    checks_fails: int | None = Field(default=None, ge=0, description="Failing checks count")
     target_load_rps: int = Field(ge=0, description="Configured target load in requests per second")
     duration_seconds: int = Field(ge=0, description="Configured scenario duration in seconds")
     thresholds: dict[str, list[str]] = Field(
@@ -144,6 +148,18 @@ class K6SummaryRow(BaseModel):
     latency_metrics_ms: dict[str, float] = Field(
         default_factory=dict,
         description="Latency metrics in milliseconds keyed by statistic name",
+    )
+    waiting_metrics_ms: dict[str, float] = Field(
+        default_factory=dict,
+        description="HTTP waiting-time metrics in milliseconds keyed by statistic name",
+    )
+    connecting_metrics_ms: dict[str, float] = Field(
+        default_factory=dict,
+        description="HTTP connecting-time metrics in milliseconds keyed by statistic name",
+    )
+    tls_handshaking_metrics_ms: dict[str, float] = Field(
+        default_factory=dict,
+        description="HTTP TLS handshaking metrics in milliseconds keyed by statistic name",
     )
     error_rate_percent: float = Field(ge=0.0, description="HTTP error rate percentage")
     outcome_passed: bool = Field(description="Whether all relevant thresholds passed")

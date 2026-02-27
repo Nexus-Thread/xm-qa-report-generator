@@ -40,9 +40,17 @@ class K6SummaryTableParser(K6SummaryParser):
 
         thresholds = self._extract_thresholds(payload.get("execThresholds", {}), scenario_name)
         latency_metrics_ms = self._extract_latency_metrics_ms(metrics, scenario_name)
+        waiting_metrics_ms = self._extract_generic_metrics_ms(metrics, "http_req_waiting")
+        connecting_metrics_ms = self._extract_generic_metrics_ms(metrics, "http_req_connecting")
+        tls_handshaking_metrics_ms = self._extract_generic_metrics_ms(metrics, "http_req_tls_handshaking")
         error_rate_percent = self._extract_error_rate_percent(metrics, scenario_name)
         outcome_passed = self._extract_outcome(metrics, scenario_name)
         observed_vus_current, observed_vus_peak = self._extract_observed_vus(metrics)
+        total_requests = self._extract_non_negative_int(self._extract_metric_values(metrics, "http_reqs", scenario_name).get("count"))
+        dropped_iterations = self._extract_non_negative_int(self._extract_metric_values(metrics, "dropped_iterations", scenario_name).get("count"))
+        checks_values = self._extract_metric_values(metrics, "checks", scenario_name)
+        checks_passes = self._extract_non_negative_int(checks_values.get("passes"))
+        checks_fails = self._extract_non_negative_int(checks_values.get("fails"))
 
         return K6SummaryRow(
             service=self._service_from_scenario(scenario_name),
@@ -53,12 +61,19 @@ class K6SummaryTableParser(K6SummaryParser):
             max_vus=self._extract_non_negative_int(scenario_config.get("maxVUs")),
             observed_vus_current=observed_vus_current,
             observed_vus_peak=observed_vus_peak,
+            total_requests=total_requests,
+            dropped_iterations=dropped_iterations,
+            checks_passes=checks_passes,
+            checks_fails=checks_fails,
             target_load_rps=target_load_rps,
             duration_seconds=duration_seconds,
             thresholds=thresholds,
             iterations=iterations,
             achieved_rps=achieved_rps,
             latency_metrics_ms=latency_metrics_ms,
+            waiting_metrics_ms=waiting_metrics_ms,
+            connecting_metrics_ms=connecting_metrics_ms,
+            tls_handshaking_metrics_ms=tls_handshaking_metrics_ms,
             error_rate_percent=error_rate_percent,
             outcome_passed=outcome_passed,
         )
@@ -160,6 +175,20 @@ class K6SummaryTableParser(K6SummaryParser):
     def _extract_error_rate_percent(self, metrics: dict[str, Any], scenario_name: str) -> float:
         error_values = self._extract_metric_values(metrics, "http_req_failed", scenario_name)
         return self._coerce_float(error_values.get("rate")) * 100.0
+
+    def _extract_generic_metrics_ms(self, metrics: dict[str, Any], metric_name: str) -> dict[str, float]:
+        raw_values = self._extract_metric_values(metrics, metric_name, scenario_name="")
+        parsed_values: dict[str, float] = {}
+        for key in ("min", "med", "avg", "p(95)", "p(99)", "max"):
+            raw_value = raw_values.get(key)
+            if raw_value is None:
+                continue
+            numeric_value = self._coerce_float(raw_value)
+            if numeric_value < 0.0:
+                continue
+            parsed_values[key] = numeric_value
+
+        return parsed_values
 
     def _extract_observed_vus(self, metrics: dict[str, Any]) -> tuple[int | None, int | None]:
         vus_values = self._extract_metric_values(metrics, "vus", scenario_name="")

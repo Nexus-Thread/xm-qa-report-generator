@@ -16,6 +16,8 @@ if TYPE_CHECKING:
 class K6SummaryTableMarkdownWriter(K6SummaryWriter):
     """Write markdown table for consolidated k6 summary rows."""
 
+    _INTERPRETATION_PLACEHOLDER = "*[LLM placeholder — to be generated later]*"
+
     def write_summary_table(self, rows: list[K6SummaryRow], output_path: Path) -> Path:
         """Write consolidated markdown table and return output path."""
         try:
@@ -101,6 +103,7 @@ class K6SummaryTableMarkdownWriter(K6SummaryWriter):
 
         lines.append("")
         lines.extend(self._render_scenario_load_model_section(ordered_rows))
+        lines.extend(self._render_performance_results_section(ordered_rows))
         return "\n".join(lines)
 
     def _render_scenario_load_model_section(self, rows: list[K6SummaryRow]) -> list[str]:
@@ -142,6 +145,76 @@ class K6SummaryTableMarkdownWriter(K6SummaryWriter):
         lines.append("")
         return lines
 
+    def _render_performance_results_section(self, rows: list[K6SummaryRow]) -> list[str]:
+        lines = ["## Performance Results", ""]
+
+        if not rows:
+            lines.extend(["*No performance results available.*", ""])
+            return lines
+
+        for row in rows:
+            lines.extend(self._render_scenario_performance_block(row))
+
+        return lines
+
+    def _render_scenario_performance_block(self, row: K6SummaryRow) -> list[str]:
+        p95_threshold = self._extract_threshold_percent(
+            row.thresholds,
+            metric_name="http_req_duration",
+            prefix="p(95)<",
+        )
+        p99_threshold = self._extract_threshold_percent(
+            row.thresholds,
+            metric_name="http_req_duration",
+            prefix="p(99)<",
+        )
+        p95_actual = row.latency_metrics_ms.get("p(95)")
+        p99_actual = row.latency_metrics_ms.get("p(99)")
+
+        return [
+            f"### {row.scenario}",
+            "",
+            "#### 4.1 Throughput & stability",
+            f"- Total requests: {self._format_optional_int(row.total_requests)}",
+            f"- Achieved rate: ~{self._format_achieved(row.achieved_rps)} rps",
+            f"- Dropped iterations: {self._format_optional_int(row.dropped_iterations)}",
+            f"- Interpretation: {self._INTERPRETATION_PLACEHOLDER}",
+            "",
+            "#### 4.2 Errors",
+            f"- HTTP failure rate: {self._format_optional_percent(row.error_rate_percent)}%",
+            (f"- Checks: {self._format_optional_int(row.checks_passes)} passes, {self._format_optional_int(row.checks_fails)} fails"),
+            f"- Interpretation: {self._INTERPRETATION_PLACEHOLDER}",
+            "",
+            "#### 4.3 Latency",
+            f"- {row.scenario} (http_req_duration{{test_name:{row.scenario}}})",
+            f"  - min {self._format_optional_latency(row.latency_metrics_ms.get('min'))}ms",
+            f"  - med {self._format_optional_latency(row.latency_metrics_ms.get('med'))}ms",
+            f"  - avg {self._format_optional_latency(row.latency_metrics_ms.get('avg'))}ms",
+            (f"  - p95 {self._format_optional_latency(p95_actual)}ms → {self._format_threshold_status(p95_actual, p95_threshold)}"),
+            (f"  - p99 {self._format_optional_latency(p99_actual)}ms → {self._format_threshold_status(p99_actual, p99_threshold)}"),
+            f"  - max {self._format_optional_latency(row.latency_metrics_ms.get('max'))}ms",
+            "",
+            "- Where time is spent:",
+            (
+                "  - http_req_waiting med "
+                f"{self._format_optional_latency(row.waiting_metrics_ms.get('med'))}ms, "
+                f"p95 {self._format_optional_latency(row.waiting_metrics_ms.get('p(95)'))}ms, "
+                f"p99 {self._format_optional_latency(row.waiting_metrics_ms.get('p(99)'))}ms, "
+                f"max {self._format_optional_latency(row.waiting_metrics_ms.get('max'))}ms"
+            ),
+            (
+                "  - Connect/TLS med "
+                f"{self._format_optional_latency(row.connecting_metrics_ms.get('med'))}"
+                f"/{self._format_optional_latency(row.tls_handshaking_metrics_ms.get('med'))}ms, "
+                f"p95 {self._format_optional_latency(row.connecting_metrics_ms.get('p(95)'))}"
+                f"/{self._format_optional_latency(row.tls_handshaking_metrics_ms.get('p(95)'))}ms, "
+                f"p99 {self._format_optional_latency(row.connecting_metrics_ms.get('p(99)'))}"
+                f"/{self._format_optional_latency(row.tls_handshaking_metrics_ms.get('p(99)'))}ms"
+            ),
+            f"- Interpretation: {self._INTERPRETATION_PLACEHOLDER}",
+            "",
+        ]
+
     def _format_duration(self, duration_seconds: int) -> str:
         minutes, seconds = divmod(duration_seconds, 60)
         hours, minutes = divmod(minutes, 60)
@@ -166,6 +239,11 @@ class K6SummaryTableMarkdownWriter(K6SummaryWriter):
         pre = str(pre_allocated_vus) if pre_allocated_vus is not None else "N/A"
         max_value = str(max_vus) if max_vus is not None else "N/A"
         return f"{pre}/{max_value}"
+
+    def _format_optional_int(self, value: int | None) -> str:
+        if value is None:
+            return "N/A"
+        return str(value)
 
     def _extract_threshold_percent(
         self,
@@ -193,6 +271,13 @@ class K6SummaryTableMarkdownWriter(K6SummaryWriter):
         if value is None:
             return "N/A"
         return self._format_latency_value(value)
+
+    def _format_threshold_status(self, actual: float | None, threshold: float | None) -> str:
+        if actual is None or threshold is None:
+            return "N/A"
+        if actual <= threshold:
+            return f"PASSED (threshold {self._format_latency_value(threshold)}ms)"
+        return f"FAILED (threshold {self._format_latency_value(threshold)}ms)"
 
     def _format_latency_value(self, value: float) -> str:
         rounded = round(value)

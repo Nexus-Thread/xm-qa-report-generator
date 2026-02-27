@@ -40,6 +40,22 @@ def _make_payload() -> dict:
                     "count": 36000,
                 }
             },
+            "http_reqs": {
+                "values": {
+                    "count": 36120,
+                }
+            },
+            "dropped_iterations": {
+                "values": {
+                    "count": 12,
+                }
+            },
+            "checks": {
+                "values": {
+                    "passes": 36120,
+                    "fails": 0,
+                }
+            },
             "vus": {
                 "values": {
                     "value": 6,
@@ -49,6 +65,30 @@ def _make_payload() -> dict:
             "vus_max": {
                 "values": {
                     "value": 100,
+                }
+            },
+            "http_req_waiting": {
+                "values": {
+                    "med": 108.0,
+                    "p(95)": 188.0,
+                    "p(99)": 250.0,
+                    "max": 1400.0,
+                }
+            },
+            "http_req_connecting": {
+                "values": {
+                    "med": 0.0,
+                    "p(95)": 0.0,
+                    "p(99)": 0.0,
+                    "max": 2.0,
+                }
+            },
+            "http_req_tls_handshaking": {
+                "values": {
+                    "med": 0.0,
+                    "p(95)": 0.0,
+                    "p(99)": 0.0,
+                    "max": 10.0,
                 }
             },
             "http_req_duration{test_name:thdGetTradingHistory}": {
@@ -90,6 +130,10 @@ def test_parse_summary_row_happy_path(tmp_path: Path) -> None:
     assert row.max_vus == 1000
     assert row.observed_vus_current == 6
     assert row.observed_vus_peak == 11
+    assert row.total_requests == 36120
+    assert row.dropped_iterations == 12
+    assert row.checks_passes == 36120
+    assert row.checks_fails == 0
     assert row.target_load_rps == 40
     assert row.duration_seconds == 900
     assert row.thresholds == {
@@ -103,6 +147,24 @@ def test_parse_summary_row_happy_path(tmp_path: Path) -> None:
         "med": 110.0,
         "p(95)": 190.0,
         "p(99)": 255.0,
+    }
+    assert row.waiting_metrics_ms == {
+        "max": 1400.0,
+        "med": 108.0,
+        "p(95)": 188.0,
+        "p(99)": 250.0,
+    }
+    assert row.connecting_metrics_ms == {
+        "max": 2.0,
+        "med": 0.0,
+        "p(95)": 0.0,
+        "p(99)": 0.0,
+    }
+    assert row.tls_handshaking_metrics_ms == {
+        "max": 10.0,
+        "med": 0.0,
+        "p(95)": 0.0,
+        "p(99)": 0.0,
     }
     assert row.error_rate_percent == 3.0
     assert row.outcome_passed is False
