@@ -1,0 +1,292 @@
+{
+  "state": {
+    "isStdOutTTY": false,
+    "isStdErrTTY": false,
+    "testRunDurationMs": 601266.925998
+  },
+  "metrics": {
+    "iterations": {
+      "type": "counter",
+      "contains": "default",
+      "values": {
+        "count": 179338,
+        "rate": 298.26686326098786
+      }
+    },
+    "http_req_sending": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "min": 0.039231,
+        "avg": 0.08953560316274206,
+        "med": 0.079392,
+        "max": 0.789729,
+        "p(95)": 0.146103,
+        "p(99)": 0.16352030000000004
+      }
+    },
+    "vus_max": {
+      "type": "gauge",
+      "contains": "default",
+      "values": {
+        "value": 1000,
+        "min": 500,
+        "max": 1000
+      }
+    },
+    "data_sent": {
+      "type": "counter",
+      "contains": "data",
+      "values": {
+        "count": 10743743,
+        "rate": 17868.508204018086
+      }
+    },
+    "vus": {
+      "contains": "default",
+      "values": {
+        "value": 166,
+        "min": 13,
+        "max": 1000
+      },
+      "type": "gauge"
+    },
+    "data_received": {
+      "type": "counter",
+      "contains": "data",
+      "values": {
+        "count": 84305039,
+        "rate": 140212.33391487165
+      }
+    },
+    "http_req_failed": {
+      "type": "rate",
+      "contains": "default",
+      "values": {
+        "passes": 0,
+        "fails": 179338,
+        "rate": 0
+      }
+    },
+    "http_req_receiving": {
+      "contains": "time",
+      "values": {
+        "max": 322.465551,
+        "p(95)": 0.5583581499999982,
+        "p(99)": 3.2785884000000034,
+        "min": 0.009351,
+        "avg": 0.20806705537588438,
+        "med": 0.04893
+      },
+      "type": "trend"
+    },
+    "http_req_failed{test_name:getMegatronFinancials}": {
+      "type": "rate",
+      "contains": "default",
+      "values": {
+        "rate": 0,
+        "passes": 0,
+        "fails": 179338
+      },
+      "thresholds": {
+        "rate<0.001": {
+          "ok": true
+        }
+      }
+    },
+    "http_req_duration{expected_response:true}": {
+      "values": {
+        "med": 53.0247945,
+        "max": 5865.298183,
+        "p(95)": 497.2174139999999,
+        "p(99)": 1074.1607633600024,
+        "min": 34.999802,
+        "avg": 118.83633820085409
+      },
+      "type": "trend",
+      "contains": "time"
+    },
+    "iteration_duration": {
+      "values": {
+        "p(99)": 1074.4590921600022,
+        "min": 35.195986,
+        "avg": 119.16551444111761,
+        "med": 53.297312500000004,
+        "max": 5865.602571,
+        "p(95)": 497.48668799999984
+      },
+      "type": "trend",
+      "contains": "time"
+    },
+    "http_reqs": {
+      "values": {
+        "count": 179338,
+        "rate": 298.26686326098786
+      },
+      "type": "counter",
+      "contains": "default"
+    },
+    "dropped_iterations": {
+      "contains": "default",
+      "values": {
+        "count": 663,
+        "rate": 1.1026716610090164
+      },
+      "type": "counter"
+    },
+    "http_req_duration{test_name:getMegatronFinancials}": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "p(95)": 497.2174139999999,
+        "p(99)": 1074.1607633600024,
+        "min": 34.999802,
+        "avg": 118.83633820085409,
+        "med": 53.0247945,
+        "max": 5865.298183
+      },
+      "thresholds": {
+        "p(95)<300": {
+          "ok": false
+        },
+        "p(99)<600": {
+          "ok": false
+        }
+      }
+    },
+    "http_req_connecting": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "min": 0,
+        "avg": 0.035114751736943665,
+        "med": 0,
+        "max": 146.86678,
+        "p(95)": 0,
+        "p(99)": 0
+      }
+    },
+    "http_req_duration": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "med": 53.0247945,
+        "max": 5865.298183,
+        "p(95)": 497.2174139999999,
+        "p(99)": 1074.1607633600024,
+        "min": 34.999802,
+        "avg": 118.83633820085409
+      }
+    },
+    "http_req_blocked": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "med": 0.000451,
+        "max": 173.657484,
+        "p(95)": 0.000751,
+        "p(99)": 0.001156670000000042,
+        "min": 0.00019,
+        "avg": 0.0766596080919547
+      }
+    },
+    "K6_Metrics_getMegatronFinancials_counter": {
+      "values": {
+        "rate": 298.26686326098786,
+        "count": 179338
+      },
+      "type": "counter",
+      "contains": "default"
+    },
+    "http_req_tls_handshaking": {
+      "contains": "time",
+      "values": {
+        "p(95)": 0,
+        "p(99)": 0,
+        "min": 0,
+        "avg": 0.04010445318337437,
+        "med": 0,
+        "max": 39.559905
+      },
+      "type": "trend"
+    },
+    "http_req_waiting": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "p(95)": 495.93847679999993,
+        "p(99)": 1073.828551780001,
+        "min": 34.910979,
+        "avg": 118.53873554231708,
+        "med": 52.8133445,
+        "max": 5863.906051
+      }
+    },
+    "K6_Metrics_getMegatronFinancials_duration": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "p(95)": 497.2174139999999,
+        "p(99)": 1074.1607633600024,
+        "min": 34.999802,
+        "avg": 118.83633820085409,
+        "med": 53.0247945,
+        "max": 5865.298183
+      }
+    },
+    "checks": {
+      "type": "rate",
+      "contains": "default",
+      "values": {
+        "rate": 1,
+        "passes": 179338,
+        "fails": 0
+      }
+    }
+  },
+  "execScenarios": {
+    "getMegatronFinancials": {
+      "executor": "constant-arrival-rate",
+      "startTime": null,
+      "gracefulStop": null,
+      "exec": "getMegatronFinancials",
+      "tags": {
+        "env_name": "staging",
+        "test_name": "getMegatronFinancials"
+      },
+      "rate": 300,
+      "duration": "10m0s",
+      "preAllocatedVUs": 500,
+      "env": null,
+      "timeUnit": "1s",
+      "maxVUs": 1000
+    }
+  },
+  "execThresholds": {
+    "http_req_duration{test_name:getMegatronFinancials}": [
+      "p(95)<300",
+      "p(99)<600"
+    ],
+    "http_req_failed{test_name:getMegatronFinancials}": ["rate<0.001"]
+  },
+  "root_group": {
+    "name": "",
+    "path": "",
+    "id": "d41d8cd98f00b204e9800998ecf8427e",
+    "groups": [],
+    "checks": [
+      {
+        "passes": 179338,
+        "fails": 0,
+        "name": "is status 200, received 200",
+        "path": "::is status 200, received 200",
+        "id": "6f5bfaa950f48155a77aa11c2e50bf2a"
+      }
+    ]
+  },
+  "options": {
+    "summaryTrendStats": ["min", "avg", "med", "max", "p(95)", "p(99)"],
+    "summaryTimeUnit": "",
+    "noColor": false
+  }
+}
