@@ -84,12 +84,11 @@ class CommandHandler:
         ] = Path("out/k6/performance_summary.md"),
     ) -> None:
         """Generate consolidated markdown summary table from a directory of k6 reports."""
-        try:
-            report_files = sorted(reports_dir.glob("*.json"))
-            if not report_files:
-                msg = f"No JSON report files found in: {reports_dir}"
-                raise ConfigurationError(msg, suggestion="Ensure the directory contains at least one *.json k6 summary report")
+        report_files = sorted(reports_dir.glob("*.json"))
+        if not report_files:
+            self._raise_no_json_reports_error(reports_dir)
 
+        try:
             result = self._k6_summary_table_use_case.generate_k6_summary_table(
                 report_files=report_files,
                 output_path=out_file,
@@ -104,6 +103,11 @@ class CommandHandler:
         else:
             self._console.print(f"[green]✅ K6 summary table: {result.output_path}[/green]")
             self._console.print(f"[dim]Rows: {result.rows_count}[/dim]")
+
+    def _raise_no_json_reports_error(self, reports_dir: Path) -> None:
+        """Raise an error for empty k6 JSON input directories."""
+        msg = f"No JSON report files found in: {reports_dir}"
+        raise ConfigurationError(msg, suggestion="Ensure the directory contains at least one *.json k6 summary report")
 
     def diff_command(
         self,

@@ -10,6 +10,7 @@ from qa_report_generator.adapters.input.cli_adapter.commands import CommandHandl
 from qa_report_generator.application.dtos import AppSettings
 from qa_report_generator.application.ports.input import (
     CompareReportsUseCase,
+    ExtractK6ServiceMetricsUseCase,
     GenerateK6SummaryTableUseCase,
     GenerateReportsUseCase,
     ValidateReportUseCase,
@@ -68,10 +69,12 @@ class K6CliAdapter:
     def __init__(
         self,
         generate_k6_summary_table_use_case: GenerateK6SummaryTableUseCase,
+        extract_k6_service_metrics_use_case: ExtractK6ServiceMetricsUseCase,
     ) -> None:
         """Initialize k6-focused CLI adapter."""
         self._console = Console()
         self._k6_summary_table_use_case = generate_k6_summary_table_use_case
+        self._extract_k6_service_metrics_use_case = extract_k6_service_metrics_use_case
 
         self._app = typer.Typer(
             help="Generate consolidated k6 summary tables",
@@ -83,6 +86,7 @@ class K6CliAdapter:
             """Run k6-focused CLI commands."""
 
         self._app.command(name="generate")(self.generate_command)
+        self._app.command(name="extract")(self.extract_command)
 
     def generate_command(
         self,
@@ -148,6 +152,54 @@ class K6CliAdapter:
             raise typer.Exit(code=1)
 
         return sorted(set(resolved))
+
+    def extract_command(
+        self,
+        *,
+        service: Annotated[
+            str,
+            typer.Option(
+                "--service",
+                help="Service identifier for extraction schema selection",
+            ),
+        ],
+        report: Annotated[
+            Path,
+            typer.Option(
+                "--report",
+                help="Input k6 JSON file",
+                exists=True,
+                file_okay=True,
+                dir_okay=False,
+            ),
+        ],
+        out_file: Annotated[
+            Path | None,
+            typer.Option(
+                "--out-file",
+                help="Output file for extracted structured JSON",
+            ),
+        ] = None,
+    ) -> None:
+        """Extract service-specific deterministic metrics from one k6 JSON report."""
+        output_path = out_file or Path(f"out/k6/extracted_{service}.json")
+
+        try:
+            result = self._extract_k6_service_metrics_use_case.extract(
+                service=service,
+                report_path=report,
+                output_path=output_path,
+            )
+        except ReportingError as e:
+            suggestion = f"\n💡 Suggestion: {e.suggestion}" if e.suggestion else ""
+            self._console.print(f"[red]❌ {e}{suggestion}[/red]")
+            raise typer.Exit(code=1) from e
+        except Exception as e:
+            self._console.print(f"[red]❌ Error: {e}[/red]")
+            raise typer.Exit(code=1) from e
+        else:
+            self._console.print(f"[green]✅ Extracted metrics JSON: {result.output_path}[/green]")
+            self._console.print(f"[dim]Service: {result.service}[/dim]")
 
     def run(self) -> None:
         """Run the CLI application."""
