@@ -1,9 +1,10 @@
 """CLI adapter that exposes k6-oriented commands."""
 
 import json
+from collections.abc import Callable
 from dataclasses import asdict
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, NoReturn, TypeVar
 
 import typer
 
@@ -12,6 +13,8 @@ from qa_report_generator.application.ports.input import (
     GenerateK6SummaryTableUseCase,
 )
 from qa_report_generator.domain.exceptions import ReportingError
+
+_RESULT = TypeVar("_RESULT")
 
 
 class K6CliAdapter:
@@ -30,10 +33,6 @@ class K6CliAdapter:
             help="Generate consolidated k6 summary tables",
             add_completion=False,
         )
-
-        @self._app.callback()
-        def _k6_callback() -> None:
-            """Run k6-focused CLI commands."""
 
         self._app.command(name="generate")(self.generate_command)
         self._app.command(name="extract")(self.extract_command)
@@ -54,45 +53,34 @@ class K6CliAdapter:
     ) -> None:
         """Generate and print consolidated k6 summary rows from file(s) or directories."""
         report_files = self._resolve_report_files(report)
-
-        try:
-            result = self._k6_summary_table_use_case.generate_k6_summary_table(report_files=report_files)
-        except ReportingError as e:
-            suggestion = f"\n💡 Suggestion: {e.suggestion}" if e.suggestion else ""
-            typer.secho(f"❌ {e}{suggestion}", fg=typer.colors.RED)
-            raise typer.Exit(code=1) from e
-        except Exception as e:
-            typer.secho(f"❌ Error: {e}", fg=typer.colors.RED)
-            raise typer.Exit(code=1) from e
-        else:
-            rows_payload = [asdict(row) for row in result.rows]
-            typer.secho("✅ Parsed k6 summary rows", fg=typer.colors.GREEN)
-            typer.echo(json.dumps(rows_payload, ensure_ascii=False, indent=2, sort_keys=True))
+        result = self._execute_or_exit(lambda: self._k6_summary_table_use_case.generate_k6_summary_table(report_files=report_files))
+        rows_payload = [asdict(row) for row in result.rows]
+        self._print_json_output(success_message="Parsed k6 summary rows", payload=rows_payload)
 
     def _resolve_report_files(self, report_inputs: list[Path]) -> list[Path]:
         """Resolve report inputs into a de-duplicated file list."""
-        resolved: list[Path] = []
+        resolved_files: set[Path] = set()
 
         for report_input in report_inputs:
-            if report_input.is_dir():
-                dir_files = sorted(path for path in report_input.glob("*.json") if path.is_file())
-                if not dir_files:
-                    typer.secho(f"❌ No JSON report files found in directory: {report_input}", fg=typer.colors.RED)
-                    raise typer.Exit(code=1)
-                resolved.extend(dir_files)
-                continue
+            resolved_files.update(self._expand_report_input(report_input))
 
-            if report_input.is_file():
-                if report_input.suffix.lower() != ".json":
-                    typer.secho(f"❌ Report file must be a JSON file: {report_input}", fg=typer.colors.RED)
-                    raise typer.Exit(code=1)
-                resolved.append(report_input)
-                continue
+        return sorted(resolved_files)
 
-            typer.secho(f"❌ Invalid report input: {report_input}", fg=typer.colors.RED)
-            raise typer.Exit(code=1)
+    def _expand_report_input(self, report_input: Path) -> list[Path]:
+        """Expand one report input into concrete JSON files."""
+        if report_input.is_dir():
+            directory_files = sorted(path for path in report_input.glob("*.json") if path.is_file())
+            if not directory_files:
+                self._exit_with_error(f"No JSON report files found in directory: {report_input}")
+            return directory_files
 
-        return sorted(set(resolved))
+        if report_input.is_file():
+            if report_input.suffix.lower() != ".json":
+                self._exit_with_error(f"Report file must be a JSON file: {report_input}")
+            return [report_input]
+
+        self._exit_with_error(f"Invalid report input: {report_input}")
+        return []
 
     def extract_command(
         self,
@@ -117,33 +105,47 @@ class K6CliAdapter:
     ) -> None:
         """Extract and print service-specific deterministic metrics from one or more k6 JSON reports."""
         report_files = self._resolve_report_files(report)
-
-        try:
-            result = self._extract_k6_service_metrics_use_case.extract(
+        result = self._execute_or_exit(
+            lambda: self._extract_k6_service_metrics_use_case.extract(
                 service=service,
                 report_paths=report_files,
             )
-        except ReportingError as e:
-            suggestion = f"\n💡 Suggestion: {e.suggestion}" if e.suggestion else ""
-            typer.secho(f"❌ {e}{suggestion}", fg=typer.colors.RED)
-            raise typer.Exit(code=1) from e
-        except Exception as e:
-            typer.secho(f"❌ Error: {e}", fg=typer.colors.RED)
-            raise typer.Exit(code=1) from e
-        else:
-            typer.secho("✅ Parsed extracted model", fg=typer.colors.GREEN)
-            typer.echo(f"Service: {result.service}")
-            payload = {
-                "service": result.service,
-                "extracted_runs": [
-                    {
-                        "report_file": run.report_file,
-                        "extracted": run.extracted,
-                    }
-                    for run in result.extracted_runs
-                ],
-            }
-            typer.echo(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True))
+        )
+        payload = {
+            "service": result.service,
+            "extracted_runs": [
+                {
+                    "report_file": run.report_file,
+                    "extracted": run.extracted,
+                }
+                for run in result.extracted_runs
+            ],
+        }
+        self._print_json_output(success_message="Parsed extracted model", payload=payload, heading=f"Service: {result.service}")
+
+    def _execute_or_exit(self, operation: Callable[[], _RESULT]) -> _RESULT:
+        """Execute operation and convert domain/system errors to CLI exits."""
+        try:
+            return operation()
+        except ReportingError as error:
+            suggestion = f"\n💡 Suggestion: {error.suggestion}" if error.suggestion else ""
+            self._exit_with_error(f"{error}{suggestion}", error=error)
+        except Exception as error:
+            self._exit_with_error(f"Error: {error}", error=error)
+
+    def _print_json_output(self, *, success_message: str, payload: object, heading: str | None = None) -> None:
+        """Print a success message and JSON payload."""
+        typer.secho(f"✅ {success_message}", fg=typer.colors.GREEN)
+        if heading:
+            typer.echo(heading)
+        typer.echo(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True))
+
+    def _exit_with_error(self, message: str, *, error: Exception | None = None) -> NoReturn:
+        """Print a formatted error and stop command execution."""
+        typer.secho(f"❌ {message}", fg=typer.colors.RED)
+        if error is None:
+            raise typer.Exit(code=1)
+        raise typer.Exit(code=1) from error
 
     def run(self) -> None:
         """Run the CLI application."""

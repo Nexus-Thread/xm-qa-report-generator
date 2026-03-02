@@ -18,8 +18,13 @@ if TYPE_CHECKING:
 class StubK6SummaryUseCase:
     """Stub k6 summary table use case."""
 
+    def __init__(self) -> None:
+        """Initialize call storage."""
+        self.calls: list[list[Path]] = []
+
     def generate_k6_summary_table(self, *, report_files: list[Path]) -> K6SummaryTableResult:
         """Return a deterministic summary result."""
+        self.calls.append(report_files)
         rows = [
             K6SummaryRow(
                 report_file=path.name,
@@ -33,6 +38,16 @@ class StubK6SummaryUseCase:
             for path in report_files
         ]
         return K6SummaryTableResult(rows=rows)
+
+
+class FailingSummaryUseCase:
+    """Summary table use case stub that raises domain error."""
+
+    def generate_k6_summary_table(self, *, report_files: list[Path]) -> K6SummaryTableResult:
+        """Raise reporting error."""
+        del report_files
+        msg = "boom"
+        raise ReportingError(msg)
 
 
 class SpyExtractionUseCase:
@@ -85,6 +100,42 @@ def test_extract_command_passes_service_and_report_to_use_case(tmp_path: Path) -
     assert called_reports == [report_path_1, report_path_2]
 
 
+def test_generate_command_resolves_directory_reports_and_deduplicates(tmp_path: Path) -> None:
+    """Generate command forwards sorted unique JSON reports to use case."""
+    reports_dir = tmp_path / "reports"
+    reports_dir.mkdir()
+    report_path_1 = reports_dir / "a.json"
+    report_path_2 = reports_dir / "b.json"
+    report_path_1.write_text("{}", encoding="utf-8")
+    report_path_2.write_text("{}", encoding="utf-8")
+    (reports_dir / "skip.txt").write_text("ignored", encoding="utf-8")
+
+    summary_use_case = StubK6SummaryUseCase()
+    adapter = K6CliAdapter(
+        generate_k6_summary_table_use_case=summary_use_case,
+        extract_k6_service_metrics_use_case=SpyExtractionUseCase(),
+    )
+
+    adapter.generate_command(report=[reports_dir, report_path_2])
+
+    assert len(summary_use_case.calls) == 1
+    assert summary_use_case.calls[0] == [report_path_1, report_path_2]
+
+
+def test_generate_command_raises_typer_exit_on_reporting_error(tmp_path: Path) -> None:
+    """Generate command converts domain reporting errors to Typer exit."""
+    report_path = tmp_path / "report.json"
+    report_path.write_text("{}", encoding="utf-8")
+
+    adapter = K6CliAdapter(
+        generate_k6_summary_table_use_case=FailingSummaryUseCase(),
+        extract_k6_service_metrics_use_case=SpyExtractionUseCase(),
+    )
+
+    with pytest.raises(typer.Exit):
+        adapter.generate_command(report=[report_path])
+
+
 def test_extract_command_raises_typer_exit_on_reporting_error(tmp_path: Path) -> None:
     """Extract command converts domain reporting errors to Typer exit."""
     report_path = tmp_path / "report.json"
@@ -93,6 +144,23 @@ def test_extract_command_raises_typer_exit_on_reporting_error(tmp_path: Path) ->
     adapter = K6CliAdapter(
         generate_k6_summary_table_use_case=StubK6SummaryUseCase(),
         extract_k6_service_metrics_use_case=FailingExtractionUseCase(),
+    )
+
+    with pytest.raises(typer.Exit):
+        adapter.extract_command(
+            service="megatron",
+            report=[report_path],
+        )
+
+
+def test_extract_command_raises_typer_exit_on_non_json_report(tmp_path: Path) -> None:
+    """Extract command rejects non-JSON report files."""
+    report_path = tmp_path / "report.txt"
+    report_path.write_text("{}", encoding="utf-8")
+
+    adapter = K6CliAdapter(
+        generate_k6_summary_table_use_case=StubK6SummaryUseCase(),
+        extract_k6_service_metrics_use_case=SpyExtractionUseCase(),
     )
 
     with pytest.raises(typer.Exit):
