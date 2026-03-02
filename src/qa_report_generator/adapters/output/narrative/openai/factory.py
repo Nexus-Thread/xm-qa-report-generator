@@ -9,7 +9,7 @@ import httpx
 
 from openai import OpenAI
 
-from .constants import DEFAULT_BACKOFF_SECONDS, DEFAULT_MAX_RETRIES, DEFAULT_TIMEOUT_SECONDS, DEFAULT_VERIFY_SSL
+from .constants import DEFAULT_BACKOFF_FACTOR, DEFAULT_MAX_RETRIES, DEFAULT_TIMEOUT_SECONDS, DEFAULT_VERIFY_SSL
 from .transport import OpenAIClient
 
 
@@ -29,8 +29,8 @@ class OpenAIClientSettingsProtocol(Protocol):
         """Return maximum retry attempts."""
 
     @property
-    def backoff_seconds(self) -> float:
-        """Return base backoff duration in seconds."""
+    def backoff_factor(self) -> float:
+        """Return exponential retry backoff factor."""
 
     @property
     def verify_ssl(self) -> bool:
@@ -48,7 +48,7 @@ class OpenAIClientSettings:
     base_url: str
     api_key: str
     max_retries: int = DEFAULT_MAX_RETRIES
-    backoff_seconds: float = DEFAULT_BACKOFF_SECONDS
+    backoff_factor: float = DEFAULT_BACKOFF_FACTOR
     verify_ssl: bool = DEFAULT_VERIFY_SSL
     timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS
 
@@ -68,5 +68,5 @@ def build_client(settings: OpenAIClientSettingsProtocol) -> OpenAIClient:
     return OpenAIClient(
         sdk_client=sdk_client,
         max_retries=settings.max_retries,
-        backoff_seconds=settings.backoff_seconds,
+        backoff_factor=settings.backoff_factor,
     )

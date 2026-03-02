@@ -1,6 +1,6 @@
 """OpenAI transport client utilities."""
 
-from .constants import DEFAULT_BACKOFF_SECONDS, DEFAULT_MAX_RETRIES, DEFAULT_TIMEOUT_SECONDS, DEFAULT_VERIFY_SSL
+from .constants import DEFAULT_BACKOFF_FACTOR, DEFAULT_MAX_RETRIES, DEFAULT_TIMEOUT_SECONDS, DEFAULT_VERIFY_SSL
 from .factory import (
     OpenAIClientSettings,
     OpenAIClientSettingsProtocol,
@@ -11,7 +11,7 @@ from .response import OpenAIResponseError, OpenAIResponseUsage, extract_message_
 from .transport import OpenAIClient
 
 __all__ = [
-    "DEFAULT_BACKOFF_SECONDS",
+    "DEFAULT_BACKOFF_FACTOR",
     "DEFAULT_MAX_RETRIES",
     "DEFAULT_TIMEOUT_SECONDS",
     "DEFAULT_VERIFY_SSL",

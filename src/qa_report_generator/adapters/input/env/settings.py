@@ -49,18 +49,6 @@ class EnvSettings(BaseSettings):
         alias="LLM_API_KEY",
         description="API key for OpenAI-compatible endpoint",
     )
-    llm_temperature: float | None = Field(
-        default=None,
-        alias="LLM_TEMPERATURE",
-        ge=0.0,
-        le=2.0,
-        description="Sampling temperature (0.0 = deterministic, 1.0 = creative). Set to None for provider default.",
-    )
-    llm_reasoning_effort: str | None = Field(
-        default=None,
-        alias="LLM_REASONING_EFFORT",
-        description="Optional reasoning effort (model-specific)",
-    )
     llm_timeout: float = Field(
         default=100.0,
         alias="LLM_TIMEOUT",

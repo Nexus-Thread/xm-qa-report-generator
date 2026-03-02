@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Protocol, cast
 
 from openai import APIError
 
-from .constants import DEFAULT_BACKOFF_SECONDS, DEFAULT_MAX_RETRIES
+from .constants import DEFAULT_BACKOFF_FACTOR, DEFAULT_MAX_RETRIES
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -54,13 +54,20 @@ class OpenAIClient:
         sdk_client: object,
         *,
         max_retries: int = DEFAULT_MAX_RETRIES,
-        backoff_seconds: float = DEFAULT_BACKOFF_SECONDS,
+        backoff_factor: float = DEFAULT_BACKOFF_FACTOR,
         sleep: Callable[[float], None] = time.sleep,
     ) -> None:
         """Store the OpenAI SDK client."""
+        if max_retries < 0:
+            msg = "max_retries must be greater than or equal to 0"
+            raise ValueError(msg)
+        if backoff_factor < 1.0:
+            msg = "backoff_factor must be greater than or equal to 1.0"
+            raise ValueError(msg)
+
         self._sdk_client = cast("_OpenAISDKClientProtocol", sdk_client)
         self._max_retries = max_retries
-        self._backoff_seconds = backoff_seconds
+        self._backoff_factor = backoff_factor
         self._sleep = sleep
 
     def create_json_completion(
@@ -97,11 +104,12 @@ class OpenAIClient:
         response_format: dict[str, str] | None,
     ) -> object:
         """Invoke the SDK chat completions API with optional JSON format and retry logic."""
-        for attempt in range(self._max_retries):
+        total_attempts = self._max_retries + 1
+        for attempt in range(total_attempts):
             try:
                 return self._chat_completions_create(model, messages, response_format=response_format)
             except APIError:
-                if attempt >= self._max_retries - 1:
+                if attempt >= total_attempts - 1:
                     LOGGER.exception(
                         "OpenAI completion failed after retries",
                         extra={
@@ -111,20 +119,21 @@ class OpenAIClient:
                         },
                     )
                     raise
-                delay = self._backoff_seconds * (2**attempt)
+                retry_attempt = attempt + 1
+                delay = self._backoff_factor**retry_attempt
                 LOGGER.warning(
                     "OpenAI completion failed, retrying",
                     extra={
                         "component": self.__class__.__name__,
                         "model": model,
-                        "attempt": attempt + 1,
+                        "attempt": retry_attempt,
                         "max_retries": self._max_retries,
                         "retry_delay_seconds": delay,
                     },
                 )
                 self._sleep(delay)
 
-        message = "Unreachable retry state"
+        message = "Unexpected transport retry loop termination"
         raise RuntimeError(message)
 
     def _chat_completions_create(

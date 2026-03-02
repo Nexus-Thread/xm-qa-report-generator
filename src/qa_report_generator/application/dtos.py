@@ -19,8 +19,6 @@ class AppSettings:
     llm_model: str
     llm_base_url: str
     llm_api_key: str
-    llm_temperature: float | None
-    llm_reasoning_effort: str | None
     llm_timeout: float
     llm_max_retries: int
     llm_retry_backoff_factor: float

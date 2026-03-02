@@ -1,0 +1,86 @@
+"""Unit tests for OpenAI response parsing helpers."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+
+import pytest
+
+from qa_report_generator.adapters.output.narrative.openai.response import (
+    OpenAIResponseError,
+    OpenAIResponseUsage,
+    extract_message_content,
+    extract_usage,
+)
+
+
+@dataclass(frozen=True)
+class _Message:
+    content: str | None
+
+
+@dataclass(frozen=True)
+class _Choice:
+    message: _Message | None
+
+
+@dataclass(frozen=True)
+class _Usage:
+    prompt_tokens: int | None = None
+    completion_tokens: int | None = None
+    total_tokens: int | None = None
+
+
+@dataclass(frozen=True)
+class _Response:
+    choices: list[_Choice] | None = None
+    usage: _Usage | None = None
+
+
+def test_extract_message_content_returns_first_choice_content() -> None:
+    """Response helper returns content from first choice message."""
+    response = _Response(choices=[_Choice(message=_Message(content="ok"))])
+
+    assert extract_message_content(response) == "ok"
+
+
+def test_extract_message_content_raises_when_choices_are_missing() -> None:
+    """Response helper raises a domain-specific error for missing choices."""
+    response = _Response(choices=[])
+
+    with pytest.raises(OpenAIResponseError, match="choices"):
+        extract_message_content(response)
+
+
+def test_extract_message_content_raises_when_message_is_missing() -> None:
+    """Response helper raises when first choice has no message."""
+    response = _Response(choices=[_Choice(message=None)])
+
+    with pytest.raises(OpenAIResponseError, match="message"):
+        extract_message_content(response)
+
+
+def test_extract_message_content_raises_when_content_is_missing() -> None:
+    """Response helper raises when message content is missing."""
+    response = _Response(choices=[_Choice(message=_Message(content=None))])
+
+    with pytest.raises(OpenAIResponseError, match="content"):
+        extract_message_content(response)
+
+
+def test_extract_usage_returns_none_when_usage_missing() -> None:
+    """Response helper returns None when token usage is absent."""
+    response = _Response(usage=None)
+
+    assert extract_usage(response) is None
+
+
+def test_extract_usage_returns_usage_dataclass() -> None:
+    """Response helper maps usage fields into stable dataclass shape."""
+    response = _Response(usage=_Usage(prompt_tokens=10, completion_tokens=5, total_tokens=15))
+
+    assert extract_usage(response) == OpenAIResponseUsage(
+        prompt_tokens=10,
+        completion_tokens=5,
+        total_tokens=15,
+    )

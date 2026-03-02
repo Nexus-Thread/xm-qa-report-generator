@@ -28,8 +28,6 @@ class EnvSettingsAdapter:
             llm_model=settings.llm_model,
             llm_base_url=settings.llm_base_url,
             llm_api_key=settings.llm_api_key,
-            llm_temperature=settings.llm_temperature,
-            llm_reasoning_effort=settings.llm_reasoning_effort,
             llm_timeout=settings.llm_timeout,
             llm_max_retries=settings.llm_max_retries,
             llm_retry_backoff_factor=settings.llm_retry_backoff_factor,
