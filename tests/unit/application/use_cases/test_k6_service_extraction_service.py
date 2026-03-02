@@ -97,19 +97,30 @@ def _extracted_payload() -> dict[str, Any]:
 
 def test_extract_filters_removed_keys_and_returns_validated_payload(tmp_path: Path) -> None:
     """Extraction filters heavy keys and returns validated payload."""
-    report_path = tmp_path / "report.json"
-    report_path.write_text(json.dumps(_source_payload()), encoding="utf-8")
+    report_path_1 = tmp_path / "report-1.json"
+    report_path_2 = tmp_path / "report-2.json"
+    report_path_1.write_text(json.dumps(_source_payload()), encoding="utf-8")
+    report_path_2.write_text(json.dumps(_source_payload()), encoding="utf-8")
 
-    llm = StubStructuredLlm([_extracted_payload(), {"mismatches": []}])
+    llm = StubStructuredLlm(
+        [
+            _extracted_payload(),
+            {"mismatches": []},
+            _extracted_payload(),
+            {"mismatches": []},
+        ]
+    )
     service = K6ServiceExtractionService(llm=llm)
 
     result = service.extract(
         service="megatron",
-        report_path=report_path,
+        report_paths=[report_path_1, report_path_2],
     )
 
     assert result.service == "megatron"
-    assert result.extracted["service"] == "megatron"
+    assert len(result.extracted_runs) == 2
+    assert result.extracted_runs[0].extracted["service"] == "megatron"
+    assert result.extracted_runs[1].extracted["service"] == "megatron"
     extraction_prompt = json.loads(llm.calls[0][1])
     assert "setup_data" not in extraction_prompt["source"]
     assert "root_group" not in extraction_prompt["source"]
@@ -142,5 +153,5 @@ def test_extract_fails_on_verification_mismatch(tmp_path: Path) -> None:
     with pytest.raises(ExtractionVerificationError):
         service.extract(
             service="megatron",
-            report_path=report_path,
+            report_paths=[report_path],
         )

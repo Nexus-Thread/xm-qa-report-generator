@@ -8,7 +8,7 @@ import pytest
 import typer
 
 from qa_report_generator.adapters.input.cli_adapter import K6CliAdapter
-from qa_report_generator.application.dtos import K6ServiceExtractionResult, K6SummaryRow, K6SummaryTableResult
+from qa_report_generator.application.dtos import K6ServiceExtractionResult, K6ServiceExtractionRun, K6SummaryRow, K6SummaryTableResult
 from qa_report_generator.domain.exceptions import ReportingError
 
 if TYPE_CHECKING:
@@ -40,31 +40,33 @@ class SpyExtractionUseCase:
 
     def __init__(self) -> None:
         """Initialize call storage."""
-        self.calls: list[tuple[str, Path]] = []
+        self.calls: list[tuple[str, list[Path]]] = []
 
-    def extract(self, *, service: str, report_path: Path) -> K6ServiceExtractionResult:
+    def extract(self, *, service: str, report_paths: list[Path]) -> K6ServiceExtractionResult:
         """Record call and return deterministic extraction result."""
-        self.calls.append((service, report_path))
+        self.calls.append((service, report_paths))
         return K6ServiceExtractionResult(
             service=service,
-            extracted={"service": service},
+            extracted_runs=[K6ServiceExtractionRun(report_file=path.name, extracted={"service": service}) for path in report_paths],
         )
 
 
 class FailingExtractionUseCase:
     """Extraction use case stub that raises domain error."""
 
-    def extract(self, *, service: str, report_path: Path) -> K6ServiceExtractionResult:
+    def extract(self, *, service: str, report_paths: list[Path]) -> K6ServiceExtractionResult:
         """Raise reporting error."""
-        del service, report_path
+        del service, report_paths
         msg = "boom"
         raise ReportingError(msg)
 
 
 def test_extract_command_passes_service_and_report_to_use_case(tmp_path: Path) -> None:
-    """Extract command forwards service and report path to use case."""
-    report_path = tmp_path / "report.json"
-    report_path.write_text("{}", encoding="utf-8")
+    """Extract command forwards service and resolved report paths to use case."""
+    report_path_1 = tmp_path / "report-1.json"
+    report_path_2 = tmp_path / "report-2.json"
+    report_path_1.write_text("{}", encoding="utf-8")
+    report_path_2.write_text("{}", encoding="utf-8")
 
     extraction_use_case = SpyExtractionUseCase()
     adapter = K6CliAdapter(
@@ -74,13 +76,13 @@ def test_extract_command_passes_service_and_report_to_use_case(tmp_path: Path) -
 
     adapter.extract_command(
         service="megatron",
-        report=report_path,
+        report=[report_path_1, report_path_2],
     )
 
     assert len(extraction_use_case.calls) == 1
-    service, called_report = extraction_use_case.calls[0]
+    service, called_reports = extraction_use_case.calls[0]
     assert service == "megatron"
-    assert called_report == report_path
+    assert called_reports == [report_path_1, report_path_2]
 
 
 def test_extract_command_raises_typer_exit_on_reporting_error(tmp_path: Path) -> None:
@@ -96,5 +98,5 @@ def test_extract_command_raises_typer_exit_on_reporting_error(tmp_path: Path) ->
     with pytest.raises(typer.Exit):
         adapter.extract_command(
             service="megatron",
-            report=report_path,
+            report=[report_path],
         )

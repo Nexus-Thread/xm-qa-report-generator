@@ -52,11 +52,19 @@ class K6SummaryTableResult:
 
 
 @dataclass(frozen=True)
+class K6ServiceExtractionRun:
+    """Validated extraction payload for one input report file."""
+
+    report_file: str
+    extracted: dict[str, Any]
+
+
+@dataclass(frozen=True)
 class K6ServiceExtractionResult:
-    """Validated extraction payload returned for one service."""
+    """Validated extraction payloads returned for one service."""
 
     service: str
-    extracted: dict[str, Any]
+    extracted_runs: list[K6ServiceExtractionRun]
 
 
 @dataclass(frozen=True)

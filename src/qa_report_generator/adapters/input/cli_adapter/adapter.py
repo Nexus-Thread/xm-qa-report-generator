@@ -107,21 +107,23 @@ class K6CliAdapter:
             ),
         ],
         report: Annotated[
-            Path,
+            list[Path],
             typer.Option(
                 "--report",
-                help="Input k6 JSON file",
+                help="k6 JSON file or directory containing k6 JSON files (repeat for multiple inputs)",
                 exists=True,
                 file_okay=True,
-                dir_okay=False,
+                dir_okay=True,
             ),
         ],
     ) -> None:
-        """Extract and print service-specific deterministic metrics from one k6 JSON report."""
+        """Extract and print service-specific deterministic metrics from one or more k6 JSON reports."""
+        report_files = self._resolve_report_files(report)
+
         try:
             result = self._extract_k6_service_metrics_use_case.extract(
                 service=service,
-                report_path=report,
+                report_paths=report_files,
             )
         except ReportingError as e:
             suggestion = f"\n💡 Suggestion: {e.suggestion}" if e.suggestion else ""
@@ -133,7 +135,17 @@ class K6CliAdapter:
         else:
             self._console.print("[green]✅ Parsed extracted model[/green]")
             self._console.print(f"[dim]Service: {result.service}[/dim]")
-            self._console.print_json(json.dumps(result.extracted, ensure_ascii=False, indent=2, sort_keys=True))
+            payload = {
+                "service": result.service,
+                "extracted_runs": [
+                    {
+                        "report_file": run.report_file,
+                        "extracted": run.extracted,
+                    }
+                    for run in result.extracted_runs
+                ],
+            }
+            self._console.print_json(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True))
 
     def run(self) -> None:
         """Run the CLI application."""

@@ -44,7 +44,7 @@ class GenerateK6SummaryTableUseCase(Protocol):
 class ExtractK6ServiceMetricsUseCase(Protocol):
     """Port for deterministic service-specific k6 metric extraction."""
 
-    def extract(self, *, service: str, report_path: Path) -> K6ServiceExtractionResult:
+    def extract(self, *, service: str, report_paths: list[Path]) -> K6ServiceExtractionResult:
         """Extract service-specific structured metrics."""
 
 

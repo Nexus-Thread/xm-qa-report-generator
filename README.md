@@ -14,13 +14,13 @@ qa-report-generator-k6 generate \
 ```bash
 qa-report-generator-k6 extract \
   --service megatron \
-  --report k6_example/megatron/megatron-1.json
+  --report k6_example/megatron
 ```
 
 Notes:
 - Extraction is service-scoped and schema-driven.
 - Verification is strict-fail: any numeric mismatch fails the run.
-- Output is printed to the console as parsed JSON models.
+- Output is printed as one consolidated envelope with `extracted_runs` (one item per executor report).
 
 ## Adding a new service extraction module
 

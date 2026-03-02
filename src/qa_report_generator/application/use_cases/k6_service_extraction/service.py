@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any, cast
 
 from pydantic import BaseModel, ValidationError
 
-from qa_report_generator.application.dtos import K6ServiceExtractionResult, VerificationMismatch
+from qa_report_generator.application.dtos import K6ServiceExtractionResult, K6ServiceExtractionRun, VerificationMismatch
 from qa_report_generator.application.service_definitions import get_service_definition
 from qa_report_generator.domain.exceptions import ConfigurationError, ExtractionVerificationError
 
@@ -25,45 +25,55 @@ class K6ServiceExtractionService:
         """Store adapter dependencies."""
         self._llm = llm
 
-    def extract(self, *, service: str, report_path: Path) -> K6ServiceExtractionResult:
-        """Run two-step extraction + verification and return validated payload."""
+    def extract(self, *, service: str, report_paths: list[Path]) -> K6ServiceExtractionResult:
+        """Run two-step extraction + verification and return validated payloads."""
+        if not report_paths:
+            msg = "No report files provided for extraction"
+            raise ConfigurationError(msg, suggestion="Pass one or more k6 JSON reports")
+
         definition = self._resolve_definition(service)
-        source = self._load_source_json(report_path)
-        filtered_source = self._filter_source(source, remove_keys=definition.remove_keys)
-        filtered_source_json = self._to_canonical_json(filtered_source)
+        extracted_runs: list[K6ServiceExtractionRun] = []
 
-        extraction_prompt = definition.build_extraction_user_prompt(
-            filtered_source_json,
-            definition.dump_schema(),
-            report_path.name,
-        )
-        extracted_payload = self._llm.complete_json(
-            system_prompt=definition.extraction_system_prompt,
-            user_prompt=extraction_prompt,
-        )
+        for report_path in report_paths:
+            source = self._load_source_json(report_path)
+            filtered_source = self._filter_source(source, remove_keys=definition.remove_keys)
+            filtered_source_json = self._to_canonical_json(filtered_source)
 
-        extracted_model = self._validate_with_schema(definition.schema_type, extracted_payload)
-        definition.validate_extracted(extracted_model)
-
-        extracted_json = self._to_canonical_json(extracted_model.model_dump(by_alias=True))
-        verification_prompt = definition.build_verification_user_prompt(filtered_source_json, extracted_json)
-        verification_payload = self._llm.complete_json(
-            system_prompt=definition.verification_system_prompt,
-            user_prompt=verification_prompt,
-        )
-        mismatches = self._parse_mismatches(verification_payload)
-        if mismatches:
-            first_mismatch = mismatches[0]
-            msg = (
-                "Verification failed with numeric mismatches. "
-                f"First mismatch: {first_mismatch.field} expected={first_mismatch.expected} "
-                f"actual={first_mismatch.actual} source={first_mismatch.source_jsonpath}"
+            extraction_prompt = definition.build_extraction_user_prompt(
+                filtered_source_json,
+                definition.dump_schema(),
+                report_path.name,
             )
-            raise ExtractionVerificationError(msg, suggestion="Inspect source and extracted payloads for mapping drift")
+            extracted_payload = self._llm.complete_json(
+                system_prompt=definition.extraction_system_prompt,
+                user_prompt=extraction_prompt,
+            )
+
+            extracted_model = self._validate_with_schema(definition.schema_type, extracted_payload)
+            definition.validate_extracted(extracted_model)
+
+            extracted = extracted_model.model_dump(by_alias=True)
+            extracted_json = self._to_canonical_json(extracted)
+            verification_prompt = definition.build_verification_user_prompt(filtered_source_json, extracted_json)
+            verification_payload = self._llm.complete_json(
+                system_prompt=definition.verification_system_prompt,
+                user_prompt=verification_prompt,
+            )
+            mismatches = self._parse_mismatches(verification_payload)
+            if mismatches:
+                first_mismatch = mismatches[0]
+                msg = (
+                    "Verification failed with numeric mismatches. "
+                    f"First mismatch: {first_mismatch.field} expected={first_mismatch.expected} "
+                    f"actual={first_mismatch.actual} source={first_mismatch.source_jsonpath}"
+                )
+                raise ExtractionVerificationError(msg, suggestion="Inspect source and extracted payloads for mapping drift")
+
+            extracted_runs.append(K6ServiceExtractionRun(report_file=report_path.name, extracted=extracted))
 
         return K6ServiceExtractionResult(
             service=service,
-            extracted=extracted_model.model_dump(by_alias=True),
+            extracted_runs=extracted_runs,
         )
 
     def _resolve_definition(self, service: str) -> ServiceDefinition:

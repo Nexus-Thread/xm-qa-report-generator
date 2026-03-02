@@ -5,10 +5,11 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 
 cd "$SCRIPT_DIR"
 
-OUTPUT_PATH="out/k6/performance_summary.md"
+SERVICE="megatron"
+REPORT_PATH="k6_example/megatron/"
 
-uv run qa-report-generator-k6 generate \
-  --report k6_example/megatron \
-  --out-file "$OUTPUT_PATH"
+uv run qa-report-generator-k6 extract \
+  --service "$SERVICE" \
+  --report "$REPORT_PATH"
 
-echo "Generated merged k6 summary: $OUTPUT_PATH"
+echo "Printed consolidated extracted_runs model for service: $SERVICE"
