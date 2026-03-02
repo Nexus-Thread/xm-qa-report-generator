@@ -2,20 +2,70 @@
 
 from __future__ import annotations
 
+import importlib
+import pkgutil
 from typing import TYPE_CHECKING
-
-from qa_report_generator.application.service_definitions.megatron import SERVICE_DEFINITION as MEGATRON_DEFINITION
 
 if TYPE_CHECKING:
     from qa_report_generator.application.service_definitions.base import ServiceDefinition
 
-SERVICE_DEFINITIONS: dict[str, ServiceDefinition] = {
-    MEGATRON_DEFINITION.name: MEGATRON_DEFINITION,
-}
+
+SERVICE_DEFINITIONS: dict[str, ServiceDefinition] = {}
+_SERVICE_SOURCES: dict[str, str] = {}
+_DISCOVERY_STATE = {"builtins_discovered": False}
+
+
+def _store_definition(*, definition: ServiceDefinition, source: str) -> None:
+    """Store one definition and reject conflicting registrations."""
+    name = definition.name.strip()
+    if not name:
+        msg = "Service definition name must not be empty"
+        raise ValueError(msg)
+
+    existing = SERVICE_DEFINITIONS.get(name)
+    if existing is not None and existing is not definition:
+        existing_source = _SERVICE_SOURCES.get(name, "unknown")
+        msg = f"Service definition '{name}' already registered by {existing_source}"
+        raise ValueError(msg)
+
+    SERVICE_DEFINITIONS[name] = definition
+    _SERVICE_SOURCES[name] = source
+
+
+def _discover_builtin_definitions() -> None:
+    """Discover built-in service definitions from subpackages."""
+    if _DISCOVERY_STATE["builtins_discovered"]:
+        return
+
+    package_paths = list(globals().get("__path__", []))
+    for module_info in pkgutil.iter_modules(package_paths):
+        if not module_info.ispkg or module_info.name.startswith("_"):
+            continue
+
+        module = importlib.import_module(f"{__name__}.{module_info.name}")
+        definition = getattr(module, "SERVICE_DEFINITION", None)
+        if definition is None:
+            continue
+        _store_definition(definition=definition, source=f"builtin:{module_info.name}")
+
+    _DISCOVERY_STATE["builtins_discovered"] = True
+
+
+def register_service_definition(definition: ServiceDefinition) -> None:
+    """Register one service definition for runtime use."""
+    _discover_builtin_definitions()
+    _store_definition(definition=definition, source="runtime")
+
+
+def list_service_definitions() -> tuple[str, ...]:
+    """Return sorted names of registered service definitions."""
+    _discover_builtin_definitions()
+    return tuple(sorted(SERVICE_DEFINITIONS))
 
 
 def get_service_definition(service: str) -> ServiceDefinition:
     """Return service definition by name or raise ValueError."""
+    _discover_builtin_definitions()
     if service in SERVICE_DEFINITIONS:
         return SERVICE_DEFINITIONS[service]
     msg = f"Unsupported service: {service}"
@@ -25,4 +75,6 @@ def get_service_definition(service: str) -> ServiceDefinition:
 __all__ = [
     "SERVICE_DEFINITIONS",
     "get_service_definition",
+    "list_service_definitions",
+    "register_service_definition",
 ]

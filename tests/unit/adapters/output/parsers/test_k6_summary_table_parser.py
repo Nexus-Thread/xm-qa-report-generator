@@ -21,7 +21,7 @@ def test_parse_prefers_scenario_metric_values(tmp_path: Path) -> None:
         json.dumps(
             {
                 "execScenarios": {
-                    "megatron-load": {
+                    "orders-load": {
                         "executor": "constant-arrival-rate",
                     }
                 },
@@ -32,7 +32,7 @@ def test_parse_prefers_scenario_metric_values(tmp_path: Path) -> None:
                             "p(99)": 999.0,
                         }
                     },
-                    "http_req_duration{test_name:megatron-load}": {
+                    "http_req_duration{test_name:orders-load}": {
                         "values": {
                             "p(95)": 150.0,
                             "p(99)": 200.0,
@@ -61,7 +61,7 @@ def test_parse_prefers_scenario_metric_values(tmp_path: Path) -> None:
 
     assert len(rows) == 1
     row = rows[0]
-    assert row.scenario == "megatron-load"
+    assert row.scenario == "orders-load"
     assert row.p95_duration_ms == 150.0
     assert row.p99_duration_ms == 200.0
     assert row.iterations == 42

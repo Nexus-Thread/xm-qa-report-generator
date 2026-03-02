@@ -6,7 +6,7 @@ import json
 from typing import TYPE_CHECKING, Any
 
 from qa_report_generator.application.dtos import K6SummaryRow
-from qa_report_generator.application.service_definitions.megatron.mapping import pick_metric, pick_primary_scenario_name
+from qa_report_generator.domain.analytics.k6_metrics import pick_metric, pick_primary_scenario_name
 from qa_report_generator.domain.exceptions import ConfigurationError
 
 if TYPE_CHECKING:
@@ -22,7 +22,6 @@ class K6SummaryTableParser:
         for report_path in report_files:
             source = self._load_json(report_path)
             scenario_name = pick_primary_scenario_name(source)
-            source.get("execScenarios", {}).get(scenario_name, {})
 
             duration_metric = pick_metric(source, "http_req_duration", scenario_name)
             checks_metric = source.get("metrics", {}).get("checks", {})

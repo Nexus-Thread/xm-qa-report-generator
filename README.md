@@ -34,9 +34,12 @@ Notes:
    - `validation.py`: service-specific invariants
    - `definition.py`: `ServiceDefinition` instance
    - `__init__.py`: export `SERVICE_DEFINITION`
-3. Register the new definition in:
-   - `src/qa_report_generator/application/service_definitions/__init__.py`
-4. Keep extraction deterministic:
+3. No central registry edit is required for in-repo definitions:
+   - built-in definitions are discovered automatically from `service_definitions/*` packages.
+4. Optional plugin path for external service packs:
+   - set `PLUGIN_MODULES` (comma-separated) in env,
+   - plugin module imports and calls `register_service_definition(...)`.
+5. Keep extraction deterministic:
    - preserve exact numeric values,
    - keep canonical JSON serialization in prompts,
    - include mismatch JSONPath fields in verification response.
