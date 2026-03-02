@@ -5,7 +5,6 @@ import logging
 from pydantic import Field, ValidationError, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from qa_report_generator.config.preprocessing import PROFILE_DEFAULTS, PreprocessingProfile
 from qa_report_generator.domain.exceptions import ConfigurationError
 
 LOGGER = logging.getLogger(__name__)
@@ -29,10 +28,6 @@ class EnvSettings(BaseSettings):
     log_format: str = Field(
         default="simple",
         description="Logging format: 'simple' for human-readable, 'json' for structured logging",
-    )
-    prompt_template_path: str | None = Field(
-        default=None,
-        description="Path to custom prompt template YAML file (uses built-in templates if not specified)",
     )
     llm_model: str = Field(
         default="gpt-5.2",
@@ -68,43 +63,6 @@ class EnvSettings(BaseSettings):
         ge=1.0,
         le=10.0,
         description="Exponential backoff multiplier for retries (wait time = factor^attempt)",
-    )
-    max_parallel_llm_sections: int = Field(
-        default=1,
-        alias="MAX_PARALLEL_LLM_SECTIONS",
-        ge=1,
-        le=10,
-        description="Maximum number of LLM sections to generate in parallel",
-    )
-    max_output_lines_per_failure: int = Field(
-        default=20,
-        ge=1,
-        le=200,
-        description="Maximum output lines per failure for prompt payloads",
-    )
-    enable_failure_grouping: bool = Field(
-        default=True,
-        description="Enable grouping failures by pattern for prompt optimization",
-    )
-    failure_clustering_threshold: float = Field(
-        default=0.7,
-        ge=0.0,
-        le=1.0,
-        description="Similarity threshold for clustering failures",
-    )
-    max_failures_for_detailed_prompt: int = Field(
-        default=10,
-        ge=1,
-        le=200,
-        description="Maximum failures to include in detailed prompt payloads",
-    )
-    preprocessing_profile: PreprocessingProfile | None = Field(
-        default=None,
-        description="Optional preprocessing profile preset (minimal, balanced, detailed)",
-    )
-    plugin_modules: list[str] = Field(
-        default_factory=list,
-        description="Optional list of plugin module paths to import at startup.",
     )
 
     @field_validator("log_level")
@@ -145,23 +103,12 @@ class EnvSettings(BaseSettings):
             raise ValueError(msg)
         return v
 
-    def apply_profile_defaults(self) -> None:
-        """Apply preprocessing profile defaults when configured."""
-        if self.preprocessing_profile is None:
-            return
-
-        # Intentional post-init mutation: BaseSettings is not frozen, so setattr
-        # is safe here. Fields already set by the user are preserved.
-        for field_name, value in PROFILE_DEFAULTS[self.preprocessing_profile].items():
-            if field_name not in self.model_fields_set:
-                setattr(self, field_name, value)
-
 
 def load_settings_from_env() -> EnvSettings:
     """Load and validate application configuration from environment variables.
 
     Returns:
-        Validated EnvSettings instance with profile defaults applied.
+        Validated EnvSettings instance.
 
     Raises:
         ConfigurationError: If environment variables fail validation.
@@ -173,6 +120,5 @@ def load_settings_from_env() -> EnvSettings:
         message = f"Invalid configuration: {exc}"
         raise ConfigurationError(message) from exc
 
-    settings.apply_profile_defaults()
-    LOGGER.debug("Configuration loaded from environment (profile=%s)", settings.preprocessing_profile)
+    LOGGER.debug("Configuration loaded from environment")
     return settings
