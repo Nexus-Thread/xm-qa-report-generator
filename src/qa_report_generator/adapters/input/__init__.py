@@ -1,10 +1,9 @@
 """Driving adapters that translate external requests into application use cases."""
 
-from qa_report_generator.adapters.input.cli_adapter import CliAdapter, K6CliAdapter
+from qa_report_generator.adapters.input.cli_adapter import K6CliAdapter
 from qa_report_generator.adapters.input.env import EnvSettingsAdapter
 
 __all__ = [
-    "CliAdapter",
     "EnvSettingsAdapter",
     "K6CliAdapter",
 ]
