@@ -105,11 +105,11 @@ class OpenAIClient:
     ) -> object:
         """Invoke the SDK chat completions API with optional JSON format and retry logic."""
         total_attempts = self._max_retries + 1
-        for attempt in range(total_attempts):
+        for attempt in range(1, total_attempts + 1):
             try:
                 return self._chat_completions_create(model, messages, response_format=response_format)
             except APIError:
-                if attempt >= total_attempts - 1:
+                if attempt >= total_attempts:
                     LOGGER.exception(
                         "OpenAI completion failed after retries",
                         extra={
@@ -119,14 +119,13 @@ class OpenAIClient:
                         },
                     )
                     raise
-                retry_attempt = attempt + 1
-                delay = self._backoff_factor**retry_attempt
+                delay = self._backoff_factor**attempt
                 LOGGER.warning(
                     "OpenAI completion failed, retrying",
                     extra={
                         "component": self.__class__.__name__,
                         "model": model,
-                        "attempt": retry_attempt,
+                        "attempt": attempt,
                         "max_retries": self._max_retries,
                         "retry_delay_seconds": delay,
                     },
@@ -143,15 +142,9 @@ class OpenAIClient:
         *,
         response_format: dict[str, str] | None,
     ) -> object:
-        if response_format is not None:
-            return self._sdk_client.chat.completions.create(
-                model=model,
-                messages=messages,
-                temperature=0,
-                response_format=response_format,
-            )
         return self._sdk_client.chat.completions.create(
             model=model,
             messages=messages,
             temperature=0,
+            response_format=response_format,
         )
