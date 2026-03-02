@@ -6,7 +6,6 @@ from pathlib import Path
 from typing import Annotated
 
 import typer
-from rich.console import Console
 
 from qa_report_generator.application.ports.input import (
     ExtractK6ServiceMetricsUseCase,
@@ -24,7 +23,6 @@ class K6CliAdapter:
         extract_k6_service_metrics_use_case: ExtractK6ServiceMetricsUseCase,
     ) -> None:
         """Initialize k6-focused CLI adapter."""
-        self._console = Console()
         self._k6_summary_table_use_case = generate_k6_summary_table_use_case
         self._extract_k6_service_metrics_use_case = extract_k6_service_metrics_use_case
 
@@ -61,15 +59,15 @@ class K6CliAdapter:
             result = self._k6_summary_table_use_case.generate_k6_summary_table(report_files=report_files)
         except ReportingError as e:
             suggestion = f"\n💡 Suggestion: {e.suggestion}" if e.suggestion else ""
-            self._console.print(f"[red]❌ {e}{suggestion}[/red]")
+            typer.secho(f"❌ {e}{suggestion}", fg=typer.colors.RED)
             raise typer.Exit(code=1) from e
         except Exception as e:
-            self._console.print(f"[red]❌ Error: {e}[/red]")
+            typer.secho(f"❌ Error: {e}", fg=typer.colors.RED)
             raise typer.Exit(code=1) from e
         else:
             rows_payload = [asdict(row) for row in result.rows]
-            self._console.print("[green]✅ Parsed k6 summary rows[/green]")
-            self._console.print_json(json.dumps(rows_payload, ensure_ascii=False, indent=2, sort_keys=True))
+            typer.secho("✅ Parsed k6 summary rows", fg=typer.colors.GREEN)
+            typer.echo(json.dumps(rows_payload, ensure_ascii=False, indent=2, sort_keys=True))
 
     def _resolve_report_files(self, report_inputs: list[Path]) -> list[Path]:
         """Resolve report inputs into a de-duplicated file list."""
@@ -79,19 +77,19 @@ class K6CliAdapter:
             if report_input.is_dir():
                 dir_files = sorted(path for path in report_input.glob("*.json") if path.is_file())
                 if not dir_files:
-                    self._console.print(f"[red]❌ No JSON report files found in directory: {report_input}[/red]")
+                    typer.secho(f"❌ No JSON report files found in directory: {report_input}", fg=typer.colors.RED)
                     raise typer.Exit(code=1)
                 resolved.extend(dir_files)
                 continue
 
             if report_input.is_file():
                 if report_input.suffix.lower() != ".json":
-                    self._console.print(f"[red]❌ Report file must be a JSON file: {report_input}[/red]")
+                    typer.secho(f"❌ Report file must be a JSON file: {report_input}", fg=typer.colors.RED)
                     raise typer.Exit(code=1)
                 resolved.append(report_input)
                 continue
 
-            self._console.print(f"[red]❌ Invalid report input: {report_input}[/red]")
+            typer.secho(f"❌ Invalid report input: {report_input}", fg=typer.colors.RED)
             raise typer.Exit(code=1)
 
         return sorted(set(resolved))
@@ -127,14 +125,14 @@ class K6CliAdapter:
             )
         except ReportingError as e:
             suggestion = f"\n💡 Suggestion: {e.suggestion}" if e.suggestion else ""
-            self._console.print(f"[red]❌ {e}{suggestion}[/red]")
+            typer.secho(f"❌ {e}{suggestion}", fg=typer.colors.RED)
             raise typer.Exit(code=1) from e
         except Exception as e:
-            self._console.print(f"[red]❌ Error: {e}[/red]")
+            typer.secho(f"❌ Error: {e}", fg=typer.colors.RED)
             raise typer.Exit(code=1) from e
         else:
-            self._console.print("[green]✅ Parsed extracted model[/green]")
-            self._console.print(f"[dim]Service: {result.service}[/dim]")
+            typer.secho("✅ Parsed extracted model", fg=typer.colors.GREEN)
+            typer.echo(f"Service: {result.service}")
             payload = {
                 "service": result.service,
                 "extracted_runs": [
@@ -145,7 +143,7 @@ class K6CliAdapter:
                     for run in result.extracted_runs
                 ],
             }
-            self._console.print_json(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True))
+            typer.echo(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True))
 
     def run(self) -> None:
         """Run the CLI application."""
