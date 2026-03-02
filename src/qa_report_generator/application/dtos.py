@@ -46,17 +46,15 @@ class K6SummaryRow:
 
 @dataclass(frozen=True)
 class K6SummaryTableResult:
-    """Result metadata for a generated k6 summary table."""
+    """Parsed rows returned by the k6 summary table use case."""
 
-    output_path: Path
-    rows_count: int
+    rows: list[K6SummaryRow]
 
 
 @dataclass(frozen=True)
 class K6ServiceExtractionResult:
-    """Result metadata for a generated service extraction JSON artifact."""
+    """Validated extraction payload returned for one service."""
 
-    output_path: Path
     service: str
     extracted: dict[str, Any]
 

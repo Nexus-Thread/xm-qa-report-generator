@@ -1,5 +1,7 @@
 """CLI adapter that exposes k6-oriented commands."""
 
+import json
+from dataclasses import asdict
 from pathlib import Path
 from typing import Annotated
 
@@ -51,22 +53,12 @@ class K6CliAdapter:
                 dir_okay=True,
             ),
         ],
-        out_file: Annotated[
-            Path,
-            typer.Option(
-                "--out-file",
-                help="Output markdown file for consolidated summary table",
-            ),
-        ] = Path("out/k6/performance_summary.md"),
     ) -> None:
-        """Generate consolidated k6 summary table from file(s) or directories."""
+        """Generate and print consolidated k6 summary rows from file(s) or directories."""
         report_files = self._resolve_report_files(report)
 
         try:
-            result = self._k6_summary_table_use_case.generate_k6_summary_table(
-                report_files=report_files,
-                output_path=out_file,
-            )
+            result = self._k6_summary_table_use_case.generate_k6_summary_table(report_files=report_files)
         except ReportingError as e:
             suggestion = f"\n💡 Suggestion: {e.suggestion}" if e.suggestion else ""
             self._console.print(f"[red]❌ {e}{suggestion}[/red]")
@@ -75,8 +67,9 @@ class K6CliAdapter:
             self._console.print(f"[red]❌ Error: {e}[/red]")
             raise typer.Exit(code=1) from e
         else:
-            self._console.print(f"[green]✅ K6 summary table: {result.output_path}[/green]")
-            self._console.print(f"[dim]Rows: {result.rows_count}[/dim]")
+            rows_payload = [asdict(row) for row in result.rows]
+            self._console.print("[green]✅ Parsed k6 summary rows[/green]")
+            self._console.print_json(json.dumps(rows_payload, ensure_ascii=False, indent=2, sort_keys=True))
 
     def _resolve_report_files(self, report_inputs: list[Path]) -> list[Path]:
         """Resolve report inputs into a de-duplicated file list."""
@@ -123,22 +116,12 @@ class K6CliAdapter:
                 dir_okay=False,
             ),
         ],
-        out_file: Annotated[
-            Path | None,
-            typer.Option(
-                "--out-file",
-                help="Output file for extracted structured JSON",
-            ),
-        ] = None,
     ) -> None:
-        """Extract service-specific deterministic metrics from one k6 JSON report."""
-        output_path = out_file or Path(f"out/k6/extracted_{service}.json")
-
+        """Extract and print service-specific deterministic metrics from one k6 JSON report."""
         try:
             result = self._extract_k6_service_metrics_use_case.extract(
                 service=service,
                 report_path=report,
-                output_path=output_path,
             )
         except ReportingError as e:
             suggestion = f"\n💡 Suggestion: {e.suggestion}" if e.suggestion else ""
@@ -148,8 +131,9 @@ class K6CliAdapter:
             self._console.print(f"[red]❌ Error: {e}[/red]")
             raise typer.Exit(code=1) from e
         else:
-            self._console.print(f"[green]✅ Extracted metrics JSON: {result.output_path}[/green]")
+            self._console.print("[green]✅ Parsed extracted model[/green]")
             self._console.print(f"[dim]Service: {result.service}[/dim]")
+            self._console.print_json(json.dumps(result.extracted, ensure_ascii=False, indent=2, sort_keys=True))
 
     def run(self) -> None:
         """Run the CLI application."""

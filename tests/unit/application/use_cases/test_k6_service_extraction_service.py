@@ -28,19 +28,6 @@ class StubStructuredLlm:
         return self._responses.pop(0)
 
 
-class SpyWriter:
-    """Spy extracted metrics writer."""
-
-    def __init__(self) -> None:
-        """Initialize call storage."""
-        self.calls: list[tuple[dict[str, Any], Path]] = []
-
-    def write(self, *, data: dict[str, Any], output_path: Path) -> Path:
-        """Record write call and return output path."""
-        self.calls.append((data, output_path))
-        return output_path
-
-
 def _source_payload() -> dict[str, Any]:
     return {
         "testRunDurationMs": 60000,
@@ -108,23 +95,21 @@ def _extracted_payload() -> dict[str, Any]:
     }
 
 
-def test_extract_filters_removed_keys_and_writes_output(tmp_path: Path) -> None:
-    """Extraction filters heavy keys and writes validated payload."""
+def test_extract_filters_removed_keys_and_returns_validated_payload(tmp_path: Path) -> None:
+    """Extraction filters heavy keys and returns validated payload."""
     report_path = tmp_path / "report.json"
     report_path.write_text(json.dumps(_source_payload()), encoding="utf-8")
 
     llm = StubStructuredLlm([_extracted_payload(), {"mismatches": []}])
-    writer = SpyWriter()
-    service = K6ServiceExtractionService(llm=llm, writer=writer)
+    service = K6ServiceExtractionService(llm=llm)
 
     result = service.extract(
         service="megatron",
         report_path=report_path,
-        output_path=tmp_path / "out.json",
     )
 
     assert result.service == "megatron"
-    assert len(writer.calls) == 1
+    assert result.extracted["service"] == "megatron"
     extraction_prompt = json.loads(llm.calls[0][1])
     assert "setup_data" not in extraction_prompt["source"]
     assert "root_group" not in extraction_prompt["source"]
@@ -152,14 +137,10 @@ def test_extract_fails_on_verification_mismatch(tmp_path: Path) -> None:
             },
         ]
     )
-    writer = SpyWriter()
-    service = K6ServiceExtractionService(llm=llm, writer=writer)
+    service = K6ServiceExtractionService(llm=llm)
 
     with pytest.raises(ExtractionVerificationError):
         service.extract(
             service="megatron",
             report_path=report_path,
-            output_path=tmp_path / "out.json",
         )
-
-    assert writer.calls == []

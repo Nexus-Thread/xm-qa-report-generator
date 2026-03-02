@@ -7,21 +7,14 @@ from .input import (
     GenerateReportsUseCase,
     ValidateReportUseCase,
 )
-from .output import (
-    ExtractedMetricsWriterPort,
-    K6SummaryTableParserPort,
-    K6SummaryTableWriterPort,
-    StructuredLlmPort,
-)
+from .output import K6SummaryTableParserPort, StructuredLlmPort
 
 __all__ = [
     "CompareReportsUseCase",
     "ExtractK6ServiceMetricsUseCase",
-    "ExtractedMetricsWriterPort",
     "GenerateK6SummaryTableUseCase",
     "GenerateReportsUseCase",
     "K6SummaryTableParserPort",
-    "K6SummaryTableWriterPort",
     "StructuredLlmPort",
     "ValidateReportUseCase",
 ]

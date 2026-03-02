@@ -2,12 +2,11 @@
 
 ## k6 CLI
 
-### Generate consolidated markdown summary
+### Generate consolidated summary rows (printed JSON)
 
 ```bash
 qa-report-generator-k6 generate \
-  --report k6_example/megatron \
-  --out-file out/k6/performance_summary.md
+  --report k6_example/megatron
 ```
 
 ### Extract deterministic service metrics (phase 1)
@@ -15,14 +14,13 @@ qa-report-generator-k6 generate \
 ```bash
 qa-report-generator-k6 extract \
   --service megatron \
-  --report k6_example/megatron/megatron-1.json \
-  --out-file out/k6/extracted_megatron.json
+  --report k6_example/megatron/megatron-1.json
 ```
 
 Notes:
 - Extraction is service-scoped and schema-driven.
 - Verification is strict-fail: any numeric mismatch fails the run.
-- Output artifact is extracted JSON only.
+- Output is printed to the console as parsed JSON models.
 
 ## Adding a new service extraction module
 

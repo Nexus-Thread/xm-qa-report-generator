@@ -14,20 +14,19 @@ from qa_report_generator.domain.exceptions import ConfigurationError, Extraction
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from qa_report_generator.application.ports.output import ExtractedMetricsWriterPort, StructuredLlmPort
+    from qa_report_generator.application.ports.output import StructuredLlmPort
     from qa_report_generator.application.service_definitions.base import ServiceDefinition
 
 
 class K6ServiceExtractionService:
     """Extract deterministic structured metrics for one service from a k6 summary JSON."""
 
-    def __init__(self, *, llm: StructuredLlmPort, writer: ExtractedMetricsWriterPort) -> None:
+    def __init__(self, *, llm: StructuredLlmPort) -> None:
         """Store adapter dependencies."""
         self._llm = llm
-        self._writer = writer
 
-    def extract(self, *, service: str, report_path: Path, output_path: Path) -> K6ServiceExtractionResult:
-        """Run two-step extraction + verification and persist extracted artifact."""
+    def extract(self, *, service: str, report_path: Path) -> K6ServiceExtractionResult:
+        """Run two-step extraction + verification and return validated payload."""
         definition = self._resolve_definition(service)
         source = self._load_source_json(report_path)
         filtered_source = self._filter_source(source, remove_keys=definition.remove_keys)
@@ -62,9 +61,7 @@ class K6ServiceExtractionService:
             )
             raise ExtractionVerificationError(msg, suggestion="Inspect source and extracted payloads for mapping drift")
 
-        written_path = self._writer.write(data=extracted_model.model_dump(by_alias=True), output_path=output_path)
         return K6ServiceExtractionResult(
-            output_path=written_path,
             service=service,
             extracted=extracted_model.model_dump(by_alias=True),
         )

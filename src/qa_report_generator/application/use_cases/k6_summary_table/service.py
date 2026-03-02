@@ -1,4 +1,4 @@
-"""Use case for generating consolidated k6 summary markdown tables."""
+"""Use case for parsing consolidated k6 summary rows."""
 
 from __future__ import annotations
 
@@ -9,19 +9,17 @@ from qa_report_generator.application.dtos import K6SummaryTableResult
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from qa_report_generator.application.ports.output import K6SummaryTableParserPort, K6SummaryTableWriterPort
+    from qa_report_generator.application.ports.output import K6SummaryTableParserPort
 
 
 class K6SummaryTableService:
-    """Generate a consolidated k6 summary table from report files."""
+    """Parse consolidated k6 summary rows from report files."""
 
-    def __init__(self, *, parser: K6SummaryTableParserPort, writer: K6SummaryTableWriterPort) -> None:
-        """Store parser and writer dependencies."""
+    def __init__(self, *, parser: K6SummaryTableParserPort) -> None:
+        """Store parser dependency."""
         self._parser = parser
-        self._writer = writer
 
-    def generate_k6_summary_table(self, *, report_files: list[Path], output_path: Path) -> K6SummaryTableResult:
-        """Parse k6 reports and write consolidated markdown summary."""
+    def generate_k6_summary_table(self, *, report_files: list[Path]) -> K6SummaryTableResult:
+        """Parse k6 reports and return consolidated rows."""
         rows = self._parser.parse(report_files=report_files)
-        written_path = self._writer.write(rows=rows, output_path=output_path)
-        return K6SummaryTableResult(output_path=written_path, rows_count=len(rows))
+        return K6SummaryTableResult(rows=rows)

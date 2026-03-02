@@ -2,22 +2,37 @@
 
 from __future__ import annotations
 
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 import typer
 
 from qa_report_generator.adapters.input.cli_adapter import K6CliAdapter
-from qa_report_generator.application.dtos import K6ServiceExtractionResult, K6SummaryTableResult
+from qa_report_generator.application.dtos import K6ServiceExtractionResult, K6SummaryRow, K6SummaryTableResult
 from qa_report_generator.domain.exceptions import ReportingError
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 class StubK6SummaryUseCase:
     """Stub k6 summary table use case."""
 
-    def generate_k6_summary_table(self, *, report_files: list[Path], output_path: Path) -> K6SummaryTableResult:
+    def generate_k6_summary_table(self, *, report_files: list[Path]) -> K6SummaryTableResult:
         """Return a deterministic summary result."""
-        return K6SummaryTableResult(output_path=output_path, rows_count=len(report_files))
+        rows = [
+            K6SummaryRow(
+                report_file=path.name,
+                scenario="sample",
+                request_rate=1.0,
+                iterations=1,
+                p95_duration_ms=1.0,
+                p99_duration_ms=1.0,
+                checks_rate=1.0,
+            )
+            for path in report_files
+        ]
+        return K6SummaryTableResult(rows=rows)
 
 
 class SpyExtractionUseCase:
@@ -25,13 +40,12 @@ class SpyExtractionUseCase:
 
     def __init__(self) -> None:
         """Initialize call storage."""
-        self.calls: list[tuple[str, Path, Path]] = []
+        self.calls: list[tuple[str, Path]] = []
 
-    def extract(self, *, service: str, report_path: Path, output_path: Path) -> K6ServiceExtractionResult:
+    def extract(self, *, service: str, report_path: Path) -> K6ServiceExtractionResult:
         """Record call and return deterministic extraction result."""
-        self.calls.append((service, report_path, output_path))
+        self.calls.append((service, report_path))
         return K6ServiceExtractionResult(
-            output_path=output_path,
             service=service,
             extracted={"service": service},
         )
@@ -40,15 +54,15 @@ class SpyExtractionUseCase:
 class FailingExtractionUseCase:
     """Extraction use case stub that raises domain error."""
 
-    def extract(self, *, service: str, report_path: Path, output_path: Path) -> K6ServiceExtractionResult:
+    def extract(self, *, service: str, report_path: Path) -> K6ServiceExtractionResult:
         """Raise reporting error."""
-        del service, report_path, output_path
+        del service, report_path
         msg = "boom"
         raise ReportingError(msg)
 
 
-def test_extract_command_uses_default_output_path(tmp_path: Path) -> None:
-    """Extract command uses service-specific default output path when omitted."""
+def test_extract_command_passes_service_and_report_to_use_case(tmp_path: Path) -> None:
+    """Extract command forwards service and report path to use case."""
     report_path = tmp_path / "report.json"
     report_path.write_text("{}", encoding="utf-8")
 
@@ -61,14 +75,12 @@ def test_extract_command_uses_default_output_path(tmp_path: Path) -> None:
     adapter.extract_command(
         service="megatron",
         report=report_path,
-        out_file=None,
     )
 
     assert len(extraction_use_case.calls) == 1
-    service, called_report, called_output = extraction_use_case.calls[0]
+    service, called_report = extraction_use_case.calls[0]
     assert service == "megatron"
     assert called_report == report_path
-    assert called_output == Path("out/k6/extracted_megatron.json")
 
 
 def test_extract_command_raises_typer_exit_on_reporting_error(tmp_path: Path) -> None:
@@ -85,5 +97,4 @@ def test_extract_command_raises_typer_exit_on_reporting_error(tmp_path: Path) ->
         adapter.extract_command(
             service="megatron",
             report=report_path,
-            out_file=None,
         )

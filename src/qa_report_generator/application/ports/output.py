@@ -17,20 +17,6 @@ class K6SummaryTableParserPort(Protocol):
         """Parse report files into table rows."""
 
 
-class K6SummaryTableWriterPort(Protocol):
-    """Port for writing consolidated summary rows."""
-
-    def write(self, *, rows: list[K6SummaryRow], output_path: Path) -> Path:
-        """Write summary rows to an output file."""
-
-
-class ExtractedMetricsWriterPort(Protocol):
-    """Port for persisting extracted service-specific metrics."""
-
-    def write(self, *, data: dict[str, Any], output_path: Path) -> Path:
-        """Write extracted JSON payload to an output file."""
-
-
 class StructuredLlmPort(Protocol):
     """Port for deterministic JSON generation with an LLM backend."""
 
