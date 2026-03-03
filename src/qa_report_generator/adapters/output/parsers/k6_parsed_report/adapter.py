@@ -10,7 +10,7 @@ from pydantic import ValidationError
 from qa_report_generator.domain.analytics import K6ParsedReport, K6Scenario
 from qa_report_generator.domain.exceptions import ConfigurationError
 
-from .k6_raw_summary_schema import K6RawSummary
+from .raw_schema import K6RawSummary
 
 if TYPE_CHECKING:
     from pathlib import Path
