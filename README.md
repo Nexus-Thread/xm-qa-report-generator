@@ -2,6 +2,21 @@
 
 ## k6 CLI
 
+### Manual parser coverage check for fixture bundle
+
+```bash
+python scripts/parse_k6_example_20260228.py
+```
+
+Optional custom input directory:
+
+```bash
+python scripts/parse_k6_example_20260228.py --base-dir k6_example/20260228
+```
+
+The script parses each `*.json` file per service folder and prints per-service status,
+scenario counts/names, file-level failures, and final totals.
+
 ### Generate consolidated summary rows (printed JSON)
 
 ```bash
