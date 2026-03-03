@@ -1,64 +1,26 @@
-"""Pydantic schema for megatron k6 extraction output."""
+"""Megatron extraction output schema."""
 
 from __future__ import annotations
 
+from typing import Literal
+
 from pydantic import BaseModel, ConfigDict, Field
+
+from .k6_schema import CounterValues, RateValues, TrendValuesMs
 
 
 class GenericScenario(BaseModel):
     """Scenario-level execution settings."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
 
-    name: str = Field(min_length=1, description="Scenario key under $.execScenarios (dynamic).")
-    env_name: str = Field(min_length=1, description="Use $.execScenarios.*.tags.env_name")
-    executor: str = Field(min_length=1, description="Use $.execScenarios.*.executor")
-    rate: float = Field(ge=0, description="Use $.execScenarios.*.rate")
-    duration: str = Field(min_length=1, description="Use $.execScenarios.*.duration")
-    pre_allocated_vus: int = Field(ge=0, description="Use $.execScenarios.*.preAllocatedVUs")
-    max_vus: int = Field(ge=0, description="Use $.execScenarios.*.maxVUs")
-
-
-class GenericChecks(BaseModel):
-    """Check rate counters."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    rate: float = Field(ge=0, description="Use $.metrics.checks.values.rate")
-    passes: int = Field(ge=0, description="Use $.metrics.checks.values.passes")
-    fails: int = Field(ge=0, description="Use $.metrics.checks.values.fails")
-
-
-class MegatronDurationTrend(BaseModel):
-    """Latency trend summary values in milliseconds."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    min: float = Field(ge=0)
-    avg: float = Field(ge=0)
-    med: float = Field(ge=0)
-    max: float = Field(ge=0)
-    p95: float = Field(alias="p(95)", ge=0)
-    p99: float = Field(alias="p(99)", ge=0)
-
-
-class MegatronReqFailed(BaseModel):
-    """Request failure counters and rate."""
-
-    model_config = ConfigDict(extra="forbid")
-
+    name: str = Field(min_length=1)
+    env_name: str = Field(min_length=1)
+    executor: str = Field(min_length=1)
     rate: float = Field(ge=0)
-    passes: int = Field(ge=0)
-    fails: int = Field(ge=0)
-
-
-class MegatronCounter(BaseModel):
-    """Request counter values."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    count: int = Field(ge=0)
-    rate: float = Field(ge=0)
+    duration: str = Field(min_length=1)
+    pre_allocated_vus: int = Field(alias="preAllocatedVUs", ge=0)
+    max_vus: int = Field(alias="maxVUs", ge=0)
 
 
 class MegatronExtractedMetrics(BaseModel):
@@ -66,14 +28,21 @@ class MegatronExtractedMetrics(BaseModel):
 
     model_config = ConfigDict(extra="forbid", populate_by_name=True)
 
-    service: str = Field(pattern="^megatron$")
+    service: Literal["megatron"]
     report_file: str = Field(min_length=1)
     test_run_duration_ms: float = Field(ge=0)
     scenario: GenericScenario
-    checks: GenericChecks
-    http_req_duration: MegatronDurationTrend
-    http_req_failed: MegatronReqFailed
-    http_reqs: MegatronCounter
-    iterations: MegatronCounter
-    dropped_iterations: MegatronCounter
+    checks: RateValues
+    http_req_duration: TrendValuesMs
+    http_req_failed: RateValues
+    http_reqs: CounterValues
+    iterations: CounterValues
+    dropped_iterations: CounterValues
     thresholds: dict[str, list[str]]
+
+
+ExtractedMetrics = MegatronExtractedMetrics
+
+REUSED_GENERIC_SCHEMA_TYPES = (CounterValues, RateValues, TrendValuesMs)
+
+__all__ = ["ExtractedMetrics", "GenericScenario", "MegatronExtractedMetrics"]
