@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
+import json
+import logging
 from dataclasses import dataclass
+from pathlib import Path
+from typing import Any, cast
 
 import pytest
 
@@ -51,6 +55,17 @@ class _StubClient:
         return self._responses.pop(0)
 
 
+class _StubDebugJsonWriter:
+    """Stub debug JSON writer for structured adapter tests."""
+
+    def __init__(self) -> None:
+        self.calls: list[tuple[str, object]] = []
+
+    def write_json(self, *, label: str, payload: object) -> Path:
+        self.calls.append((label, payload))
+        return Path(f"debug/{label}.json")
+
+
 def test_complete_json_returns_payload_and_formats_messages() -> None:
     """Structured adapter returns parsed dict and sends expected prompts."""
     client = _StubClient([_Response(choices=[_Choice(message=_Message(content='{"ok": true}'))])])
@@ -95,3 +110,92 @@ def test_complete_json_raises_when_message_content_missing() -> None:
 
     with pytest.raises(ExtractionVerificationError, match="missing content"):
         adapter.complete_json(system_prompt="system", user_prompt="user")
+
+
+def test_complete_json_logs_request_response_and_payload(caplog: pytest.LogCaptureFixture) -> None:
+    """Structured adapter emits debug logs for request and response lifecycle."""
+    logger_name = "qa_report_generator.adapters.output.narrative.structured_llm.adapter"
+    client = _StubClient([_Response(choices=[_Choice(message=_Message(content='{"ok": true}'))])])
+    adapter = OpenAIStructuredLlmAdapter(client=client, model="gpt-test")
+
+    with caplog.at_level(logging.DEBUG, logger=logger_name):
+        payload = adapter.complete_json(system_prompt="system", user_prompt="user")
+
+    assert payload == {"ok": True}
+
+    request_record = next(record for record in caplog.records if record.getMessage().startswith("Structured LLM request payload"))
+    response_record = next(record for record in caplog.records if record.getMessage().startswith("Structured LLM response content"))
+    parsed_record = next(record for record in caplog.records if record.getMessage().startswith("Structured LLM parsed JSON payload"))
+    request_record_any = cast("Any", request_record)
+    response_record_any = cast("Any", response_record)
+    parsed_record_any = cast("Any", parsed_record)
+
+    assert request_record_any.model == "gpt-test"
+    assert request_record_any.payload_truncated is False
+    assert response_record_any.payload_truncated is False
+    assert parsed_record_any.payload_truncated is False
+    assert parsed_record_any.payload_keys == ["ok"]
+
+
+def test_complete_json_truncates_large_request_and_response_logs(caplog: pytest.LogCaptureFixture) -> None:
+    """Structured adapter truncates oversized payloads in debug logs."""
+    logger_name = "qa_report_generator.adapters.output.narrative.structured_llm.adapter"
+    long_text = "x" * 2_100_000
+    content = json.dumps({"summary": long_text})
+    client = _StubClient([_Response(choices=[_Choice(message=_Message(content=content))])])
+    adapter = OpenAIStructuredLlmAdapter(client=client, model="gpt-test")
+
+    with caplog.at_level(logging.DEBUG, logger=logger_name):
+        adapter.complete_json(system_prompt="system", user_prompt=long_text)
+
+    request_record = next(record for record in caplog.records if record.getMessage().startswith("Structured LLM request payload"))
+    response_record = next(record for record in caplog.records if record.getMessage().startswith("Structured LLM response content"))
+    parsed_record = next(record for record in caplog.records if record.getMessage().startswith("Structured LLM parsed JSON payload"))
+    request_record_any = cast("Any", request_record)
+    response_record_any = cast("Any", response_record)
+    parsed_record_any = cast("Any", parsed_record)
+
+    assert request_record_any.payload_truncated is True
+    assert response_record_any.payload_truncated is True
+    assert parsed_record_any.payload_truncated is True
+    assert "...[truncated]" in request_record.getMessage()
+    assert "...[truncated]" in response_record.getMessage()
+    assert "...[truncated]" in parsed_record.getMessage()
+
+
+def test_complete_json_writes_debug_files_when_enabled() -> None:
+    """Structured adapter writes request/response/parsed payloads when debug enabled."""
+    debug_writer = _StubDebugJsonWriter()
+    client = _StubClient([_Response(choices=[_Choice(message=_Message(content='{"ok": true}'))])])
+    adapter = OpenAIStructuredLlmAdapter(
+        client=client,
+        model="gpt-test",
+        debug_json_writer=debug_writer,
+        debug_json_enabled=True,
+    )
+
+    payload = adapter.complete_json(system_prompt="system", user_prompt="user")
+
+    assert payload == {"ok": True}
+    assert [label for label, _ in debug_writer.calls] == [
+        "request_payload",
+        "response_content",
+        "parsed_payload",
+    ]
+
+
+def test_complete_json_skips_debug_files_when_disabled() -> None:
+    """Structured adapter does not write debug files when debug is disabled."""
+    debug_writer = _StubDebugJsonWriter()
+    client = _StubClient([_Response(choices=[_Choice(message=_Message(content='{"ok": true}'))])])
+    adapter = OpenAIStructuredLlmAdapter(
+        client=client,
+        model="gpt-test",
+        debug_json_writer=debug_writer,
+        debug_json_enabled=False,
+    )
+
+    payload = adapter.complete_json(system_prompt="system", user_prompt="user")
+
+    assert payload == {"ok": True}
+    assert debug_writer.calls == []

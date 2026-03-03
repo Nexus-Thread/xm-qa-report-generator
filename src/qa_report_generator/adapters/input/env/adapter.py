@@ -29,4 +29,6 @@ class EnvSettingsAdapter:
             llm_timeout=settings.llm_timeout,
             llm_max_retries=settings.llm_max_retries,
             llm_retry_backoff_factor=settings.llm_retry_backoff_factor,
+            llm_debug_json_enabled=settings.llm_debug_json_enabled,
+            llm_debug_json_dir=settings.llm_debug_json_dir,
         )

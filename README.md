@@ -22,6 +22,22 @@ Notes:
 - Verification is strict-fail: any numeric mismatch fails the run.
 - Output is printed as one consolidated envelope with `extracted_runs` (one item per executor report).
 
+### Optional structured LLM debug JSON dumps
+
+You can persist low-level structured LLM payloads (request, response content, parsed JSON) into files:
+
+```bash
+LLM_DEBUG_JSON_ENABLED=true \
+LLM_DEBUG_JSON_DIR=out/debug/llm \
+qa-report-generator-k6 extract \
+  --service megatron \
+  --report k6_example/megatron
+```
+
+Environment variables:
+- `LLM_DEBUG_JSON_ENABLED` (default: `false`)
+- `LLM_DEBUG_JSON_DIR` (default: `out/debug/llm`)
+
 ## Adding a new service extraction module
 
 1. Create a new package under:

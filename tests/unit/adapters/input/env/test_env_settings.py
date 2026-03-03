@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from qa_report_generator.adapters.input.env import EnvSettingsAdapter
@@ -16,6 +18,8 @@ def test_env_settings_adapter_loads_minimal_required_settings(monkeypatch: pytes
     monkeypatch.setenv("LLM_TIMEOUT", "30")
     monkeypatch.setenv("LLM_MAX_RETRIES", "2")
     monkeypatch.setenv("LLM_RETRY_BACKOFF_FACTOR", "1.5")
+    monkeypatch.setenv("LLM_DEBUG_JSON_ENABLED", "true")
+    monkeypatch.setenv("LLM_DEBUG_JSON_DIR", "out/debug/custom")
     monkeypatch.setenv("LOG_LEVEL", "debug")
     monkeypatch.setenv("LOG_FORMAT", "JSON")
 
@@ -29,6 +33,8 @@ def test_env_settings_adapter_loads_minimal_required_settings(monkeypatch: pytes
     assert settings.llm_timeout == 30.0
     assert settings.llm_max_retries == 2
     assert settings.llm_retry_backoff_factor == 1.5
+    assert settings.llm_debug_json_enabled is True
+    assert settings.llm_debug_json_dir == Path("out/debug/custom")
 
 
 def test_env_settings_adapter_raises_configuration_error_for_invalid_log_level(monkeypatch: pytest.MonkeyPatch) -> None:

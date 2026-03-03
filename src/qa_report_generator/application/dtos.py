@@ -21,6 +21,8 @@ class AppSettings:
     llm_timeout: float
     llm_max_retries: int
     llm_retry_backoff_factor: float
+    llm_debug_json_enabled: bool
+    llm_debug_json_dir: Path
 
 
 @dataclass(frozen=True)

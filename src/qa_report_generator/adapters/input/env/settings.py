@@ -1,6 +1,7 @@
 """Environment-backed settings loader."""
 
 import logging
+from pathlib import Path
 
 from pydantic import Field, ValidationError, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -63,6 +64,16 @@ class EnvSettings(BaseSettings):
         ge=1.0,
         le=10.0,
         description="Exponential backoff multiplier for retries (wait time = factor^attempt)",
+    )
+    llm_debug_json_enabled: bool = Field(
+        default=False,
+        alias="LLM_DEBUG_JSON_ENABLED",
+        description="Enable writing structured LLM request/response/parsed payloads to JSON files",
+    )
+    llm_debug_json_dir: Path = Field(
+        default=Path("out/debug/llm"),
+        alias="LLM_DEBUG_JSON_DIR",
+        description="Directory where structured LLM debug JSON payload files are written",
     )
 
     @field_validator("log_level")

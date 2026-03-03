@@ -1,3 +1,5 @@
 """Output adapter exports."""
 
-__all__ = []
+from .persistence import JsonFileDebugWriterAdapter
+
+__all__ = ["JsonFileDebugWriterAdapter"]

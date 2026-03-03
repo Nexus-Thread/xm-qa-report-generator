@@ -5,6 +5,7 @@ from qa_report_generator.adapters.input.env import EnvSettingsAdapter
 from qa_report_generator.adapters.output.narrative.openai import OpenAIClientSettings, build_client
 from qa_report_generator.adapters.output.narrative.structured_llm import OpenAIStructuredLlmAdapter
 from qa_report_generator.adapters.output.parsers import K6SummaryTableParser
+from qa_report_generator.adapters.output.persistence import JsonFileDebugWriterAdapter
 from qa_report_generator.application.use_cases import K6ServiceExtractionService, K6SummaryTableService
 from qa_report_generator.config import setup_logging
 
@@ -26,7 +27,13 @@ def create_cli_adapter() -> K6CliAdapter:
             timeout_seconds=config.llm_timeout,
         )
     )
-    structured_llm = OpenAIStructuredLlmAdapter(client=openai_client, model=config.llm_model)
+    debug_json_writer = JsonFileDebugWriterAdapter(base_dir=config.llm_debug_json_dir)
+    structured_llm = OpenAIStructuredLlmAdapter(
+        client=openai_client,
+        model=config.llm_model,
+        debug_json_writer=debug_json_writer,
+        debug_json_enabled=config.llm_debug_json_enabled,
+    )
     k6_service_extraction_use_case = K6ServiceExtractionService(llm=structured_llm)
 
     return K6CliAdapter(

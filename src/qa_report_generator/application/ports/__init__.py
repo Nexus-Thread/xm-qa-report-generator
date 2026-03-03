@@ -7,10 +7,11 @@ from .input import (
     GenerateReportsUseCase,
     ValidateReportUseCase,
 )
-from .output import K6SummaryTableParserPort, StructuredLlmPort
+from .output import DebugJsonWriterPort, K6SummaryTableParserPort, StructuredLlmPort
 
 __all__ = [
     "CompareReportsUseCase",
+    "DebugJsonWriterPort",
     "ExtractK6ServiceMetricsUseCase",
     "GenerateK6SummaryTableUseCase",
     "GenerateReportsUseCase",
