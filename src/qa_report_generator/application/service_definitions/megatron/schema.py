@@ -11,7 +11,7 @@ class MegatronScenario(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     name: str = Field(min_length=1)
-    env_name: str = Field(min_length=1)
+    env_name: str = Field(min_length=1, description="Use tags.env_name.")
     executor: str = Field(min_length=1)
     rate: float = Field(ge=0)
     duration: str = Field(min_length=1)
