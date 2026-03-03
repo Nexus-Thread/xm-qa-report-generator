@@ -57,6 +57,25 @@ def test_megatron_schema_rejects_unknown_fields() -> None:
         MegatronExtractedMetrics.model_validate(payload)
 
 
+def test_megatron_schema_accepts_camel_case_scenario_aliases() -> None:
+    """Megatron schema accepts canonical k6 scenario alias field names."""
+    payload = _valid_payload()
+    payload["scenario"] = {
+        "name": "megatron-load",
+        "env_name": "staging",
+        "executor": "constant-arrival-rate",
+        "rate": 10,
+        "duration": "1m",
+        "preAllocatedVUs": 10,
+        "maxVUs": 20,
+    }
+
+    model = MegatronExtractedMetrics.model_validate(payload)
+
+    assert model.scenario.pre_allocated_vus == 10
+    assert model.scenario.max_vus == 20
+
+
 def test_validate_extracted_metrics_rejects_invalid_scenario_bounds() -> None:
     """Validation rejects scenario with max vus lower than preallocated."""
     payload = _valid_payload()
