@@ -8,6 +8,7 @@ from typing import Annotated, NoReturn, TypeVar
 
 import typer
 
+from qa_report_generator.application.dtos import K6ServiceExtractionResult
 from qa_report_generator.application.ports.input import (
     ExtractK6ServiceMetricsUseCase,
     GenerateK6SummaryTableUseCase,
@@ -18,7 +19,7 @@ _RESULT = TypeVar("_RESULT")
 
 
 class K6CliAdapter:
-    """CLI adapter that exposes only k6-oriented commands."""
+    """CLI adapter that exposes k6-oriented commands."""
 
     def __init__(
         self,
@@ -59,6 +60,9 @@ class K6CliAdapter:
 
     def _resolve_report_files(self, report_inputs: list[Path]) -> list[Path]:
         """Resolve report inputs into a de-duplicated file list."""
+        if not report_inputs:
+            self._exit_with_error("At least one --report input is required")
+
         resolved_files: set[Path] = set()
 
         for report_input in report_inputs:
@@ -80,7 +84,8 @@ class K6CliAdapter:
             return [report_input]
 
         self._exit_with_error(f"Invalid report input: {report_input}")
-        return []
+        msg = "Unreachable"
+        raise AssertionError(msg)
 
     def extract_command(
         self,
@@ -104,14 +109,31 @@ class K6CliAdapter:
         ],
     ) -> None:
         """Extract and print service-specific deterministic metrics from one or more k6 JSON reports."""
+        normalized_service = self._normalize_service(service)
         report_files = self._resolve_report_files(report)
         result = self._execute_or_exit(
             lambda: self._extract_k6_service_metrics_use_case.extract(
-                service=service,
+                service=normalized_service,
                 report_paths=report_files,
             )
         )
-        payload = {
+        payload = self._build_extraction_payload(result)
+        self._print_json_output(
+            success_message="Extracted service metrics",
+            payload=payload,
+            heading=f"Service: {result.service}",
+        )
+
+    def _normalize_service(self, service: str) -> str:
+        """Normalize and validate service identifier input."""
+        normalized_service = service.strip()
+        if not normalized_service:
+            self._exit_with_error("--service cannot be empty")
+        return normalized_service
+
+    def _build_extraction_payload(self, result: K6ServiceExtractionResult) -> dict[str, object]:
+        """Build extraction JSON payload for CLI output."""
+        return {
             "service": result.service,
             "extracted_runs": [
                 {
@@ -121,7 +143,6 @@ class K6CliAdapter:
                 for run in result.extracted_runs
             ],
         }
-        self._print_json_output(success_message="Parsed extracted model", payload=payload, heading=f"Service: {result.service}")
 
     def _execute_or_exit(self, operation: Callable[[], _RESULT]) -> _RESULT:
         """Execute operation and convert domain/system errors to CLI exits."""
@@ -134,14 +155,14 @@ class K6CliAdapter:
             self._exit_with_error(f"Error: {error}", error=error)
 
     def _print_json_output(self, *, success_message: str, payload: object, heading: str | None = None) -> None:
-        """Print a success message and JSON payload."""
+        """Print success text and JSON payload."""
         typer.secho(f"✅ {success_message}", fg=typer.colors.GREEN)
         if heading:
             typer.echo(heading)
         typer.echo(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True))
 
     def _exit_with_error(self, message: str, *, error: Exception | None = None) -> NoReturn:
-        """Print a formatted error and stop command execution."""
+        """Print formatted error and stop command execution."""
         typer.secho(f"❌ {message}", fg=typer.colors.RED)
         if error is None:
             raise typer.Exit(code=1)

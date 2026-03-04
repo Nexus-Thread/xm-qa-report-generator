@@ -43,11 +43,15 @@ class StubK6SummaryUseCase:
 class FailingSummaryUseCase:
     """Summary table use case stub that raises domain error."""
 
+    def __init__(self, *, suggestion: str | None = None) -> None:
+        """Store optional error suggestion."""
+        self._suggestion = suggestion
+
     def generate_k6_summary_table(self, *, report_files: list[Path]) -> K6SummaryTableResult:
         """Raise reporting error."""
         del report_files
         msg = "boom"
-        raise ReportingError(msg)
+        raise ReportingError(msg, suggestion=self._suggestion)
 
 
 class SpyExtractionUseCase:
@@ -69,11 +73,15 @@ class SpyExtractionUseCase:
 class FailingExtractionUseCase:
     """Extraction use case stub that raises domain error."""
 
+    def __init__(self, *, suggestion: str | None = None) -> None:
+        """Store optional error suggestion."""
+        self._suggestion = suggestion
+
     def extract(self, *, service: str, report_paths: list[Path]) -> K6ServiceExtractionResult:
         """Raise reporting error."""
         del service, report_paths
         msg = "boom"
-        raise ReportingError(msg)
+        raise ReportingError(msg, suggestion=self._suggestion)
 
 
 def test_extract_command_passes_service_and_report_to_use_case(tmp_path: Path) -> None:
@@ -89,10 +97,7 @@ def test_extract_command_passes_service_and_report_to_use_case(tmp_path: Path) -
         extract_k6_service_metrics_use_case=extraction_use_case,
     )
 
-    adapter.extract_command(
-        service="megatron",
-        report=[report_path_1, report_path_2],
-    )
+    adapter.extract_command(service="  megatron  ", report=[report_path_1, report_path_2])
 
     assert len(extraction_use_case.calls) == 1
     service, called_reports = extraction_use_case.calls[0]
@@ -168,3 +173,78 @@ def test_extract_command_raises_typer_exit_on_non_json_report(tmp_path: Path) ->
             service="megatron",
             report=[report_path],
         )
+
+
+def test_generate_command_prints_success_message_and_json_payload(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """Generate command prints success text and JSON payload."""
+    report_path = tmp_path / "report.json"
+    report_path.write_text("{}", encoding="utf-8")
+
+    adapter = K6CliAdapter(
+        generate_k6_summary_table_use_case=StubK6SummaryUseCase(),
+        extract_k6_service_metrics_use_case=SpyExtractionUseCase(),
+    )
+
+    adapter.generate_command(report=[report_path])
+
+    captured = capsys.readouterr()
+    assert "✅ Parsed k6 summary rows" in captured.out
+    assert '"report_file": "report.json"' in captured.out
+    assert '"scenario": "sample"' in captured.out
+
+
+def test_extract_command_prints_success_message_heading_and_json_payload(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Extract command prints success text, heading, and JSON payload."""
+    report_path = tmp_path / "report.json"
+    report_path.write_text("{}", encoding="utf-8")
+
+    adapter = K6CliAdapter(
+        generate_k6_summary_table_use_case=StubK6SummaryUseCase(),
+        extract_k6_service_metrics_use_case=SpyExtractionUseCase(),
+    )
+
+    adapter.extract_command(service="megatron", report=[report_path])
+
+    captured = capsys.readouterr()
+    assert "✅ Extracted service metrics" in captured.out
+    assert "Service: megatron" in captured.out
+    assert '"service": "megatron"' in captured.out
+    assert '"report_file": "report.json"' in captured.out
+
+
+def test_extract_command_raises_typer_exit_on_empty_service(tmp_path: Path) -> None:
+    """Extract command rejects empty service identifier."""
+    report_path = tmp_path / "report.json"
+    report_path.write_text("{}", encoding="utf-8")
+
+    adapter = K6CliAdapter(
+        generate_k6_summary_table_use_case=StubK6SummaryUseCase(),
+        extract_k6_service_metrics_use_case=SpyExtractionUseCase(),
+    )
+
+    with pytest.raises(typer.Exit):
+        adapter.extract_command(service="   ", report=[report_path])
+
+
+def test_generate_command_raises_typer_exit_and_prints_reporting_suggestion(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Generate command prints reporting suggestion when provided."""
+    report_path = tmp_path / "report.json"
+    report_path.write_text("{}", encoding="utf-8")
+
+    adapter = K6CliAdapter(
+        generate_k6_summary_table_use_case=FailingSummaryUseCase(suggestion="Check your report format"),
+        extract_k6_service_metrics_use_case=SpyExtractionUseCase(),
+    )
+
+    with pytest.raises(typer.Exit):
+        adapter.generate_command(report=[report_path])
+
+    captured = capsys.readouterr()
+    assert "❌ boom" in captured.out
+    assert "💡 Suggestion: Check your report format" in captured.out
