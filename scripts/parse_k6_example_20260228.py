@@ -4,16 +4,18 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Protocol
+from typing import TYPE_CHECKING, Any, Protocol
 
 if TYPE_CHECKING:
     from qa_report_generator.domain.analytics import K6ParsedReport
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 SRC_DIR = PROJECT_ROOT / "src"
+LOGGER = logging.getLogger(__name__)
 
 
 def _write_line(text: str) -> None:
@@ -56,13 +58,7 @@ class ParsedReportParser(Protocol):
         """Parse report files for one service."""
 
 
-def main() -> int:
-    """Run manual parser validation across service fixture folders."""
-    if str(SRC_DIR) not in sys.path:
-        sys.path.insert(0, str(SRC_DIR))
-
-    from qa_report_generator.adapters.output.parsers import K6ParsedReportParser
-
+def _build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Parse k6 fixtures and print service coverage summary")
     parser.add_argument(
         "--base-dir",
@@ -75,42 +71,87 @@ def main() -> int:
         default=[],
         help="Service folder name to validate (repeatable). Defaults to all services.",
     )
-    args = parser.parse_args()
+    return parser
+
+
+def _load_parser_class() -> type[ParsedReportParser] | None:
+    if str(SRC_DIR) not in sys.path:
+        sys.path.insert(0, str(SRC_DIR))
+
+    try:
+        from qa_report_generator.adapters.output.parsers import K6ParsedReportParser
+    except ImportError as err:
+        _write_error(f"ERROR: unable to import parser adapter: {err}")
+        _write_error("Hint: run from repository root or set PYTHONPATH=src")
+        return None
+
+    return K6ParsedReportParser
+
+
+def main() -> int:
+    """Run manual parser validation across service fixture folders."""
+    args = _build_arg_parser().parse_args()
 
     base_dir = Path(args.base_dir)
     if not base_dir.exists() or not base_dir.is_dir():
         _write_error(f"ERROR: base directory does not exist or is not a directory: {base_dir}")
         return 2
 
-    requested_services = tuple(args.service)
+    parser_class = _load_parser_class()
+    if parser_class is None:
+        return 2
+
+    requested_services = tuple(dict.fromkeys(args.service))
+    service_dirs, missing_services = _resolve_service_dirs(base_dir=base_dir, requested_services=requested_services)
+    if missing_services:
+        _write_error(f"ERROR: unknown service(s): {', '.join(missing_services)}")
+        available_services = ", ".join(_discover_service_names(base_dir)) or "-"
+        _write_error(f"Available services: {available_services}")
+        return 2
+
+    if not service_dirs:
+        _write_error(f"ERROR: no service directories found in {base_dir}")
+        return 2
+
     results = _parse_services(
-        base_dir,
-        parser_class=K6ParsedReportParser,
-        requested_services=requested_services,
+        service_dirs=service_dirs,
+        parser_class=parser_class,
     )
     return _print_summary(base_dir=base_dir, results=results)
 
 
-def _parse_services(
-    base_dir: Path,
-    *,
-    parser_class: type[ParsedReportParser],
-    requested_services: tuple[str, ...],
-) -> list[ServiceParseResult]:
+def _discover_service_names(base_dir: Path) -> tuple[str, ...]:
+    return tuple(sorted(path.name for path in base_dir.iterdir() if path.is_dir()))
+
+
+def _resolve_service_dirs(base_dir: Path, requested_services: tuple[str, ...]) -> tuple[tuple[Path, ...], tuple[str, ...]]:
+    available_dirs = tuple(sorted(path for path in base_dir.iterdir() if path.is_dir()))
+    available_by_name = {path.name: path for path in available_dirs}
+
+    if not requested_services:
+        return available_dirs, ()
+
+    selected_dirs: list[Path] = []
+    missing_services: list[str] = []
+    for service in requested_services:
+        path = available_by_name.get(service)
+        if path is None:
+            missing_services.append(service)
+            continue
+        selected_dirs.append(path)
+
+    return tuple(selected_dirs), tuple(missing_services)
+
+
+def _parse_services(*, service_dirs: tuple[Path, ...], parser_class: type[ParsedReportParser]) -> list[ServiceParseResult]:
     parser = parser_class()
     results: list[ServiceParseResult] = []
-    requested_set = set(requested_services)
 
-    for service_dir in sorted(path for path in base_dir.iterdir() if path.is_dir()):
+    for service_dir in service_dirs:
         service = service_dir.name
-        if requested_set and service not in requested_set:
-            continue
 
         report_files = sorted(service_dir.glob("*.json"))
-        file_results = [
-            _parse_one_file(parser=parser, service=service, report_file=report_file)
-            for report_file in report_files
-        ]
+        file_results = [_parse_one_file(parser=parser, service=service, report_file=report_file) for report_file in report_files]
 
         scenario_names: set[str] = set()
         scenario_total = 0
@@ -138,7 +179,20 @@ def _parse_services(
 def _parse_one_file(*, parser: ParsedReportParser, service: str, report_file: Path) -> FileParseResult:
     from qa_report_generator.domain.exceptions import ConfigurationError
 
-    source = _load_json(report_file)
+    try:
+        source = _load_json(report_file)
+    except OSError as err:
+        LOGGER.exception("Failed reading report file", extra={"service": service, "file": report_file.name})
+        return FileParseResult(
+            file_name=report_file.name,
+            ok=False,
+            scenario_names=(),
+            checks_ok=0,
+            checks_failed=1,
+            check_lines=("MISMATCH unable to read report file",),
+            error=f"I/O error: {err}",
+        )
+
     if source is None:
         return FileParseResult(
             file_name=report_file.name,
@@ -161,6 +215,17 @@ def _parse_one_file(*, parser: ParsedReportParser, service: str, report_file: Pa
             checks_failed=1,
             check_lines=("MISMATCH parser rejected file",),
             error=str(err),
+        )
+    except Exception as err:  # pragma: no cover - safety net for manual diagnostics
+        LOGGER.exception("Unexpected parser failure", extra={"service": service, "file": report_file.name})
+        return FileParseResult(
+            file_name=report_file.name,
+            ok=False,
+            scenario_names=(),
+            checks_ok=0,
+            checks_failed=1,
+            check_lines=("MISMATCH parser raised unexpected error",),
+            error=f"Unexpected parser error: {err}",
         )
 
     scenario_names = tuple(sorted(scenario.name for scenario in parsed.scenarios))
@@ -192,19 +257,14 @@ def _load_json(path: Path) -> dict[str, object] | None:
 def _compare_parsed_to_source(*, source: dict[str, object], parsed: K6ParsedReport, report_file: Path) -> tuple[list[str], int, int]:
     checks: list[tuple[str, bool]] = []
 
-    raw_exec = source.get("execScenarios")
-    raw_exec = raw_exec if isinstance(raw_exec, dict) else {}
-    raw_thresholds = source.get("execThresholds")
-    raw_thresholds = raw_thresholds if isinstance(raw_thresholds, dict) else {}
-    raw_metrics = source.get("metrics")
-    raw_metrics = raw_metrics if isinstance(raw_metrics, dict) else {}
+    raw_exec = _as_dict(source.get("execScenarios"))
+    raw_thresholds = _as_dict(source.get("execThresholds"))
+    raw_metrics = _as_dict(source.get("metrics"))
 
     raw_duration = 0.0
     raw_state = source.get("state")
     if isinstance(raw_state, dict):
-        duration_value = raw_state.get("testRunDurationMs")
-        if isinstance(duration_value, (int, float)):
-            raw_duration = float(duration_value)
+        raw_duration = _as_float(raw_state.get("testRunDurationMs"))
 
     checks.append(("scenario count", len(parsed.scenarios) == len(raw_exec)))
 
@@ -223,8 +283,7 @@ def _compare_parsed_to_source(*, source: dict[str, object], parsed: K6ParsedRepo
         if scenario is None:
             continue
 
-        tags = raw_config.get("tags")
-        tags = tags if isinstance(tags, dict) else {}
+        tags = _as_dict(raw_config.get("tags"))
         raw_env = tags.get("env_name")
         raw_env_name = raw_env if isinstance(raw_env, str) and raw_env else None
 
@@ -233,10 +292,10 @@ def _compare_parsed_to_source(*, source: dict[str, object], parsed: K6ParsedRepo
                 (f"{scenario_name}: source_report_file", scenario.source_report_file == report_file.name),
                 (f"{scenario_name}: env_name", scenario.env_name == raw_env_name),
                 (f"{scenario_name}: executor", scenario.executor == raw_config.get("executor")),
-                (f"{scenario_name}: rate", scenario.rate == float(raw_config.get("rate", 0.0))),
+                (f"{scenario_name}: rate", scenario.rate == _as_float(raw_config.get("rate"))),
                 (f"{scenario_name}: duration", scenario.duration == raw_config.get("duration")),
-                (f"{scenario_name}: preAllocatedVUs", scenario.pre_allocated_vus == int(raw_config.get("preAllocatedVUs", 0))),
-                (f"{scenario_name}: maxVUs", scenario.max_vus == int(raw_config.get("maxVUs", 0))),
+                (f"{scenario_name}: preAllocatedVUs", scenario.pre_allocated_vus == _as_int(raw_config.get("preAllocatedVUs"))),
+                (f"{scenario_name}: maxVUs", scenario.max_vus == _as_int(raw_config.get("maxVUs"))),
                 (f"{scenario_name}: testRunDurationMs", scenario.test_run_duration_ms == raw_duration),
                 (
                     f"{scenario_name}: thresholds deep equality",
@@ -253,6 +312,28 @@ def _compare_parsed_to_source(*, source: dict[str, object], parsed: K6ParsedRepo
     checks_ok = sum(1 for _, is_ok in checks if is_ok)
     checks_failed = sum(1 for _, is_ok in checks if not is_ok)
     return check_lines, checks_ok, checks_failed
+
+
+def _as_dict(value: Any) -> dict[str, Any]:
+    if isinstance(value, dict):
+        return value
+    return {}
+
+
+def _as_float(value: object) -> float:
+    if isinstance(value, (int, float)):
+        return float(value)
+    return 0.0
+
+
+def _as_int(value: object) -> int:
+    if isinstance(value, bool):
+        return 0
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float) and value.is_integer():
+        return int(value)
+    return 0
 
 
 def _normalize_json_like(value: object) -> object:
@@ -293,14 +374,10 @@ def _print_summary(*, base_dir: Path, results: list[ServiceParseResult]) -> int:
             if file_result.ok:
                 names = ", ".join(file_result.scenario_names) if file_result.scenario_names else "-"
                 _write_line(
-                    f"   - OK   {file_result.file_name} scenarios=[{names}] "
-                    f"checks={file_result.checks_ok}/{file_result.checks_ok + file_result.checks_failed}"
+                    f"   - OK   {file_result.file_name} scenarios=[{names}] checks={file_result.checks_ok}/{file_result.checks_ok + file_result.checks_failed}"
                 )
             else:
-                _write_line(
-                    f"   - FAIL {file_result.file_name} error={file_result.error} "
-                    f"checks_failed={file_result.checks_failed}"
-                )
+                _write_line(f"   - FAIL {file_result.file_name} error={file_result.error} checks_failed={file_result.checks_failed}")
 
             for check_line in file_result.check_lines:
                 _write_line(f"      · {check_line}")
