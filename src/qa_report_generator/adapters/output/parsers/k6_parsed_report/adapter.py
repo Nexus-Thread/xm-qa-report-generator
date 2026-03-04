@@ -20,15 +20,26 @@ if TYPE_CHECKING:
 class K6ParsedReportParser:
     """Parse k6 JSON files into scenario-centric parsed report models."""
 
-    _IGNORED_TOP_LEVEL_KEYS = frozenset({"setup_data", "root_group"})
-
-    def parse(self, *, service: str, report_files: list[Path]) -> K6ParsedReport:
+    def parse(
+        self,
+        *,
+        service: str,
+        report_files: list[Path],
+        remove_keys: frozenset[str] | None = None,
+    ) -> K6ParsedReport:
         """Parse report files and return a parsed report with scenario entries."""
+        effective_remove_keys = remove_keys if remove_keys is not None else frozenset()
         scenarios: list[K6Scenario] = []
 
         for report_file in report_files:
             source = self._load_json(report_file)
-            scenarios.extend(self._extract_scenarios(source=source, source_report_file=report_file))
+            scenarios.extend(
+                self._extract_scenarios(
+                    source=source,
+                    source_report_file=report_file,
+                    remove_keys=effective_remove_keys,
+                )
+            )
 
         return K6ParsedReport(service=service, scenarios=scenarios)
 
@@ -43,8 +54,14 @@ class K6ParsedReportParser:
             msg = f"Unable to read k6 JSON report: {path}"
             raise ConfigurationError(msg, suggestion="Ensure report file exists and is readable") from err
 
-    def _extract_scenarios(self, *, source: dict[str, Any], source_report_file: Path) -> list[K6Scenario]:
-        sanitized_source = self._remove_ignored_top_level_keys(source)
+    def _extract_scenarios(
+        self,
+        *,
+        source: dict[str, Any],
+        source_report_file: Path,
+        remove_keys: frozenset[str],
+    ) -> list[K6Scenario]:
+        sanitized_source = self._remove_top_level_keys(source, remove_keys=remove_keys)
         validated_report = self._validate_report(sanitized_source)
         exec_scenarios = validated_report.exec_scenarios
         if not exec_scenarios:
@@ -78,8 +95,10 @@ class K6ParsedReportParser:
 
         return parsed_scenarios
 
-    def _remove_ignored_top_level_keys(self, source: dict[str, Any]) -> dict[str, Any]:
-        return {key: value for key, value in source.items() if key not in self._IGNORED_TOP_LEVEL_KEYS}
+    def _remove_top_level_keys(self, source: dict[str, Any], *, remove_keys: frozenset[str]) -> dict[str, Any]:
+        if not remove_keys:
+            return dict(source)
+        return {key: value for key, value in source.items() if key not in remove_keys}
 
     def _validate_report(self, source: dict[str, Any]) -> K6RawSummary:
         try:

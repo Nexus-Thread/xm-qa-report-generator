@@ -50,7 +50,11 @@ def test_parse_builds_scenario_with_report_file_provenance(tmp_path: Path) -> No
 
     parser = K6ParsedReportParser()
 
-    parsed_report = parser.parse(service="megatron", report_files=[report_path])
+    parsed_report = parser.parse(
+        service="megatron",
+        report_files=[report_path],
+        remove_keys=frozenset({"setup_data", "root_group"}),
+    )
 
     assert parsed_report.service == "megatron"
     assert len(parsed_report.scenarios) == 1
@@ -68,6 +72,33 @@ def test_parse_builds_scenario_with_report_file_provenance(tmp_path: Path) -> No
     assert "http_req_duration{test_name:orders-load}" in scenario.thresholds
     assert "setup_data" not in scenario.raw_payload
     assert "root_group" not in scenario.raw_payload
+
+
+def test_parse_keeps_top_level_keys_when_remove_keys_not_provided(tmp_path: Path) -> None:
+    """Parser preserves full payload by default when no key filter is provided."""
+    report_path = tmp_path / "report.json"
+    report_path.write_text(
+        json.dumps(
+            {
+                "execScenarios": {
+                    "orders-load": {
+                        "executor": "constant-arrival-rate",
+                    }
+                },
+                "setup_data": {"large": "payload"},
+                "root_group": {"ignored": True},
+                "metrics": {},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    parser = K6ParsedReportParser()
+    parsed_report = parser.parse(service="megatron", report_files=[report_path])
+
+    scenario = parsed_report.scenarios[0]
+    assert "setup_data" in scenario.raw_payload
+    assert "root_group" in scenario.raw_payload
 
 
 def test_parse_raises_configuration_error_on_invalid_json(tmp_path: Path) -> None:
