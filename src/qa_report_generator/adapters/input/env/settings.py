@@ -76,19 +76,39 @@ class EnvSettings(BaseSettings):
         description="Directory where structured LLM debug JSON payload files are written",
     )
 
+    @field_validator("llm_model", "llm_base_url", "llm_api_key", mode="before")
+    @classmethod
+    def validate_non_empty_text(cls, value: object) -> object:
+        """Normalize text settings and reject blank values."""
+        if not isinstance(value, str):
+            return value
+
+        normalized = value.strip()
+        if not normalized:
+            msg = "Value must not be blank"
+            raise ValueError(msg)
+        return normalized
+
+    @field_validator("llm_debug_json_dir", mode="before")
+    @classmethod
+    def validate_llm_debug_json_dir(cls, value: object) -> object:
+        """Normalize debug output directory and reject blank values."""
+        if isinstance(value, Path):
+            return value
+        if not isinstance(value, str):
+            return value
+
+        normalized = value.strip()
+        if not normalized:
+            msg = "LLM_DEBUG_JSON_DIR must not be blank"
+            raise ValueError(msg)
+        return Path(normalized)
+
     @field_validator("log_level")
     @classmethod
     def validate_log_level(cls, v: str) -> str:
-        """Validate the log level against allowed values.
-
-        Args:
-            v: Log level to validate
-
-        Returns:
-            Validated log level in uppercase
-
-        """
-        v = v.upper()
+        """Normalize and validate log level."""
+        v = v.strip().upper()
         allowed_levels = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
         if v not in allowed_levels:
             msg = f"Invalid log level: {v}. Must be one of: {', '.join(sorted(allowed_levels))}"
@@ -98,16 +118,8 @@ class EnvSettings(BaseSettings):
     @field_validator("log_format")
     @classmethod
     def validate_log_format(cls, v: str) -> str:
-        """Validate the log format against allowed values.
-
-        Args:
-            v: Log format to validate
-
-        Returns:
-            Validated log format in lowercase
-
-        """
-        v = v.lower()
+        """Normalize and validate log format."""
+        v = v.strip().lower()
         allowed_formats = {"simple", "json"}
         if v not in allowed_formats:
             msg = f"Invalid log format: {v}. Must be one of: {', '.join(sorted(allowed_formats))}"
@@ -116,19 +128,12 @@ class EnvSettings(BaseSettings):
 
 
 def load_settings_from_env() -> EnvSettings:
-    """Load and validate application configuration from environment variables.
-
-    Returns:
-        Validated EnvSettings instance.
-
-    Raises:
-        ConfigurationError: If environment variables fail validation.
-
-    """
+    """Load and validate application configuration from environment variables."""
     try:
         settings = EnvSettings()
     except ValidationError as exc:
-        message = f"Invalid configuration: {exc}"
+        details = "; ".join(f"{'.'.join(str(part) for part in error['loc'])}: {error['msg']}" for error in exc.errors())
+        message = f"Invalid configuration: {details}"
         raise ConfigurationError(message) from exc
 
     LOGGER.debug("Configuration loaded from environment")
