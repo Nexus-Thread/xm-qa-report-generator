@@ -8,8 +8,6 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from qa_report_generator.domain.analytics import K6ParsedReport
-
 
 @dataclass(frozen=True)
 class AppSettings:
@@ -61,15 +59,6 @@ class K6ServiceExtractionResult:
 
     service: str
     extracted_runs: list[K6ServiceExtractionRun]
-
-
-@dataclass(frozen=True)
-class K6ServiceReportResult:
-    """Combined parsed and extracted data for one service report workflow."""
-
-    service: str
-    parsed_report: K6ParsedReport
-    extraction: K6ServiceExtractionResult
 
 
 @dataclass(frozen=True)

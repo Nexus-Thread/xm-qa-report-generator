@@ -8,7 +8,6 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     from qa_report_generator.application.dtos import K6SummaryRow
-    from qa_report_generator.domain.analytics import K6ParsedReport
 
 
 class K6SummaryTableParserPort(Protocol):
@@ -16,19 +15,6 @@ class K6SummaryTableParserPort(Protocol):
 
     def parse(self, *, report_files: list[Path]) -> list[K6SummaryRow]:
         """Parse report files into table rows."""
-
-
-class K6ParsedReportParserPort(Protocol):
-    """Port for parsing raw k6 reports into scenario-centric report models."""
-
-    def parse(
-        self,
-        *,
-        service: str,
-        report_files: list[Path],
-        remove_keys: frozenset[str] | None = None,
-    ) -> K6ParsedReport:
-        """Parse report files into parsed report domain model."""
 
 
 class StructuredLlmPort(Protocol):

@@ -11,7 +11,6 @@ import typer
 from qa_report_generator.application.dtos import K6ServiceExtractionResult
 from qa_report_generator.application.ports.input import (
     ExtractK6ServiceMetricsUseCase,
-    GenerateK6ServiceReportUseCase,
     GenerateK6SummaryTableUseCase,
 )
 from qa_report_generator.domain.exceptions import ReportingError
@@ -26,12 +25,10 @@ class K6CliAdapter:
         self,
         generate_k6_summary_table_use_case: GenerateK6SummaryTableUseCase,
         extract_k6_service_metrics_use_case: ExtractK6ServiceMetricsUseCase,
-        generate_k6_service_report_use_case: GenerateK6ServiceReportUseCase | None = None,
     ) -> None:
         """Initialize k6-focused CLI adapter."""
         self._k6_summary_table_use_case = generate_k6_summary_table_use_case
         self._extract_k6_service_metrics_use_case = extract_k6_service_metrics_use_case
-        self._generate_k6_service_report_use_case = generate_k6_service_report_use_case
 
         self._app = typer.Typer(
             help="Generate consolidated k6 summary tables",
@@ -40,7 +37,6 @@ class K6CliAdapter:
 
         self._app.command(name="generate")(self.generate_command)
         self._app.command(name="extract")(self.extract_command)
-        self._app.command(name="report")(self.report_command)
 
     def generate_command(
         self,
@@ -147,51 +143,6 @@ class K6CliAdapter:
                 for run in result.extracted_runs
             ],
         }
-
-    def report_command(
-        self,
-        *,
-        service: Annotated[
-            str,
-            typer.Option(
-                "--service",
-                help="Service identifier for extraction schema selection",
-            ),
-        ],
-        report: Annotated[
-            list[Path],
-            typer.Option(
-                "--report",
-                help="k6 JSON file or directory containing k6 JSON files (repeat for multiple inputs)",
-                exists=True,
-                file_okay=True,
-                dir_okay=True,
-            ),
-        ],
-    ) -> None:
-        """Generate combined parsed and extracted service report payload."""
-        service_report_use_case = self._generate_k6_service_report_use_case
-        if service_report_use_case is None:
-            self._exit_with_error("Service report use case is not configured")
-
-        normalized_service = self._normalize_service(service)
-        report_files = self._resolve_report_files(report)
-        result = self._execute_or_exit(
-            lambda: service_report_use_case.generate_service_report(
-                service=normalized_service,
-                report_paths=report_files,
-            )
-        )
-        payload = {
-            "service": result.service,
-            "parsed_report": asdict(result.parsed_report),
-            "extraction": self._build_extraction_payload(result.extraction),
-        }
-        self._print_json_output(
-            success_message="Generated service report",
-            payload=payload,
-            heading=f"Service: {result.service}",
-        )
 
     def _execute_or_exit(self, operation: Callable[[], _RESULT]) -> _RESULT:
         """Execute operation and convert domain/system errors to CLI exits."""

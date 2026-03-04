@@ -37,19 +37,6 @@ Notes:
 - Verification is strict-fail: any numeric mismatch fails the run.
 - Output is printed as one consolidated envelope with `extracted_runs` (one item per executor report).
 
-### Generate combined service report payload (parse + extract)
-
-```bash
-qa-report-generator-k6 report \
-  --service megatron \
-  --report k6_example/20260228/megatron
-```
-
-Notes:
-- This command first parses input k6 JSON files via the `k6_parsed_report` adapter.
-- It then runs deterministic service-level extraction with schema validation + verification.
-- Output includes both sections: `parsed_report` and `extraction`.
-
 ### Optional structured LLM debug JSON dumps
 
 You can persist low-level structured LLM payloads (request, response content, parsed JSON) into files:
