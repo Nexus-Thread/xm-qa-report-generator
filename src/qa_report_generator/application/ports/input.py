@@ -7,17 +7,7 @@ from typing import TYPE_CHECKING, Protocol
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from qa_report_generator.application.dtos import (
-        K6ServiceExtractionResult,
-        K6SummaryTableResult,
-    )
-
-
-class GenerateK6SummaryTableUseCase(Protocol):
-    """Port for parsing k6 reports into summary rows."""
-
-    def generate_k6_summary_table(self, *, report_files: list[Path]) -> K6SummaryTableResult:
-        """Return parsed summary rows."""
+    from qa_report_generator.application.dtos import K6ServiceExtractionResult
 
 
 class ExtractK6ServiceMetricsUseCase(Protocol):

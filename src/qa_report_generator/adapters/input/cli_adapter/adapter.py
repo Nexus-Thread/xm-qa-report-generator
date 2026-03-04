@@ -2,7 +2,6 @@
 
 import json
 from collections.abc import Callable
-from dataclasses import asdict
 from pathlib import Path
 from typing import Annotated, NoReturn, TypeVar
 
@@ -11,7 +10,6 @@ import typer
 from qa_report_generator.application.dtos import K6ServiceExtractionResult
 from qa_report_generator.application.ports.input import (
     ExtractK6ServiceMetricsUseCase,
-    GenerateK6SummaryTableUseCase,
 )
 from qa_report_generator.domain.exceptions import ReportingError
 
@@ -23,40 +21,21 @@ class K6CliAdapter:
 
     def __init__(
         self,
-        generate_k6_summary_table_use_case: GenerateK6SummaryTableUseCase,
         extract_k6_service_metrics_use_case: ExtractK6ServiceMetricsUseCase,
     ) -> None:
         """Initialize k6-focused CLI adapter."""
-        self._k6_summary_table_use_case = generate_k6_summary_table_use_case
         self._extract_k6_service_metrics_use_case = extract_k6_service_metrics_use_case
 
         self._app = typer.Typer(
-            help="Generate consolidated k6 summary tables",
+            help="Generate deterministic service metrics from k6 reports",
             add_completion=False,
         )
 
+        self._app.callback()(self.root_command)
         self._app.command(name="generate")(self.generate_command)
-        self._app.command(name="extract")(self.extract_command)
 
-    def generate_command(
-        self,
-        *,
-        report: Annotated[
-            list[Path],
-            typer.Option(
-                "--report",
-                help="k6 JSON file or directory containing k6 JSON files (repeat for multiple inputs)",
-                exists=True,
-                file_okay=True,
-                dir_okay=True,
-            ),
-        ],
-    ) -> None:
-        """Generate and print consolidated k6 summary rows from file(s) or directories."""
-        report_files = self._resolve_report_files(report)
-        result = self._execute_or_exit(lambda: self._k6_summary_table_use_case.generate_k6_summary_table(report_files=report_files))
-        rows_payload = [asdict(row) for row in result.rows]
-        self._print_json_output(success_message="Parsed k6 summary rows", payload=rows_payload)
+    def root_command(self) -> None:
+        """Define CLI root to keep command-group behavior with explicit subcommands."""
 
     def _resolve_report_files(self, report_inputs: list[Path]) -> list[Path]:
         """Resolve report inputs into a de-duplicated file list."""
@@ -87,7 +66,7 @@ class K6CliAdapter:
         msg = "Unreachable"
         raise AssertionError(msg)
 
-    def extract_command(
+    def generate_command(
         self,
         *,
         service: Annotated[
@@ -108,7 +87,7 @@ class K6CliAdapter:
             ),
         ],
     ) -> None:
-        """Extract and print service-specific deterministic metrics from one or more k6 JSON reports."""
+        """Generate and print service-specific deterministic metrics from one or more k6 JSON reports."""
         normalized_service = self._normalize_service(service)
         report_files = self._resolve_report_files(report)
         result = self._execute_or_exit(
@@ -119,7 +98,7 @@ class K6CliAdapter:
         )
         payload = self._build_extraction_payload(result)
         self._print_json_output(
-            success_message="Extracted service metrics",
+            success_message="Generated service metrics",
             payload=payload,
             heading=f"Service: {result.service}",
         )

@@ -5,8 +5,6 @@ from .dtos import (
     GeneratedReportsResult,
     K6ServiceExtractionResult,
     K6ServiceExtractionRun,
-    K6SummaryRow,
-    K6SummaryTableResult,
     ReportValidationMetrics,
     VerificationMismatch,
 )
@@ -16,8 +14,6 @@ __all__ = [
     "GeneratedReportsResult",
     "K6ServiceExtractionResult",
     "K6ServiceExtractionRun",
-    "K6SummaryRow",
-    "K6SummaryTableResult",
     "ReportValidationMetrics",
     "VerificationMismatch",
 ]

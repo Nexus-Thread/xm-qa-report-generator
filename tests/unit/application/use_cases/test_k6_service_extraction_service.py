@@ -155,3 +155,27 @@ def test_extract_fails_on_verification_mismatch(tmp_path: Path) -> None:
             service="megatron",
             report_paths=[report_path],
         )
+
+
+def test_verification_prompt_includes_leaf_metric_mapping_rules(tmp_path: Path) -> None:
+    """Verification prompt enforces leaf-value metric comparisons."""
+    report_path = tmp_path / "report.json"
+    report_path.write_text(json.dumps(_source_payload()), encoding="utf-8")
+
+    llm = StubStructuredLlm(
+        [
+            _extracted_payload(),
+            {"mismatches": []},
+        ]
+    )
+    service = K6ServiceExtractionService(llm=llm)
+
+    service.extract(
+        service="megatron",
+        report_paths=[report_path],
+    )
+
+    verification_prompt_payload = json.loads(llm.calls[1][1])
+    rules = verification_prompt_payload["rules"]
+    assert any("dropped_iterations" in rule for rule in rules)
+    assert any("Do not compare extracted fields against whole metric objects" in rule for rule in rules)

@@ -2,14 +2,11 @@
 
 from .input import (
     ExtractK6ServiceMetricsUseCase,
-    GenerateK6SummaryTableUseCase,
 )
-from .output import DebugJsonWriterPort, K6SummaryTableParserPort, StructuredLlmPort
+from .output import DebugJsonWriterPort, StructuredLlmPort
 
 __all__ = [
     "DebugJsonWriterPort",
     "ExtractK6ServiceMetricsUseCase",
-    "GenerateK6SummaryTableUseCase",
-    "K6SummaryTableParserPort",
     "StructuredLlmPort",
 ]

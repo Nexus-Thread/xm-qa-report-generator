@@ -26,26 +26,6 @@ class AppSettings:
 
 
 @dataclass(frozen=True)
-class K6SummaryRow:
-    """Single row in the generated consolidated k6 summary table."""
-
-    report_file: str
-    scenario: str
-    request_rate: float
-    iterations: int
-    p95_duration_ms: float
-    p99_duration_ms: float
-    checks_rate: float
-
-
-@dataclass(frozen=True)
-class K6SummaryTableResult:
-    """Parsed rows returned by the k6 summary table use case."""
-
-    rows: list[K6SummaryRow]
-
-
-@dataclass(frozen=True)
 class K6ServiceExtractionRun:
     """Validated extraction payload for one input report file."""
 

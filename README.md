@@ -17,17 +17,10 @@ python scripts/parse_k6_example_20260228.py --base-dir k6_example/20260228
 The script parses each `*.json` file per service folder and prints per-service status,
 scenario counts/names, file-level failures, and final totals.
 
-### Generate consolidated summary rows (printed JSON)
+### Generate deterministic service metrics
 
 ```bash
 qa-report-generator-k6 generate \
-  --report k6_example/megatron
-```
-
-### Extract deterministic service metrics (phase 1)
-
-```bash
-qa-report-generator-k6 extract \
   --service megatron \
   --report k6_example/megatron
 ```
@@ -44,7 +37,7 @@ You can persist low-level structured LLM payloads (request, response content, pa
 ```bash
 LLM_DEBUG_JSON_ENABLED=true \
 LLM_DEBUG_JSON_DIR=out/debug/llm \
-qa-report-generator-k6 extract \
+qa-report-generator-k6 generate \
   --service megatron \
   --report k6_example/megatron
 ```
