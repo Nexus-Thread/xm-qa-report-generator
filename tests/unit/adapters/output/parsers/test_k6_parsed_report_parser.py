@@ -34,6 +34,8 @@ def test_parse_builds_scenario_with_report_file_provenance(tmp_path: Path) -> No
                     "http_req_duration{test_name:orders-load}": ["p(95)<300", "p(99)<600"],
                 },
                 "state": {"testRunDurationMs": 60000},
+                "setup_data": {"large": "payload"},
+                "root_group": {"ignored": True},
                 "metrics": {
                     "checks": {
                         "type": "rate",
@@ -64,6 +66,8 @@ def test_parse_builds_scenario_with_report_file_provenance(tmp_path: Path) -> No
     assert scenario.test_run_duration_ms == 60000.0
     assert "checks" in scenario.metrics
     assert "http_req_duration{test_name:orders-load}" in scenario.thresholds
+    assert "setup_data" not in scenario.raw_payload
+    assert "root_group" not in scenario.raw_payload
 
 
 def test_parse_raises_configuration_error_on_invalid_json(tmp_path: Path) -> None:

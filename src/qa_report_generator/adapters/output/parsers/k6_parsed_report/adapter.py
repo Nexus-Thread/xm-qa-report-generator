@@ -19,6 +19,8 @@ if TYPE_CHECKING:
 class K6ParsedReportParser:
     """Parse k6 JSON files into scenario-centric parsed report models."""
 
+    _IGNORED_TOP_LEVEL_KEYS = frozenset({"setup_data", "root_group"})
+
     def parse(self, *, service: str, report_files: list[Path]) -> K6ParsedReport:
         """Parse report files and return a parsed report with scenario entries."""
         scenarios: list[K6Scenario] = []
@@ -38,13 +40,14 @@ class K6ParsedReportParser:
             raise ConfigurationError(msg, suggestion="Validate k6 artifact JSON format") from err
 
     def _extract_scenarios(self, *, source: dict[str, Any], source_report_file: Path) -> list[K6Scenario]:
-        validated_report = self._validate_report(source)
+        sanitized_source = self._remove_ignored_top_level_keys(source)
+        validated_report = self._validate_report(sanitized_source)
         exec_scenarios = validated_report.exec_scenarios
         if not exec_scenarios:
             msg = "Missing execScenarios object"
             raise ConfigurationError(msg, suggestion="Ensure report includes execScenarios")
 
-        metrics = self._as_dict(source.get("metrics"))
+        metrics = self._as_dict(sanitized_source.get("metrics"))
         thresholds = validated_report.exec_thresholds
         run_duration = validated_report.state.test_run_duration_ms if validated_report.state else 0.0
 
@@ -65,11 +68,14 @@ class K6ParsedReportParser:
                     test_run_duration_ms=run_duration,
                     thresholds=thresholds,
                     metrics=metrics,
-                    raw_payload=source,
+                    raw_payload=sanitized_source,
                 )
             )
 
         return parsed_scenarios
+
+    def _remove_ignored_top_level_keys(self, source: dict[str, Any]) -> dict[str, Any]:
+        return {key: value for key, value in source.items() if key not in self._IGNORED_TOP_LEVEL_KEYS}
 
     def _validate_report(self, source: dict[str, Any]) -> K6RawSummary:
         try:
