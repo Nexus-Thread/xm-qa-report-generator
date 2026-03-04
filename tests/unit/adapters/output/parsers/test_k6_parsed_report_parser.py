@@ -81,6 +81,14 @@ def test_parse_raises_configuration_error_on_invalid_json(tmp_path: Path) -> Non
         parser.parse(service="megatron", report_files=[report_path])
 
 
+def test_parse_raises_configuration_error_on_missing_file(tmp_path: Path) -> None:
+    """Parser raises a configuration error when report file cannot be read."""
+    parser = K6ParsedReportParser()
+
+    with pytest.raises(ConfigurationError, match="Unable to read k6 JSON report"):
+        parser.parse(service="megatron", report_files=[tmp_path / "does-not-exist.json"])
+
+
 def test_parse_raises_configuration_error_on_missing_exec_scenarios(tmp_path: Path) -> None:
     """Parser raises a configuration error when scenario definitions are absent."""
     report_path = tmp_path / "missing-scenarios.json"
@@ -117,3 +125,104 @@ def test_parse_raises_configuration_error_on_invalid_exec_scenario_shape(tmp_pat
 
     with pytest.raises(ConfigurationError, match="Invalid k6 report schema"):
         parser.parse(service="megatron", report_files=[report_path])
+
+
+def test_parse_allows_missing_executor_specific_fields_with_defaults(tmp_path: Path) -> None:
+    """Parser maps absent scenario fields to deterministic defaults."""
+    report_path = tmp_path / "executor-specific-shape.json"
+    report_path.write_text(
+        json.dumps(
+            {
+                "execScenarios": {
+                    "orders-load": {
+                        "executor": "per-vu-iterations",
+                    }
+                },
+                "metrics": {},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    parser = K6ParsedReportParser()
+    parsed_report = parser.parse(service="megatron", report_files=[report_path])
+    scenario = parsed_report.scenarios[0]
+
+    assert scenario.rate == 0.0
+    assert scenario.duration == ""
+    assert scenario.pre_allocated_vus == 0
+    assert scenario.max_vus == 0
+
+
+def test_parse_creates_independent_payload_structures_per_scenario(tmp_path: Path) -> None:
+    """Parser provides independent mutable structures for each parsed scenario."""
+    report_path = tmp_path / "two-scenarios.json"
+    report_path.write_text(
+        json.dumps(
+            {
+                "execScenarios": {
+                    "orders-load": {
+                        "executor": "constant-arrival-rate",
+                        "rate": 10,
+                        "duration": "1m",
+                        "preAllocatedVUs": 1,
+                        "maxVUs": 2,
+                    },
+                    "positions-load": {
+                        "executor": "constant-arrival-rate",
+                        "rate": 20,
+                        "duration": "1m",
+                        "preAllocatedVUs": 2,
+                        "maxVUs": 4,
+                    },
+                },
+                "execThresholds": {"http_req_duration": ["p(95)<300"]},
+                "metrics": {"checks": {"values": {"rate": 1.0}}},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    parser = K6ParsedReportParser()
+    parsed_report = parser.parse(service="megatron", report_files=[report_path])
+    first, second = parsed_report.scenarios
+
+    first.thresholds["new"] = ["p(99)<500"]
+    first.metrics["checks"]["contains"] = "first-only"
+    first.raw_payload["extra"] = {"flag": True}
+
+    assert "new" not in second.thresholds
+    assert second.metrics["checks"].get("contains") is None
+    assert "extra" not in second.raw_payload
+
+
+def test_parse_drops_non_dict_metrics_payload_entries(tmp_path: Path) -> None:
+    """Parser keeps only metric entries that are object-shaped."""
+    report_path = tmp_path / "mixed-metrics.json"
+    report_path.write_text(
+        json.dumps(
+            {
+                "execScenarios": {
+                    "orders-load": {
+                        "executor": "constant-arrival-rate",
+                        "rate": 10,
+                        "duration": "1m",
+                        "preAllocatedVUs": 1,
+                        "maxVUs": 2,
+                    }
+                },
+                "metrics": {
+                    "checks": {"values": {"rate": 1.0}},
+                    "invalid_metric": 10,
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    parser = K6ParsedReportParser()
+    parsed_report = parser.parse(service="megatron", report_files=[report_path])
+
+    scenario = parsed_report.scenarios[0]
+    assert "checks" in scenario.metrics
+    assert "invalid_metric" not in scenario.metrics

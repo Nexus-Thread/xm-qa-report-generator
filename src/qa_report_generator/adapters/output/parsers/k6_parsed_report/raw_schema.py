@@ -21,10 +21,10 @@ class K6RawExecScenario(BaseModel):
     model_config = ConfigDict(extra="allow", populate_by_name=True)
 
     executor: str = Field(min_length=1)
-    rate: float = Field(ge=0)
-    duration: str = Field(min_length=1)
-    pre_allocated_vus: int = Field(alias="preAllocatedVUs", ge=0)
-    max_vus: int = Field(alias="maxVUs", ge=0)
+    rate: float | None = Field(default=None, ge=0)
+    duration: str | None = Field(default=None, min_length=1)
+    pre_allocated_vus: int | None = Field(default=None, alias="preAllocatedVUs", ge=0)
+    max_vus: int | None = Field(default=None, alias="maxVUs", ge=0)
     tags: dict[str, Any] | None = Field(default=None)
 
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from copy import deepcopy
 from typing import TYPE_CHECKING, Any
 
 from pydantic import ValidationError
@@ -38,6 +39,9 @@ class K6ParsedReportParser:
         except json.JSONDecodeError as err:
             msg = f"Invalid k6 JSON report: {path}"
             raise ConfigurationError(msg, suggestion="Validate k6 artifact JSON format") from err
+        except OSError as err:
+            msg = f"Unable to read k6 JSON report: {path}"
+            raise ConfigurationError(msg, suggestion="Ensure report file exists and is readable") from err
 
     def _extract_scenarios(self, *, source: dict[str, Any], source_report_file: Path) -> list[K6Scenario]:
         sanitized_source = self._remove_ignored_top_level_keys(source)
@@ -47,7 +51,7 @@ class K6ParsedReportParser:
             msg = "Missing execScenarios object"
             raise ConfigurationError(msg, suggestion="Ensure report includes execScenarios")
 
-        metrics = self._as_dict(sanitized_source.get("metrics"))
+        metrics = self._normalize_metrics(sanitized_source.get("metrics"))
         thresholds = validated_report.exec_thresholds
         run_duration = validated_report.state.test_run_duration_ms if validated_report.state else 0.0
 
@@ -61,14 +65,14 @@ class K6ParsedReportParser:
                     name=str(scenario_name),
                     env_name=self._extract_env_name(tags=tags),
                     executor=raw_config.executor,
-                    rate=raw_config.rate,
-                    duration=raw_config.duration,
-                    pre_allocated_vus=raw_config.pre_allocated_vus,
-                    max_vus=raw_config.max_vus,
+                    rate=raw_config.rate if raw_config.rate is not None else 0.0,
+                    duration=raw_config.duration if raw_config.duration is not None else "",
+                    pre_allocated_vus=(raw_config.pre_allocated_vus if raw_config.pre_allocated_vus is not None else 0),
+                    max_vus=raw_config.max_vus if raw_config.max_vus is not None else 0,
                     test_run_duration_ms=run_duration,
-                    thresholds=thresholds,
-                    metrics=metrics,
-                    raw_payload=sanitized_source,
+                    thresholds=deepcopy(thresholds),
+                    metrics=deepcopy(metrics),
+                    raw_payload=deepcopy(sanitized_source),
                 )
             )
 
@@ -84,10 +88,12 @@ class K6ParsedReportParser:
             msg = "Invalid k6 report schema"
             raise ConfigurationError(msg, suggestion=str(err)) from err
 
-    def _as_dict(self, value: Any) -> dict[str, Any]:
-        if isinstance(value, dict):
-            return value
-        return {}
+    def _normalize_metrics(self, value: Any) -> dict[str, dict[str, Any]]:
+        if not isinstance(value, dict):
+            return {}
+        return {
+            metric_name: metric_payload for metric_name, metric_payload in value.items() if isinstance(metric_name, str) and isinstance(metric_payload, dict)
+        }
 
     def _extract_env_name(self, *, tags: dict[str, Any]) -> str | None:
         tagged_env_name = tags.get("env_name")
