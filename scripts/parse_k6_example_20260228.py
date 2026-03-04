@@ -5,7 +5,6 @@ from __future__ import annotations
 import argparse
 import json
 import logging
-import re
 import sys
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -17,7 +16,6 @@ if TYPE_CHECKING:
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 SRC_DIR = PROJECT_ROOT / "src"
 LOGGER = logging.getLogger(__name__)
-_FILENAME_SAFE_PATTERN = re.compile(r"[^a-zA-Z0-9_.-]+")
 
 
 def _write_line(text: str) -> None:
@@ -39,7 +37,14 @@ class FileParseResult:
     checks_failed: int
     check_lines: tuple[str, ...]
     error: str | None
-    parsed_dump_file: str | None
+
+
+@dataclass(frozen=True)
+class ParseResultWithDumpEntry:
+    """One file parse result with optional dump entry payload."""
+
+    file_result: FileParseResult
+    dump_entry: dict[str, Any] | None
 
 
 @dataclass(frozen=True)
@@ -52,6 +57,7 @@ class ServiceParseResult:
     scenario_total: int
     scenario_names: tuple[str, ...]
     file_results: tuple[FileParseResult, ...]
+    parsed_dump_file: str | None
 
 
 class ParsedReportParser(Protocol):
@@ -59,6 +65,13 @@ class ParsedReportParser(Protocol):
 
     def parse(self, *, service: str, report_files: list[Path]) -> K6ParsedReport:
         """Parse report files for one service."""
+
+
+class DebugJsonWriter(Protocol):
+    """Protocol for JSON debug dump writer used by this script."""
+
+    def write_json(self, *, label: str, payload: Any) -> Path:
+        """Write one labeled JSON payload and return file path."""
 
 
 def _build_arg_parser() -> argparse.ArgumentParser:
@@ -96,6 +109,17 @@ def _load_parser_class() -> type[ParsedReportParser] | None:
     return K6ParsedReportParser
 
 
+def _load_debug_writer(*, dump_dir: Path) -> DebugJsonWriter | None:
+    try:
+        from qa_report_generator.adapters.output.persistence import JsonFileDebugWriterAdapter
+    except ImportError as err:
+        _write_error(f"ERROR: unable to import JSON debug writer adapter: {err}")
+        _write_error("Hint: run from repository root or set PYTHONPATH=src")
+        return None
+
+    return JsonFileDebugWriterAdapter(base_dir=dump_dir)
+
+
 def main() -> int:
     """Run manual parser validation across service fixture folders."""
     args = _build_arg_parser().parse_args()
@@ -105,8 +129,16 @@ def main() -> int:
         _write_error(f"ERROR: base directory does not exist or is not a directory: {base_dir}")
         return 2
 
+    dump_dir = Path(args.dump_dir)
+    try:
+        dump_dir.mkdir(parents=True, exist_ok=True)
+    except OSError as err:
+        _write_error(f"ERROR: cannot create dump directory {dump_dir}: {err}")
+        return 2
+
     parser_class = _load_parser_class()
-    if parser_class is None:
+    debug_writer = _load_debug_writer(dump_dir=dump_dir)
+    if parser_class is None or debug_writer is None:
         return 2
 
     requested_services = tuple(dict.fromkeys(args.service))
@@ -121,17 +153,10 @@ def main() -> int:
         _write_error(f"ERROR: no service directories found in {base_dir}")
         return 2
 
-    dump_dir = Path(args.dump_dir)
-    try:
-        dump_dir.mkdir(parents=True, exist_ok=True)
-    except OSError as err:
-        _write_error(f"ERROR: cannot create dump directory {dump_dir}: {err}")
-        return 2
-
     results = _parse_services(
         service_dirs=service_dirs,
         parser_class=parser_class,
-        dump_dir=dump_dir,
+        dump_writer=debug_writer,
     )
     return _print_summary(base_dir=base_dir, results=results, dump_dir=dump_dir)
 
@@ -163,7 +188,7 @@ def _parse_services(
     *,
     service_dirs: tuple[Path, ...],
     parser_class: type[ParsedReportParser],
-    dump_dir: Path,
+    dump_writer: DebugJsonWriter,
 ) -> list[ServiceParseResult]:
     parser = parser_class()
     results: list[ServiceParseResult] = []
@@ -172,15 +197,23 @@ def _parse_services(
         service = service_dir.name
 
         report_files = sorted(service_dir.glob("*.json"))
-        file_results = [
-            _parse_one_file(
+        file_results: list[FileParseResult] = []
+        dump_entries: list[dict[str, Any]] = []
+        for report_file in report_files:
+            parse_result = _parse_one_file(
                 parser=parser,
                 service=service,
                 report_file=report_file,
-                dump_dir=dump_dir,
             )
-            for report_file in report_files
-        ]
+            file_results.append(parse_result.file_result)
+            if parse_result.dump_entry is not None:
+                dump_entries.append(parse_result.dump_entry)
+
+        parsed_dump_file = _write_service_parsed_dump(
+            dump_writer=dump_writer,
+            service=service,
+            dump_entries=dump_entries,
+        )
 
         scenario_names: set[str] = set()
         scenario_total = 0
@@ -199,109 +232,109 @@ def _parse_services(
                 scenario_total=scenario_total,
                 scenario_names=tuple(sorted(scenario_names)),
                 file_results=tuple(file_results),
+                parsed_dump_file=parsed_dump_file,
             )
         )
 
     return results
 
 
-def _parse_one_file(*, parser: ParsedReportParser, service: str, report_file: Path, dump_dir: Path) -> FileParseResult:
+def _parse_one_file(*, parser: ParsedReportParser, service: str, report_file: Path) -> ParseResultWithDumpEntry:
     from qa_report_generator.domain.exceptions import ConfigurationError
 
     try:
         source = _load_json(report_file)
     except OSError as err:
         LOGGER.exception("Failed reading report file", extra={"service": service, "file": report_file.name})
-        return FileParseResult(
-            file_name=report_file.name,
-            ok=False,
-            scenario_names=(),
-            checks_ok=0,
-            checks_failed=1,
-            check_lines=("MISMATCH unable to read report file",),
-            error=f"I/O error: {err}",
-            parsed_dump_file=None,
+        return ParseResultWithDumpEntry(
+            file_result=FileParseResult(
+                file_name=report_file.name,
+                ok=False,
+                scenario_names=(),
+                checks_ok=0,
+                checks_failed=1,
+                check_lines=("MISMATCH unable to read report file",),
+                error=f"I/O error: {err}",
+            ),
+            dump_entry=None,
         )
 
     if source is None:
-        return FileParseResult(
-            file_name=report_file.name,
-            ok=False,
-            scenario_names=(),
-            checks_ok=0,
-            checks_failed=1,
-            check_lines=("MISMATCH invalid JSON",),
-            error="Invalid JSON",
-            parsed_dump_file=None,
+        return ParseResultWithDumpEntry(
+            file_result=FileParseResult(
+                file_name=report_file.name,
+                ok=False,
+                scenario_names=(),
+                checks_ok=0,
+                checks_failed=1,
+                check_lines=("MISMATCH invalid JSON",),
+                error="Invalid JSON",
+            ),
+            dump_entry=None,
         )
 
     try:
         parsed = parser.parse(service=service, report_files=[report_file])
     except ConfigurationError as err:
-        return FileParseResult(
-            file_name=report_file.name,
-            ok=False,
-            scenario_names=(),
-            checks_ok=0,
-            checks_failed=1,
-            check_lines=("MISMATCH parser rejected file",),
-            error=str(err),
-            parsed_dump_file=None,
+        return ParseResultWithDumpEntry(
+            file_result=FileParseResult(
+                file_name=report_file.name,
+                ok=False,
+                scenario_names=(),
+                checks_ok=0,
+                checks_failed=1,
+                check_lines=("MISMATCH parser rejected file",),
+                error=str(err),
+            ),
+            dump_entry=None,
         )
     except Exception as err:  # pragma: no cover - safety net for manual diagnostics
         LOGGER.exception("Unexpected parser failure", extra={"service": service, "file": report_file.name})
-        return FileParseResult(
-            file_name=report_file.name,
-            ok=False,
-            scenario_names=(),
-            checks_ok=0,
-            checks_failed=1,
-            check_lines=("MISMATCH parser raised unexpected error",),
-            error=f"Unexpected parser error: {err}",
-            parsed_dump_file=None,
+        return ParseResultWithDumpEntry(
+            file_result=FileParseResult(
+                file_name=report_file.name,
+                ok=False,
+                scenario_names=(),
+                checks_ok=0,
+                checks_failed=1,
+                check_lines=("MISMATCH parser raised unexpected error",),
+                error=f"Unexpected parser error: {err}",
+            ),
+            dump_entry=None,
         )
-
-    parsed_dump_file = _write_parsed_model_dump(
-        parsed=parsed,
-        service=service,
-        report_file=report_file,
-        dump_dir=dump_dir,
-    )
 
     scenario_names = tuple(sorted(scenario.name for scenario in parsed.scenarios))
     check_lines, checks_ok, checks_failed = _compare_parsed_to_source(source=source, parsed=parsed, report_file=report_file)
 
     is_ok = checks_failed == 0
-    return FileParseResult(
-        file_name=report_file.name,
-        ok=is_ok,
-        scenario_names=scenario_names,
-        checks_ok=checks_ok,
-        checks_failed=checks_failed,
-        check_lines=tuple(check_lines),
-        error=None,
-        parsed_dump_file=parsed_dump_file,
+    return ParseResultWithDumpEntry(
+        file_result=FileParseResult(
+            file_name=report_file.name,
+            ok=is_ok,
+            scenario_names=scenario_names,
+            checks_ok=checks_ok,
+            checks_failed=checks_failed,
+            check_lines=tuple(check_lines),
+            error=None,
+        ),
+        dump_entry={"report_file": report_file.name, "parsed": asdict(parsed)},
     )
 
 
-def _write_parsed_model_dump(*, parsed: K6ParsedReport, service: str, report_file: Path, dump_dir: Path) -> str | None:
-    payload = asdict(parsed)
-    file_name = f"{_sanitize_file_name(service)}__{_sanitize_file_name(report_file.stem)}__parsed.json"
-    dump_path = dump_dir / file_name
+def _write_service_parsed_dump(*, dump_writer: DebugJsonWriter, service: str, dump_entries: list[dict[str, Any]]) -> str | None:
+    payload = {
+        "service": service,
+        "reports": dump_entries,
+    }
     try:
-        dump_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    except OSError:
+        dump_path = dump_writer.write_json(label=f"{service}__parsed", payload=payload)
+    except (OSError, TypeError, ValueError):
         LOGGER.exception(
-            "Failed writing parsed model dump",
-            extra={"service": service, "report_file": report_file.name, "dump_file": str(dump_path)},
+            "Failed writing service parsed model dump",
+            extra={"service": service},
         )
         return None
     return str(dump_path)
-
-
-def _sanitize_file_name(value: str) -> str:
-    sanitized = _FILENAME_SAFE_PATTERN.sub("_", value.strip()).strip("._")
-    return sanitized or "value"
 
 
 def _load_json(path: Path) -> dict[str, object] | None:
@@ -441,16 +474,16 @@ def _print_summary(*, base_dir: Path, results: list[ServiceParseResult], dump_di
             else:
                 _write_line(f"   - FAIL {file_result.file_name} error={file_result.error} checks_failed={file_result.checks_failed}")
 
-            if file_result.parsed_dump_file:
-                dumps_written += 1
-                _write_line(f"      · DUMP {file_result.parsed_dump_file}")
-
             for check_line in file_result.check_lines:
                 _write_line(f"      · {check_line}")
 
+        if result.parsed_dump_file:
+            dumps_written += 1
+            _write_line(f"   · DUMP {result.parsed_dump_file}")
+
     _write_line("=" * 88)
     _write_line(f"Totals: services={len(results)} services_failed={services_failed} files={files_total} files_failed={files_failed}")
-    _write_line(f"Parsed model dumps: {dumps_written} file(s) in {dump_dir}")
+    _write_line(f"Parsed model dumps: {dumps_written} service file(s) in {dump_dir}")
 
     if services_failed or files_failed:
         return 1
