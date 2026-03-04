@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from qa_report_generator.application.ports.output import K6ParsedReportParserPort
 from qa_report_generator.domain.analytics import K6ParsedReport, K6Scenario
 
 from .file_loader import load_json_report
@@ -14,7 +15,7 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 
-class K6ParsedReportParser:
+class K6ParsedReportParser(K6ParsedReportParserPort):
     """Parse k6 JSON files into scenario-centric parsed report models."""
 
     def parse(
