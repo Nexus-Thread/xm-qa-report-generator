@@ -6,22 +6,14 @@ import json
 import logging
 from typing import TYPE_CHECKING, Any
 
-from qa_report_generator.adapters.output.narrative.openai.response import OpenAIResponseError, extract_message_content
-from qa_report_generator.domain.exceptions import ExtractionVerificationError
+from .logging_utils import truncate_for_log
+from .response_parser import extract_structured_content, parse_json_object
 
 if TYPE_CHECKING:
     from qa_report_generator.adapters.output.narrative.openai.protocols import OpenAIClientProtocol
     from qa_report_generator.application.ports.output import DebugJsonWriterPort
 
 LOGGER = logging.getLogger(__name__)
-_MAX_LOG_PREVIEW_CHARS = 10_000
-
-
-def _truncate_for_log(value: str, *, max_chars: int = _MAX_LOG_PREVIEW_CHARS) -> tuple[str, bool]:
-    """Return truncated log preview and truncation flag."""
-    if len(value) <= max_chars:
-        return value, False
-    return f"{value[:max_chars]}...[truncated]", True
 
 
 class OpenAIStructuredLlmAdapter:
@@ -50,7 +42,7 @@ class OpenAIStructuredLlmAdapter:
         request_payload = {"model": self._model, "messages": messages}
         self._write_debug_payload(label="request_payload", payload=request_payload)
         request_payload_json = json.dumps(request_payload, ensure_ascii=False)
-        request_payload_preview, request_payload_truncated = _truncate_for_log(request_payload_json)
+        request_payload_preview, request_payload_truncated = truncate_for_log(request_payload_json)
         LOGGER.debug(
             "Structured LLM request payload: %s",
             request_payload_preview,
@@ -63,9 +55,9 @@ class OpenAIStructuredLlmAdapter:
         )
 
         response = self._client.create_json_completion(model=self._model, messages=messages)
-        content = self._extract_content(response)
+        content = extract_structured_content(response)
         self._write_debug_payload(label="response_content", payload={"content": content})
-        response_preview, response_truncated = _truncate_for_log(content)
+        response_preview, response_truncated = truncate_for_log(content)
         LOGGER.debug(
             "Structured LLM response content: %s",
             response_preview,
@@ -77,18 +69,11 @@ class OpenAIStructuredLlmAdapter:
             },
         )
 
-        try:
-            payload = json.loads(content)
-        except json.JSONDecodeError as err:
-            msg = "LLM returned invalid JSON payload"
-            raise ExtractionVerificationError(msg, suggestion="Inspect model output and prompts") from err
-        if not isinstance(payload, dict):
-            msg = "LLM payload must be a JSON object"
-            raise ExtractionVerificationError(msg, suggestion="Ensure prompt requests top-level JSON object")
+        payload = parse_json_object(content)
 
         self._write_debug_payload(label="parsed_payload", payload=payload)
         parsed_payload_json = json.dumps(payload, ensure_ascii=False)
-        parsed_payload_preview, parsed_payload_truncated = _truncate_for_log(parsed_payload_json)
+        parsed_payload_preview, parsed_payload_truncated = truncate_for_log(parsed_payload_json)
         LOGGER.debug(
             "Structured LLM parsed JSON payload: %s",
             parsed_payload_preview,
@@ -101,13 +86,6 @@ class OpenAIStructuredLlmAdapter:
             },
         )
         return payload
-
-    def _extract_content(self, response: object) -> str:
-        try:
-            return extract_message_content(response)
-        except OpenAIResponseError as err:
-            msg = "LLM response has missing content or invalid content shape"
-            raise ExtractionVerificationError(msg, suggestion=str(err)) from err
 
     def _write_debug_payload(self, *, label: str, payload: Any) -> None:
         """Write debug payload if JSON debug output is enabled."""
