@@ -30,6 +30,7 @@ class SpyExtractionUseCase:
         self.calls.append((service, report_paths))
         return K6ServiceExtractionResult(
             service=service,
+            mode="service_specific",
             extracted_runs=[K6ServiceExtractionRun(report_file=path.name, extracted={"service": service}) for path in report_paths],
         )
 
@@ -117,6 +118,7 @@ def test_generate_command_prints_success_message_heading_and_json_payload(
     captured = capsys.readouterr()
     assert "✅ Generated service metrics" in captured.out
     assert "Service: megatron" in captured.out
+    assert '"mode": "service_specific"' in captured.out
     assert '"service": "megatron"' in captured.out
     assert '"report_file": "report.json"' in captured.out
 

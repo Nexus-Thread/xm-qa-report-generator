@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import json
+from copy import deepcopy
 from typing import TYPE_CHECKING, Any
 
 import pytest
 
 from qa_report_generator.application.use_cases.k6_service_extraction import K6ServiceExtractionService
+from qa_report_generator.domain.analytics import K6ParsedReport, K6Scenario
 from qa_report_generator.domain.exceptions import ExtractionVerificationError
 
 if TYPE_CHECKING:
@@ -26,6 +28,43 @@ class StubStructuredLlm:
         """Return the next planned response."""
         self.calls.append((system_prompt, user_prompt))
         return self._responses.pop(0)
+
+
+class StubK6ParsedReportParser:
+    """Stub parser returning a deterministic parsed report."""
+
+    def __init__(self, parsed_report: K6ParsedReport) -> None:
+        """Store parsed report template to return for parse calls."""
+        self._parsed_report = parsed_report
+
+    def parse(
+        self,
+        *,
+        service: str,
+        report_files: list[Path],
+        remove_keys: frozenset[str] | None = None,
+    ) -> K6ParsedReport:
+        """Return parsed report with one scenario entry per report file."""
+        del remove_keys
+        template = self._parsed_report.scenarios[0]
+        scenarios = [
+            K6Scenario(
+                source_report_file=report_file.name,
+                name=template.name,
+                env_name=template.env_name,
+                executor=template.executor,
+                rate=template.rate,
+                duration=template.duration,
+                pre_allocated_vus=template.pre_allocated_vus,
+                max_vus=template.max_vus,
+                test_run_duration_ms=template.test_run_duration_ms,
+                thresholds=deepcopy(template.thresholds),
+                metrics=deepcopy(template.metrics),
+                raw_payload=deepcopy(template.raw_payload),
+            )
+            for report_file in report_files
+        ]
+        return K6ParsedReport(service=service, scenarios=scenarios)
 
 
 def _source_payload() -> dict[str, Any]:
@@ -95,6 +134,33 @@ def _extracted_payload() -> dict[str, Any]:
     }
 
 
+def _parsed_report(*, service: str = "megatron", source_report_file: str = "report.json") -> K6ParsedReport:
+    """Build parsed report fixture for service extraction tests."""
+    scenario_payload = _source_payload()
+    scenario_payload.pop("setup_data", None)
+    scenario_payload.pop("root_group", None)
+
+    return K6ParsedReport(
+        service=service,
+        scenarios=[
+            K6Scenario(
+                source_report_file=source_report_file,
+                name="megatron-load",
+                env_name="staging",
+                executor="constant-arrival-rate",
+                rate=10.0,
+                duration="1m",
+                pre_allocated_vus=10,
+                max_vus=20,
+                test_run_duration_ms=60000.0,
+                thresholds={"http_req_duration": ["p(95)<1000"]},
+                metrics=scenario_payload["metrics"],
+                raw_payload=scenario_payload,
+            )
+        ],
+    )
+
+
 def test_extract_filters_removed_keys_and_returns_validated_payload(tmp_path: Path) -> None:
     """Extraction filters heavy keys and returns validated payload."""
     report_path_1 = tmp_path / "report-1.json"
@@ -110,7 +176,8 @@ def test_extract_filters_removed_keys_and_returns_validated_payload(tmp_path: Pa
             {"mismatches": []},
         ]
     )
-    service = K6ServiceExtractionService(llm=llm)
+    parser = StubK6ParsedReportParser(_parsed_report())
+    service = K6ServiceExtractionService(llm=llm, parser=parser)
 
     result = service.extract(
         service="megatron",
@@ -118,6 +185,7 @@ def test_extract_filters_removed_keys_and_returns_validated_payload(tmp_path: Pa
     )
 
     assert result.service == "megatron"
+    assert result.mode == "service_specific"
     assert len(result.extracted_runs) == 2
     assert result.extracted_runs[0].extracted["service"] == "megatron"
     assert result.extracted_runs[1].extracted["service"] == "megatron"
@@ -148,7 +216,8 @@ def test_extract_fails_on_verification_mismatch(tmp_path: Path) -> None:
             },
         ]
     )
-    service = K6ServiceExtractionService(llm=llm)
+    parser = StubK6ParsedReportParser(_parsed_report())
+    service = K6ServiceExtractionService(llm=llm, parser=parser)
 
     with pytest.raises(ExtractionVerificationError):
         service.extract(
@@ -168,7 +237,8 @@ def test_verification_prompt_includes_leaf_metric_mapping_rules(tmp_path: Path) 
             {"mismatches": []},
         ]
     )
-    service = K6ServiceExtractionService(llm=llm)
+    parser = StubK6ParsedReportParser(_parsed_report())
+    service = K6ServiceExtractionService(llm=llm, parser=parser)
 
     service.extract(
         service="megatron",
@@ -179,3 +249,24 @@ def test_verification_prompt_includes_leaf_metric_mapping_rules(tmp_path: Path) 
     rules = verification_prompt_payload["rules"]
     assert any("dropped_iterations" in rule for rule in rules)
     assert any("Do not compare extracted fields against whole metric objects" in rule for rule in rules)
+
+
+def test_extract_returns_generic_payload_when_service_definition_is_missing(tmp_path: Path) -> None:
+    """Extraction returns generic parsed payload when no service definition exists."""
+    report_path = tmp_path / "report.json"
+    report_path.write_text(json.dumps(_source_payload()), encoding="utf-8")
+
+    llm = StubStructuredLlm([])
+    parser = StubK6ParsedReportParser(_parsed_report(service="unknown-service", source_report_file="report.json"))
+    service = K6ServiceExtractionService(llm=llm, parser=parser)
+
+    result = service.extract(
+        service="unknown-service",
+        report_paths=[report_path],
+    )
+
+    assert result.service == "unknown-service"
+    assert result.mode == "generic"
+    assert len(result.extracted_runs) == 1
+    assert result.extracted_runs[0].extracted["scenario"]["name"] == "megatron-load"
+    assert llm.calls == []

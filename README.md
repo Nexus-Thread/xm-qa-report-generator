@@ -26,9 +26,11 @@ qa-report-generator-k6 generate \
 ```
 
 Notes:
-- Extraction is service-scoped and schema-driven.
+- Reports are parsed first into a normalized scenario model.
+- If a service definition exists, extraction is service-scoped and schema-driven.
+- If a service definition does not exist, CLI returns generic parsed scenario output.
 - Verification is strict-fail: any numeric mismatch fails the run.
-- Output is printed as one consolidated envelope with `extracted_runs` (one item per executor report).
+- Output is printed as one consolidated envelope with `mode` and `extracted_runs`.
 
 ### Optional structured LLM debug JSON dumps
 
@@ -53,7 +55,7 @@ Environment variables:
 2. Implement:
    - `schema.py`: Pydantic model(s)
    - `prompts.py`: extraction + verification prompt builders
-   - `validation.py`: service-specific invariants
+   - optional schema/model validators for service-specific invariants
    - `definition.py`: `ServiceDefinition` instance
    - `__init__.py`: export `SERVICE_DEFINITION`
 3. No central registry edit is required for in-repo definitions:

@@ -114,6 +114,7 @@ class K6CliAdapter:
         """Build extraction JSON payload for CLI output."""
         return {
             "service": result.service,
+            "mode": result.mode,
             "extracted_runs": [
                 {
                     "report_file": run.report_file,

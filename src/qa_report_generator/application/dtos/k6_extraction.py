@@ -19,6 +19,7 @@ class K6ServiceExtractionResult:
     """Validated extraction payloads returned for one service."""
 
     service: str
+    mode: str
     extracted_runs: list[K6ServiceExtractionRun]
 
 

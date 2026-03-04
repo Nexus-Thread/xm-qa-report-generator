@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel, ValidationError
 
@@ -14,16 +14,18 @@ from qa_report_generator.domain.exceptions import ConfigurationError, Extraction
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from qa_report_generator.application.ports.output import StructuredLlmPort
+    from qa_report_generator.application.ports.output import K6ParsedReportParserPort, StructuredLlmPort
     from qa_report_generator.application.service_definitions.base import ServiceDefinition
+    from qa_report_generator.domain.analytics import K6ParsedReport
 
 
 class K6ServiceExtractionService:
     """Extract deterministic structured metrics for one service from a k6 summary JSON."""
 
-    def __init__(self, *, llm: StructuredLlmPort) -> None:
+    def __init__(self, *, llm: StructuredLlmPort, parser: K6ParsedReportParserPort) -> None:
         """Store adapter dependencies."""
         self._llm = llm
+        self._parser = parser
 
     def extract(self, *, service: str, report_paths: list[Path]) -> K6ServiceExtractionResult:
         """Run two-step extraction + verification and return validated payloads."""
@@ -32,17 +34,34 @@ class K6ServiceExtractionService:
             raise ConfigurationError(msg, suggestion="Pass one or more k6 JSON reports")
 
         definition = self._resolve_definition(service)
+        remove_keys = definition.remove_keys if definition is not None else frozenset()
+        parsed_report = self._parser.parse(
+            service=service,
+            report_files=report_paths,
+            remove_keys=remove_keys,
+        )
+
+        if definition is None:
+            return self._build_generic_result(parsed_report)
+
+        return self._extract_service_specific(parsed_report=parsed_report, definition=definition)
+
+    def _extract_service_specific(
+        self,
+        *,
+        parsed_report: K6ParsedReport,
+        definition: ServiceDefinition,
+    ) -> K6ServiceExtractionResult:
+        """Run service-specific extraction flow for parsed scenarios."""
         extracted_runs: list[K6ServiceExtractionRun] = []
 
-        for report_path in report_paths:
-            source = self._load_source_json(report_path)
-            filtered_source = self._filter_source(source, remove_keys=definition.remove_keys)
-            filtered_source_json = self._to_canonical_json(filtered_source)
+        for scenario in parsed_report.scenarios:
+            filtered_source_json = self._to_canonical_json(scenario.raw_payload)
 
             extraction_prompt = definition.build_extraction_user_prompt(
                 filtered_source_json,
                 definition.dump_schema(),
-                report_path.name,
+                scenario.source_report_file,
             )
             extracted_payload = self._llm.complete_json(
                 system_prompt=definition.extraction_system_prompt,
@@ -70,34 +89,48 @@ class K6ServiceExtractionService:
                 )
                 raise ExtractionVerificationError(msg, suggestion="Inspect source and extracted payloads for mapping drift")
 
-            extracted_runs.append(K6ServiceExtractionRun(report_file=report_path.name, extracted=extracted))
+            extracted_runs.append(K6ServiceExtractionRun(report_file=scenario.source_report_file, extracted=extracted))
 
         return K6ServiceExtractionResult(
-            service=service,
+            service=parsed_report.service,
+            mode="service_specific",
             extracted_runs=extracted_runs,
         )
 
-    def _resolve_definition(self, service: str) -> ServiceDefinition:
+    def _resolve_definition(self, service: str) -> ServiceDefinition | None:
         try:
             return get_service_definition(service)
-        except ValueError as err:
-            msg = f"Unsupported service '{service}'"
-            raise ConfigurationError(msg, suggestion="Add service definition module and register it") from err
+        except ValueError:
+            return None
 
-    def _load_source_json(self, report_path: Path) -> dict[str, Any]:
-        try:
-            return cast("dict[str, Any]", json.loads(report_path.read_text(encoding="utf-8")))
-        except json.JSONDecodeError as err:
-            msg = f"Invalid JSON in report: {report_path}"
-            raise ConfigurationError(msg, suggestion="Check k6 artifact validity") from err
-
-    def _filter_source(self, source: dict[str, Any], *, remove_keys: frozenset[str]) -> dict[str, Any]:
-        filtered: dict[str, Any] = {}
-        for key, value in source.items():
-            if key in remove_keys:
-                continue
-            filtered[key] = value
-        return filtered
+    def _build_generic_result(self, parsed_report: K6ParsedReport) -> K6ServiceExtractionResult:
+        """Build generic parsed output when no service definition exists."""
+        extracted_runs = [
+            K6ServiceExtractionRun(
+                report_file=scenario.source_report_file,
+                extracted={
+                    "service": parsed_report.service,
+                    "scenario": {
+                        "name": scenario.name,
+                        "env_name": scenario.env_name,
+                        "executor": scenario.executor,
+                        "rate": scenario.rate,
+                        "duration": scenario.duration,
+                        "pre_allocated_vus": scenario.pre_allocated_vus,
+                        "max_vus": scenario.max_vus,
+                    },
+                    "test_run_duration_ms": scenario.test_run_duration_ms,
+                    "thresholds": scenario.thresholds,
+                    "metrics": scenario.metrics,
+                },
+            )
+            for scenario in parsed_report.scenarios
+        ]
+        return K6ServiceExtractionResult(
+            service=parsed_report.service,
+            mode="generic",
+            extracted_runs=extracted_runs,
+        )
 
     def _to_canonical_json(self, payload: dict[str, Any]) -> str:
         return json.dumps(payload, ensure_ascii=False, separators=(",", ":"), sort_keys=True)

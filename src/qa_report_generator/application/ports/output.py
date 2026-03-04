@@ -7,6 +7,8 @@ from typing import TYPE_CHECKING, Any, Protocol
 if TYPE_CHECKING:
     from pathlib import Path
 
+    from qa_report_generator.domain.analytics import K6ParsedReport
+
 
 class StructuredLlmPort(Protocol):
     """Port for deterministic JSON generation with an LLM backend."""
@@ -20,3 +22,16 @@ class DebugJsonWriterPort(Protocol):
 
     def write_json(self, *, label: str, payload: Any) -> Path:
         """Persist one labeled JSON payload and return file path."""
+
+
+class K6ParsedReportParserPort(Protocol):
+    """Port for parsing raw k6 report files into scenario-centric models."""
+
+    def parse(
+        self,
+        *,
+        service: str,
+        report_files: list[Path],
+        remove_keys: frozenset[str] | None = None,
+    ) -> K6ParsedReport:
+        """Parse report files into a normalized parsed report."""
