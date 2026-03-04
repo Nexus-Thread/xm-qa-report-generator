@@ -4,15 +4,18 @@ from __future__ import annotations
 
 import importlib
 import pkgutil
+from types import MappingProxyType
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from qa_report_generator.application.service_definitions.base import ServiceDefinition
 
 
-SERVICE_DEFINITIONS: dict[str, ServiceDefinition] = {}
+_SERVICE_DEFINITIONS: dict[str, ServiceDefinition] = {}
 _SERVICE_SOURCES: dict[str, str] = {}
 _DISCOVERY_STATE = {"builtins_discovered": False}
+
+SERVICE_DEFINITIONS = MappingProxyType(_SERVICE_DEFINITIONS)
 
 
 def _store_definition(*, definition: ServiceDefinition, source: str) -> None:
@@ -22,13 +25,13 @@ def _store_definition(*, definition: ServiceDefinition, source: str) -> None:
         msg = "Service definition name must not be empty"
         raise ValueError(msg)
 
-    existing = SERVICE_DEFINITIONS.get(name)
+    existing = _SERVICE_DEFINITIONS.get(name)
     if existing is not None and existing is not definition:
         existing_source = _SERVICE_SOURCES.get(name, "unknown")
         msg = f"Service definition '{name}' already registered by {existing_source}"
         raise ValueError(msg)
 
-    SERVICE_DEFINITIONS[name] = definition
+    _SERVICE_DEFINITIONS[name] = definition
     _SERVICE_SOURCES[name] = source
 
 
@@ -60,14 +63,14 @@ def register_service_definition(definition: ServiceDefinition) -> None:
 def list_service_definitions() -> tuple[str, ...]:
     """Return sorted names of registered service definitions."""
     _discover_builtin_definitions()
-    return tuple(sorted(SERVICE_DEFINITIONS))
+    return tuple(sorted(_SERVICE_DEFINITIONS))
 
 
 def get_service_definition(service: str) -> ServiceDefinition:
     """Return service definition by name or raise ValueError."""
     _discover_builtin_definitions()
-    if service in SERVICE_DEFINITIONS:
-        return SERVICE_DEFINITIONS[service]
+    if service in _SERVICE_DEFINITIONS:
+        return _SERVICE_DEFINITIONS[service]
     msg = f"Unsupported service: {service}"
     raise ValueError(msg)
 

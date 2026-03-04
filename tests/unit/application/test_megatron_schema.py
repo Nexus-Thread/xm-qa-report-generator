@@ -6,7 +6,6 @@ import pytest
 from pydantic import ValidationError
 
 from qa_report_generator.application.service_definitions.megatron.schema import MegatronExtractedMetrics
-from qa_report_generator.application.service_definitions.megatron.validation import validate_extracted_metrics
 
 
 def _valid_payload() -> dict[str, object]:
@@ -76,8 +75,8 @@ def test_megatron_schema_accepts_camel_case_scenario_aliases() -> None:
     assert model.scenario.max_vus == 20
 
 
-def test_validate_extracted_metrics_rejects_invalid_scenario_bounds() -> None:
-    """Validation rejects scenario with max vus lower than preallocated."""
+def test_megatron_schema_rejects_invalid_scenario_bounds() -> None:
+    """Megatron schema rejects scenario with max vus lower than preallocated."""
     payload = _valid_payload()
     payload["scenario"] = {
         "name": "megatron-load",
@@ -88,7 +87,5 @@ def test_validate_extracted_metrics_rejects_invalid_scenario_bounds() -> None:
         "pre_allocated_vus": 20,
         "max_vus": 10,
     }
-    model = MegatronExtractedMetrics.model_validate(payload)
-
     with pytest.raises(ValueError, match="maxVUs must be >= preAllocatedVUs"):
-        validate_extracted_metrics(model)
+        MegatronExtractedMetrics.model_validate(payload)

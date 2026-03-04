@@ -49,8 +49,9 @@ class K6ServiceExtractionService:
                 user_prompt=extraction_prompt,
             )
 
-            extracted_model = self._validate_with_schema(definition.schema_type, extracted_payload)
-            definition.validate_extracted(extracted_model)
+            extracted_model = self._validate_with_schema(definition.schema_model, extracted_payload)
+            if definition.validate_extracted is not None:
+                definition.validate_extracted(extracted_model)
 
             extracted = extracted_model.model_dump(by_alias=True)
             extracted_json = self._to_canonical_json(extracted)
