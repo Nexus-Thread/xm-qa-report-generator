@@ -35,7 +35,45 @@ def extract_message_content(response: object) -> str:
         msg = "LLM response did not include content"
         raise OpenAIResponseError(msg)
 
-    return content
+    if isinstance(content, str):
+        return content
+
+    if isinstance(content, list):
+        extracted_parts = [_extract_content_part_text(part) for part in content]
+        extracted_text = "".join(part for part in extracted_parts if part is not None)
+        if extracted_text:
+            return extracted_text
+
+    msg = "LLM response content is not a supported text shape"
+    raise OpenAIResponseError(msg)
+
+
+def _extract_content_part_text(part: object) -> str | None:
+    """Extract text from a structured content part."""
+    if isinstance(part, str):
+        return part
+
+    if isinstance(part, dict):
+        text = part.get("text")
+        return text if isinstance(text, str) else None
+
+    text = getattr(part, "text", None)
+    if isinstance(text, str):
+        return text
+
+    nested_text = _extract_nested_text_field(part)
+    if isinstance(nested_text, str):
+        return nested_text
+
+    return None
+
+
+def _extract_nested_text_field(part: object) -> object:
+    """Return nested text value when content part exposes rich text objects."""
+    text = getattr(part, "text", None)
+    if text is None:
+        return None
+    return getattr(text, "value", None)
 
 
 def extract_usage(response: object) -> OpenAIResponseUsage | None:

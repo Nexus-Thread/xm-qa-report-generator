@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from types import SimpleNamespace
 
 import pytest
 
@@ -16,7 +17,7 @@ from qa_report_generator.adapters.output.narrative.openai.response import (
 
 @dataclass(frozen=True)
 class _Message:
-    content: str | None
+    content: object | None
 
 
 @dataclass(frozen=True)
@@ -65,6 +66,67 @@ def test_extract_message_content_raises_when_content_is_missing() -> None:
     response = _Response(choices=[_Choice(message=_Message(content=None))])
 
     with pytest.raises(OpenAIResponseError, match="content"):
+        extract_message_content(response)
+
+
+def test_extract_message_content_supports_structured_list_with_string_parts() -> None:
+    """Response helper joins text from string parts."""
+    response = _Response(choices=[_Choice(message=_Message(content=["hello", " ", "world"]))])
+
+    assert extract_message_content(response) == "hello world"
+
+
+def test_extract_message_content_supports_structured_list_with_dict_text_parts() -> None:
+    """Response helper joins text from dict-based parts."""
+    response = _Response(
+        choices=[
+            _Choice(
+                message=_Message(
+                    content=[
+                        {"type": "output_text", "text": "hello"},
+                        {"type": "output_text", "text": " world"},
+                    ]
+                )
+            )
+        ]
+    )
+
+    assert extract_message_content(response) == "hello world"
+
+
+def test_extract_message_content_supports_structured_list_with_nested_text_value() -> None:
+    """Response helper extracts text from object parts with nested value."""
+    response = _Response(
+        choices=[
+            _Choice(
+                message=_Message(
+                    content=[
+                        SimpleNamespace(text=SimpleNamespace(value="hello")),
+                        SimpleNamespace(text=SimpleNamespace(value=" world")),
+                    ]
+                )
+            )
+        ]
+    )
+
+    assert extract_message_content(response) == "hello world"
+
+
+def test_extract_message_content_raises_when_structured_content_has_no_text() -> None:
+    """Response helper raises when structured parts do not include text."""
+    response = _Response(
+        choices=[
+            _Choice(
+                message=_Message(
+                    content=[
+                        {"type": "output_image", "image_url": "https://example.invalid"},
+                    ]
+                )
+            )
+        ]
+    )
+
+    with pytest.raises(OpenAIResponseError, match="supported text shape"):
         extract_message_content(response)
 
 

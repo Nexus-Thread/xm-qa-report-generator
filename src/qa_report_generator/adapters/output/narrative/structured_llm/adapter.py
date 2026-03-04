@@ -14,7 +14,7 @@ if TYPE_CHECKING:
     from qa_report_generator.application.ports.output import DebugJsonWriterPort
 
 LOGGER = logging.getLogger(__name__)
-_MAX_LOG_PREVIEW_CHARS = 2_000_000
+_MAX_LOG_PREVIEW_CHARS = 10_000
 
 
 def _truncate_for_log(value: str, *, max_chars: int = _MAX_LOG_PREVIEW_CHARS) -> tuple[str, bool]:
@@ -35,7 +35,7 @@ class OpenAIStructuredLlmAdapter:
         debug_json_writer: DebugJsonWriterPort | None = None,
         debug_json_enabled: bool = False,
     ) -> None:
-        """Store transport client and model name."""
+        """Store transport client and runtime configuration."""
         self._client = client
         self._model = model
         self._debug_json_writer = debug_json_writer
@@ -106,7 +106,7 @@ class OpenAIStructuredLlmAdapter:
         try:
             return extract_message_content(response)
         except OpenAIResponseError as err:
-            msg = "LLM response is missing content"
+            msg = "LLM response has missing content or invalid content shape"
             raise ExtractionVerificationError(msg, suggestion=str(err)) from err
 
     def _write_debug_payload(self, *, label: str, payload: Any) -> None:
