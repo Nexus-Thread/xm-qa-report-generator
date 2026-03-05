@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field
 
 from qa_report_generator.application.service_definitions import schema as k6_schema
 
@@ -25,14 +25,6 @@ class MegatronExtractedMetrics(BaseModel):
     iterations: k6_schema.CounterValues
     dropped_iterations: k6_schema.CounterValues
     thresholds: dict[str, list[str]]
-
-    @model_validator(mode="after")
-    def validate_scenario_bounds(self) -> MegatronExtractedMetrics:
-        """Ensure scenario VU bounds are valid."""
-        if self.scenario.max_vus < self.scenario.pre_allocated_vus:
-            msg = "maxVUs must be >= preAllocatedVUs"
-            raise ValueError(msg)
-        return self
 
 
 ExtractedMetrics = MegatronExtractedMetrics
