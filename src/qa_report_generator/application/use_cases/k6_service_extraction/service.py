@@ -6,9 +6,9 @@ from typing import TYPE_CHECKING
 
 from qa_report_generator.application.dtos import K6ServiceExtractionResult, K6ServiceExtractionRun
 from qa_report_generator.application.ports.input import ExtractK6ServiceMetricsUseCase
+from qa_report_generator.application.service_definitions import get_optional_service_definition
 from qa_report_generator.domain.exceptions import ConfigurationError, ExtractionVerificationError
 
-from .definition_resolver import resolve_service_definition
 from .json_utils import to_canonical_json
 from .result_builders import build_generic_result
 from .schema_validation import validate_with_schema
@@ -36,7 +36,7 @@ class K6ServiceExtractionService(ExtractK6ServiceMetricsUseCase):
             msg = "No report files provided for extraction"
             raise ConfigurationError(msg, suggestion="Pass one or more k6 JSON reports")
 
-        definition = resolve_service_definition(service)
+        definition = get_optional_service_definition(service)
         remove_keys = definition.remove_keys if definition is not None else frozenset()
         parsed_report = self._parser.parse(
             service=service,

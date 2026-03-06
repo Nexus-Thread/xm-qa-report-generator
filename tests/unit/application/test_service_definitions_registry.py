@@ -12,6 +12,7 @@ from qa_report_generator.application.exceptions import (
     UnknownServiceDefinitionError,
 )
 from qa_report_generator.application.service_definitions import (
+    get_optional_service_definition,
     get_service_definition,
     list_service_definitions,
     register_service_definition,
@@ -40,6 +41,11 @@ def test_get_service_definition_returns_builtin_definition() -> None:
     definition: ServiceDefinition = get_service_definition("megatron")
 
     assert definition.name == "megatron"
+
+
+def test_get_optional_service_definition_returns_none_for_unknown_service() -> None:
+    """Optional lookup returns None for unsupported services."""
+    assert get_optional_service_definition("unknown-service") is None
 
 
 def test_get_service_definition_rejects_unknown_service() -> None:
