@@ -2,6 +2,8 @@
 
 Use these rules to keep documentation helpful without being verbose.
 
+This file governs documentation written inside source code. Requirements for README updates, ADRs, and changelog notes live in `04-docs-and-adr.md`.
+
 ## Module docstrings
 - **One line** stating the module's purpose
 - No bullet lists, feature descriptions, or implementation notes

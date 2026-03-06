@@ -21,6 +21,33 @@
 - Use **Must/Should** language for clarity and consistency.
 - When adding a new module, update this README and ensure numbering remains sequential.
 
+## Rule authoring standards
+- Keep each module focused on one primary topic with a clearly implied owner.
+- Avoid restating requirements owned by another module unless the later module is adding stricter or more specific constraints.
+- Prefer one requirement per bullet so review discussions can reference a single rule precisely.
+- Use **Must** only for review-blocking requirements.
+- Use **Should** for strong defaults that may allow justified exceptions.
+- When a later module intentionally overrides or sharpens an earlier rule, make that override explicit.
+
+## Ownership and specialization
+- Earlier files should define broad policy and defaults for their topic.
+- Later specialized files should define detailed mechanics for narrower subtopics.
+- When a specialized file exists, earlier files should point to it instead of repeating detailed guidance.
+
+### Topic ownership map
+- `01-core-standards.md`: universal coding behavior and defaults
+- `02-architecture-guardrails.md`: architecture boundaries and dependency direction
+- `03-testing-standards.md`: automated testing expectations
+- `04-docs-and-adr.md`: required project documentation outside source code
+- `05-module-structure.md`: file, package, and export mechanics
+- `06-performance-and-observability.md`: performance expectations and runtime visibility
+- `07-repo-navigation.md`: repository discovery and navigation guidance
+- `08-pr-and-commit-hygiene.md`: review and change-management discipline
+- `09-tooling-and-ci.md`: local quality gate and CI workflow expectations
+- `10-documentation-standards.md`: in-code documentation style only
+- `11-logging-conventions.md`: logging implementation mechanics only
+- `12-command-execution-safety.md`: command execution and process safety
+
 ## Active modules
 - `01-core-standards.md` - Naming, formatting, error handling, logging
 - `02-architecture-guardrails.md` - Hexagonal architecture doctrine, adapter directory structure
@@ -41,16 +68,26 @@
 ## Enforcement and automation matrix
 Use this map to keep "Must" rules enforceable, not just advisory.
 
+Interpret enforcement labels as follows:
+- **Tool-enforced**: verified directly by automated tooling.
+- **Review-enforced**: verified primarily in code review.
+- **Process-enforced**: verified through operating discipline when tools cannot reliably enforce the rule.
+
 | Rule area | Primary enforcement | Secondary enforcement |
 | --- | --- | --- |
 | Naming, formatting, imports | `ruff format .`, `ruff check . --fix`, `ruff check .` | PR review |
 | Type contracts and API drift | `mypy src/ tests/` | PR review |
 | Behavior changes and regressions | `pytest tests/` | Targeted regression tests |
-| Architecture boundaries (hexagonal) | Code review vs `02-architecture-guardrails.md` | Optional import-lint/custom boundary scripts |
-| Module/file structure conventions | Code review | Optional repository audit script |
-| Docs/ADR/changelog updates | PR checklist/review | Release checklist |
-| Logging conventions | `ruff` + code review | Runtime log sampling |
-| Command execution safety | Process discipline (no `python - <<'PY'` patterns; git `--no-pager`/non-interactive) | PR review |
+| Architecture boundaries (hexagonal) | Review-enforced against `02-architecture-guardrails.md` | Optional import-lint/custom boundary scripts |
+| Module/file structure conventions | Review-enforced against `05-module-structure.md` | Optional repository audit script |
+| Docs/ADR/changelog updates | Review-enforced via PR checklist | Release checklist |
+| Logging conventions | Review-enforced against `11-logging-conventions.md` | Runtime log sampling |
+| Command execution safety | Process-enforced (no `python - <<'PY'` patterns; git `--no-pager`/non-interactive) | PR review |
+
+## Rules-to-enforcement alignment
+- Hard constraints should be backed by tool enforcement where practical; otherwise, mark them as review-enforced or process-enforced.
+- If automation cannot fully enforce a rule, write the rule so a reviewer can still evaluate compliance consistently.
+- Keep rule text, examples, and tooling configuration aligned; when they differ intentionally, document the reason in the relevant rule file or PR notes.
 
 ## Scope
 These rules apply to Python projects using hexagonal architecture unless explicitly stated otherwise.

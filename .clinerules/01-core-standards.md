@@ -34,4 +34,4 @@ Use these rules for all Python code in this repo to keep behavior predictable an
 - Use the configured logger (typically from a dedicated `logging_config.py` module) — **no `print()`** in production code.
 - Never log secrets, tokens, API keys, or sensitive data unless required for debugging.
 - Keep logging setup centralized; do not duplicate global logging configuration in feature modules.
-- For logger naming, structured context, exception logging patterns, and allowed exceptions, see `11-logging-conventions.md`.
+- For logger naming, structured context, and implementation mechanics, see `11-logging-conventions.md`.

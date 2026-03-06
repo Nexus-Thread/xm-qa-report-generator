@@ -12,12 +12,20 @@ Use these rules to keep files focused, navigable, and easy to maintain.
 - **Must** use `__init__.py` to expose public API; keep internal implementation private.
 - **Should** group related classes/functions by responsibility, not by type.
 - **Must** keep one primary class/responsibility per file when splitting modules.
+- Adapter-specific structure should satisfy the architectural consistency expectations in `02-architecture-guardrails.md`.
 
 ## Naming conventions for split modules
 - Module directory: `snake_case/` (e.g., `cli_adapter/`)
 - Main file: `adapter.py`, `service.py`, `writer.py`, etc. (semantic, not repetitive)
 - Supporting files: `types.py`, `validators.py`, `formatters.py`, `utils.py`, etc.
 - **Must** avoid redundant naming (use `cli_adapter/adapter.py`, not `cli_adapter/cli_adapter.py`)
+
+## Adapter package mechanics
+- **Must** organize adapters in subdirectories when multiple adapters exist in the same parent directory.
+- **Should** use subdirectories even for simple, single-file adapters to preserve consistent expansion paths.
+- **Must** name the main adapter implementation semantically, such as `adapter.py`, `parser.py`, `writer.py`, or `client.py`.
+- **Must** keep adapter categories internally consistent instead of mixing standalone files and subpackages without a documented reason.
+- When there is only one adapter in a category and no near-term expectation of siblings, a single file may be acceptable if the reasoning is documented.
 
 ## Splitting strategies
 - **Orchestration vs. implementation**: Main class in one file, helpers in others

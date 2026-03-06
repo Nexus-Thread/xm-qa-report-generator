@@ -6,11 +6,13 @@ Use these rules to keep documentation consistent and decision records traceable.
 - **Must** update `README.md` when behavior, configuration, or usage changes.
 - **Should** add short usage examples when new CLI flags or commands are introduced.
 - **Must** document new environment variables and defaults.
+- In-code docstring and comment style is governed separately by `10-documentation-standards.md`.
 
 ## ADR (Architecture Decision Records)
 - **Must** create an ADR when a decision impacts architecture, dependencies, or boundaries.
 - **Must** use the format: **Context**, **Decision**, **Consequences**, **Alternatives**.
 - **Should** include links to related issues/PRs.
+- Put architectural rationale in ADRs rather than module docstrings or inline comments.
 
 ## Changelog notes
 - **Must** call out breaking changes explicitly.

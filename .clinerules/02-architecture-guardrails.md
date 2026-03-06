@@ -52,6 +52,7 @@ Use this doctrine as the default architecture standard for this repo. Any deviat
 - `application/`: use cases + ports + DTOs.
 - `adapters/`: input (CLI/HTTP/GraphQL) and output (persistence, external APIs, messaging, etc.).
 - `infrastructure/` (optional): shared infra utilities used by adapters only.
+- Detailed file splitting, package export, and `__init__.py` mechanics are governed by `05-module-structure.md`.
 
 ## Naming conventions (layer-aware)
 - `.../ports/` for interfaces/protocols.
@@ -67,49 +68,7 @@ Use this doctrine as the default architecture standard for this repo. Any deviat
 ## Adapter directory structure
 Adapters at the same conceptual level **must** be organized uniformly to keep navigation predictable and scalable.
 
-### Directory structure rules
-- **Must** organize adapters in subdirectories (not as standalone files) when multiple adapters exist in the same parent directory.
-- **Should** use subdirectories even for simple, single-file adapters to maintain consistency and allow future expansion without restructuring.
-- **Must** name the main implementation file semantically: `adapter.py`, `parser.py`, `writer.py`, `client.py`, etc. (never repeat the directory name).
-- **Must** export public classes from the subdirectory's `__init__.py` to keep imports clean.
-
-### Pattern: output adapters
-When you have multiple output adapters (e.g., persistence, narrative, parsers), each should follow the same structure:
-
-✅ **Consistent structure**
-```
-adapters/output/
-├── persistence/
-│   ├── cache/
-│   │   ├── __init__.py       # Exports CacheAdapter
-│   │   └── adapter.py        # Implementation
-│   └── database/
-│       ├── __init__.py       # Exports DatabaseAdapter
-│       ├── adapter.py        # Main class
-│       ├── mappers.py
-│       └── queries.py
-├── messaging/
-│   ├── __init__.py
-│   └── queue_adapter.py
-└── external_api/
-    ├── __init__.py
-    └── http_client.py
-```
-
-❌ **Inconsistent structure (avoid)**
-```
-adapters/output/
-├── persistence/
-│   ├── cache.py               # ❌ Standalone file
-│   └── database/              # ✅ Subdirectory
-│       └── ...
-```
-
-### Naming conventions
-- Directory: `snake_case` (e.g., `user_repository/`, `email_client/`, `payment_gateway/`)
-- Main file: semantic name matching responsibility (e.g., `adapter.py`, `repository.py`, `client.py`)
-- Supporting files: `types.py`, `mappers.py`, `validators.py`, `serializers.py`, etc.
-
-### Exceptions
-- When there's only **one** adapter in a category and no plans for more, a single file may be acceptable.
-- Document the reasoning if deviating from the standard structure.
+- **Must** keep adapter structure consistent within the same conceptual category.
+- **Must** avoid mixing one-off standalone adapters with subdirectory-based adapters without a documented reason.
+- **Must** keep adapter naming and packaging aligned with the package-structure rules in `05-module-structure.md`.
+- For detailed directory, file naming, and export conventions, follow `05-module-structure.md`.
