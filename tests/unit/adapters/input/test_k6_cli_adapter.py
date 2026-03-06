@@ -49,6 +49,16 @@ class FailingExtractionUseCase:
         raise ReportingError(msg, suggestion=self._suggestion)
 
 
+class CrashingExtractionUseCase:
+    """Extraction use case stub that raises an unexpected error."""
+
+    def extract(self, *, service: str, report_paths: list[Path]) -> K6ServiceExtractionResult:
+        """Raise unexpected runtime error."""
+        del service, report_paths
+        msg = "unexpected boom"
+        raise RuntimeError(msg)
+
+
 def test_generate_command_passes_service_and_report_to_use_case(tmp_path: Path) -> None:
     """Generate command forwards service and resolved report paths to use case."""
     report_path_1 = tmp_path / "report-1.json"
@@ -79,6 +89,22 @@ def test_generate_command_raises_typer_exit_on_reporting_error(tmp_path: Path) -
     )
 
     with pytest.raises(typer.Exit):
+        adapter.generate_command(
+            service="megatron",
+            report=[report_path],
+        )
+
+
+def test_generate_command_propagates_unexpected_errors(tmp_path: Path) -> None:
+    """Generate command propagates unexpected errors without wrapping them."""
+    report_path = tmp_path / "report.json"
+    report_path.write_text("{}", encoding="utf-8")
+
+    adapter = K6CliAdapter(
+        extract_k6_service_metrics_use_case=CrashingExtractionUseCase(),
+    )
+
+    with pytest.raises(RuntimeError, match="unexpected boom"):
         adapter.generate_command(
             service="megatron",
             report=[report_path],

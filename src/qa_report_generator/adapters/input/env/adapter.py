@@ -13,12 +13,7 @@ class EnvSettingsAdapter:
     """Load AppSettings from environment-backed settings."""
 
     def load(self) -> AppSettings:
-        """Load environment settings and map them to AppSettings DTO.
-
-        Returns:
-            Immutable AppSettings populated from the current environment
-
-        """
+        """Load environment settings and map them to AppSettings DTO."""
         settings = load_settings_from_env()
         return AppSettings(
             log_level=settings.log_level,

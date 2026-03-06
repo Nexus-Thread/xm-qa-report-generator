@@ -131,8 +131,6 @@ class K6CliAdapter:
         except ReportingError as error:
             suggestion = f"\n💡 Suggestion: {error.suggestion}" if error.suggestion else ""
             self._exit_with_error(f"{error}{suggestion}", error=error)
-        except Exception as error:
-            self._exit_with_error(f"Error: {error}", error=error)
 
     def _print_json_output(self, *, success_message: str, payload: object, heading: str | None = None) -> None:
         """Print success text and JSON payload."""
