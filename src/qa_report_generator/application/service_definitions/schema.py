@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class CounterValues(BaseModel):
@@ -61,6 +61,14 @@ class Scenario(BaseModel):
     duration: str = Field(min_length=1, description="Use $.execScenarios.<scenario>.duration")
     pre_allocated_vus: int = Field(alias="preAllocatedVUs", ge=0, description="Use $.execScenarios.<scenario>.preAllocatedVUs")
     max_vus: int = Field(alias="maxVUs", ge=0, description="Use $.execScenarios.<scenario>.maxVUs")
+
+    @model_validator(mode="after")
+    def validate_vu_bounds(self) -> Scenario:
+        """Validate that max VUs is not lower than preallocated VUs."""
+        if self.max_vus < self.pre_allocated_vus:
+            msg = "maxVUs must be >= preAllocatedVUs"
+            raise ValueError(msg)
+        return self
 
 
 class ThresholdResult(BaseModel):
