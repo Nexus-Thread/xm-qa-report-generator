@@ -7,23 +7,6 @@ from typing import Any
 
 
 @dataclass(frozen=True)
-class ReportIdentifier:
-    """Suite and test name pair used in diff outputs."""
-
-    suite: str
-    name: str
-
-
-@dataclass(frozen=True)
-class ReportDiff:
-    """Collection of differences between two report runs."""
-
-    new_failures: list[ReportIdentifier]
-    fixed_tests: list[ReportIdentifier]
-    regressions: list[ReportIdentifier]
-
-
-@dataclass(frozen=True)
 class K6Scenario:
     """Parsed k6 scenario with normalized fields and raw payload."""
 
