@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from qa_report_generator.application.exceptions import UnknownServiceDefinitionError
 from qa_report_generator.application.service_definitions import get_service_definition
 
 if TYPE_CHECKING:
@@ -14,5 +15,5 @@ def resolve_service_definition(service: str) -> ServiceDefinition | None:
     """Resolve optional service definition for extraction flow."""
     try:
         return get_service_definition(service)
-    except ValueError:
+    except UnknownServiceDefinitionError:
         return None

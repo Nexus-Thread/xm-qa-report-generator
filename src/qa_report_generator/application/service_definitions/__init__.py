@@ -7,6 +7,12 @@ import pkgutil
 from types import MappingProxyType
 from typing import TYPE_CHECKING
 
+from qa_report_generator.application.exceptions import (
+    DuplicateServiceDefinitionError,
+    InvalidServiceDefinitionError,
+    UnknownServiceDefinitionError,
+)
+
 if TYPE_CHECKING:
     from qa_report_generator.application.service_definitions.base import ServiceDefinition
 
@@ -23,13 +29,13 @@ def _store_definition(*, definition: ServiceDefinition, source: str) -> None:
     name = definition.name.strip()
     if not name:
         msg = "Service definition name must not be empty"
-        raise ValueError(msg)
+        raise InvalidServiceDefinitionError(msg)
 
     existing = _SERVICE_DEFINITIONS.get(name)
     if existing is not None and existing is not definition:
         existing_source = _SERVICE_SOURCES.get(name, "unknown")
         msg = f"Service definition '{name}' already registered by {existing_source}"
-        raise ValueError(msg)
+        raise DuplicateServiceDefinitionError(msg)
 
     _SERVICE_DEFINITIONS[name] = definition
     _SERVICE_SOURCES[name] = source
@@ -67,12 +73,12 @@ def list_service_definitions() -> tuple[str, ...]:
 
 
 def get_service_definition(service: str) -> ServiceDefinition:
-    """Return service definition by name or raise ValueError."""
+    """Return service definition by name or raise application error."""
     _discover_builtin_definitions()
     if service in _SERVICE_DEFINITIONS:
         return _SERVICE_DEFINITIONS[service]
     msg = f"Unsupported service: {service}"
-    raise ValueError(msg)
+    raise UnknownServiceDefinitionError(msg)
 
 
 __all__ = [

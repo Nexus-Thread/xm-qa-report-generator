@@ -7,6 +7,10 @@ from typing import TYPE_CHECKING
 
 import pytest
 
+from qa_report_generator.application.exceptions import (
+    DuplicateServiceDefinitionError,
+    UnknownServiceDefinitionError,
+)
 from qa_report_generator.application.service_definitions import (
     get_service_definition,
     list_service_definitions,
@@ -27,7 +31,7 @@ def test_register_service_definition_rejects_duplicate_name() -> None:
     existing_definition = get_service_definition("megatron")
     duplicate_definition = replace(existing_definition)
 
-    with pytest.raises(ValueError, match="already registered"):
+    with pytest.raises(DuplicateServiceDefinitionError, match="already registered"):
         register_service_definition(duplicate_definition)
 
 
@@ -36,3 +40,9 @@ def test_get_service_definition_returns_builtin_definition() -> None:
     definition: ServiceDefinition = get_service_definition("megatron")
 
     assert definition.name == "megatron"
+
+
+def test_get_service_definition_rejects_unknown_service() -> None:
+    """Lookup raises application-specific error for unsupported services."""
+    with pytest.raises(UnknownServiceDefinitionError, match="Unsupported service"):
+        get_service_definition("unknown-service")
