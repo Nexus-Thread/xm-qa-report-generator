@@ -138,7 +138,22 @@ def _extracted_payload() -> dict[str, Any]:
 
 def _parsed_report(*, service: str = "megatron", source_report_file: str = "report.json") -> K6ParsedReport:
     """Build parsed report fixture for service extraction tests."""
+    return _parsed_report_with_source_payload(
+        source_payload=_source_payload(),
+        service=service,
+        source_report_file=source_report_file,
+    )
+
+
+def _parsed_report_with_source_payload(
+    *,
+    source_payload: dict[str, Any],
+    service: str = "megatron",
+    source_report_file: str = "report.json",
+) -> K6ParsedReport:
+    """Build parsed report fixture from a provided source payload."""
     scenario_payload = _source_payload()
+    scenario_payload = deepcopy(source_payload)
     scenario_payload.pop("setup_data", None)
     scenario_payload.pop("root_group", None)
 
@@ -257,6 +272,8 @@ def test_verification_prompt_includes_leaf_metric_mapping_rules(tmp_path: Path) 
     assert "target_schema" in verification_prompt_payload
     rules = verification_prompt_payload["rules"]
     assert any("Treat missing required fields as mismatches" in rule for rule in rules)
+    assert any("allows null for a field" in rule for rule in rules)
+    assert any("optional metric object is absent in source and the extracted value is null" in rule for rule in rules)
     assert any("source of truth" in rule for rule in rules)
     assert any("multiple candidate source values" in rule for rule in rules)
     assert any("unrelated duplicate source fields" in rule for rule in rules)
@@ -290,6 +307,38 @@ def test_verification_prompt_includes_schema_guidance_for_duplicate_values(tmp_p
     assert verification_prompt_payload["source"]["env"] is None
     assert verification_prompt_payload["source"]["execScenarios"]["megatron-load"]["tags"]["env_name"] == "staging"
     assert scenario_properties["env_name"]["description"] == "Use $.execScenarios.<scenario>.tags.env_name"
+
+
+def test_verification_prompt_describes_optional_missing_metric_as_null(tmp_path: Path) -> None:
+    """Verification payload explains that absent optional metrics should validate as null."""
+    report_path = tmp_path / "report.json"
+    source_payload = _source_payload()
+    source_payload["metrics"].pop("dropped_iterations", None)
+    report_path.write_text(json.dumps(source_payload), encoding="utf-8")
+
+    llm = StubStructuredLlm(
+        [
+            {**_extracted_payload(), "dropped_iterations": None},
+            {"mismatches": []},
+        ]
+    )
+    parser = StubK6ParsedReportParser(_parsed_report_with_source_payload(source_payload=source_payload))
+    service = K6ServiceExtractionService(llm=llm, parser=parser)
+
+    service.extract(
+        service="megatron",
+        report_paths=[report_path],
+    )
+
+    verification_prompt_payload = json.loads(llm.calls[1][1])
+    dropped_iterations_schema = verification_prompt_payload["target_schema"]["properties"]["dropped_iterations"]
+    rules = verification_prompt_payload["rules"]
+
+    assert "otherwise use null" in dropped_iterations_schema["description"]
+    assert verification_prompt_payload["source"]["metrics"].get("dropped_iterations") is None
+    assert verification_prompt_payload["extracted"]["dropped_iterations"] is None
+    assert any("allows null for a field" in rule for rule in rules)
+    assert any("optional metric object is absent in source and the extracted value is null" in rule for rule in rules)
 
 
 def test_extract_returns_generic_payload_when_service_definition_is_missing(tmp_path: Path) -> None:

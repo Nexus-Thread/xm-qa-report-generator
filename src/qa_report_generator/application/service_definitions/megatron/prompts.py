@@ -47,6 +47,8 @@ def build_verification_user_prompt(filtered_source_json: str, extracted_json: st
             "Treat missing required fields as mismatches.",
             "Ignore minor wording differences only in optional text fields.",
             "Use target_schema field descriptions as the source of truth for where each extracted field must be verified from.",
+            "If target_schema allows null for a field and the schema-authorized source path is absent, treat null as correct rather than as a mismatch.",
+            "Do not report a mismatch when an optional metric object is absent in source and the extracted value is null.",
             "When multiple candidate source values exist, prefer the source location described by the schema guidance.",
             "Do not treat unrelated duplicate source fields as mismatches if the extracted value matches the schema-authorized source field.",
             "For scenario fields, verify against the selected scenario entry rather than similarly named values elsewhere in the payload.",

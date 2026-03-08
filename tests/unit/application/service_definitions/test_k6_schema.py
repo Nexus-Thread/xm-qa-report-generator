@@ -1,6 +1,10 @@
 """Unit tests for generic extracted k6 schema models."""
 
-from qa_report_generator.application.service_definitions.schema import Scenario, TrendValuesMs
+from qa_report_generator.application.service_definitions.schema import (
+    Scenario,
+    TrendValuesMs,
+    metric_values_field,
+)
 
 
 def test_scenario_accepts_camel_case_alias_fields() -> None:
@@ -36,3 +40,10 @@ def test_trend_values_accept_percentile_aliases() -> None:
 
     assert values.p95 == 400.0
     assert values.p99 == 700.0
+
+
+def test_metric_values_field_supports_optional_metrics() -> None:
+    """Metric field guidance can describe optional null fallback."""
+    field = metric_values_field("dropped_iterations", optional=True)
+
+    assert field.description == "Use $.metrics.dropped_iterations.values when present; otherwise use null"

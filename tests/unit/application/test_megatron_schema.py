@@ -105,4 +105,5 @@ def test_megatron_schema_exposes_shared_ai_descriptions() -> None:
         properties["http_req_duration"]["description"]
         == "Use scenario-tagged $.metrics.http_req_duration{test_name:<scenario>}.values when present, otherwise use $.metrics.http_req_duration.values"
     )
+    assert properties["dropped_iterations"]["description"] == "Use $.metrics.dropped_iterations.values when present; otherwise use null"
     assert properties["thresholds"]["description"] == "Use $.execThresholds"

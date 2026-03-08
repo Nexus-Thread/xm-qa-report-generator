@@ -27,11 +27,18 @@ def scenario_field() -> Any:
     return Field(description="Use the selected scenario from $.execScenarios")
 
 
-def metric_values_field(metric_key: str, *, prefer_scenario_tagged: bool = False) -> Any:
+def metric_values_field(
+    metric_key: str,
+    *,
+    prefer_scenario_tagged: bool = False,
+    optional: bool = False,
+) -> Any:
     """Build a metric field with reusable extraction guidance."""
     description = f"Use $.metrics.{metric_key}.values"
     if prefer_scenario_tagged:
         description = f"Use scenario-tagged $.metrics.{metric_key}{{test_name:<scenario>}}.values when present, otherwise use $.metrics.{metric_key}.values"
+    if optional:
+        description = f"{description} when present; otherwise use null"
     return Field(description=description)
 
 

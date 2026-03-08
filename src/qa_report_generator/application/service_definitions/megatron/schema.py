@@ -26,7 +26,10 @@ class MegatronExtractedMetrics(BaseModel):
     http_req_failed: k6_schema.RateValues = k6_schema.metric_values_field("http_req_failed")
     http_reqs: k6_schema.CounterValues = k6_schema.metric_values_field("http_reqs")
     iterations: k6_schema.CounterValues = k6_schema.metric_values_field("iterations")
-    dropped_iterations: k6_schema.CounterValues | None = k6_schema.metric_values_field("dropped_iterations")
+    dropped_iterations: k6_schema.CounterValues | None = k6_schema.metric_values_field(
+        "dropped_iterations",
+        optional=True,
+    )
     thresholds: dict[str, list[str]] = k6_schema.thresholds_field()
 
 
