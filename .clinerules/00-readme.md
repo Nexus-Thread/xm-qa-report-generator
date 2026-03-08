@@ -64,6 +64,7 @@
 
 ## Workflows
 - `workflows/update-repo-navigation.md` - Generate project-specific navigation maps on demand
+- `workflows/audit-module.md` - Audit a given module or package, improve it in scope, and validate the result
 
 ## Enforcement and automation matrix
 Use this map to keep "Must" rules enforceable, not just advisory.
