@@ -66,6 +66,18 @@ class _StubDebugJsonWriter:
         return Path(f"debug/{label}.json")
 
 
+class _FailingDebugJsonWriter:
+    """Stub debug JSON writer that fails for resilience testing."""
+
+    def __init__(self, exception: Exception) -> None:
+        self._exception = exception
+        self.calls: list[tuple[str, object]] = []
+
+    def write_json(self, *, label: str, payload: object) -> Path:
+        self.calls.append((label, payload))
+        raise self._exception
+
+
 def test_complete_json_returns_payload_and_formats_messages() -> None:
     """Structured adapter returns parsed dict and sends expected prompts."""
     client = _StubClient([_Response(choices=[_Choice(message=_Message(content='{"ok": true}'))])])
@@ -199,3 +211,33 @@ def test_complete_json_skips_debug_files_when_disabled() -> None:
 
     assert payload == {"ok": True}
     assert debug_writer.calls == []
+
+
+def test_complete_json_continues_when_debug_write_fails(caplog: pytest.LogCaptureFixture) -> None:
+    """Structured adapter continues when optional debug payload persistence fails."""
+    logger_name = "qa_report_generator.adapters.output.narrative.structured_llm.adapter"
+    debug_writer = _FailingDebugJsonWriter(OSError("disk full"))
+    client = _StubClient([_Response(choices=[_Choice(message=_Message(content='{"ok": true}'))])])
+    adapter = OpenAIStructuredLlmAdapter(
+        client=client,
+        model="gpt-test",
+        debug_json_writer=debug_writer,
+        debug_json_enabled=True,
+    )
+
+    with caplog.at_level(logging.WARNING, logger=logger_name):
+        payload = adapter.complete_json(system_prompt="system", user_prompt="user")
+
+    assert payload == {"ok": True}
+    assert [label for label, _ in debug_writer.calls] == [
+        "request_payload",
+        "response_content",
+        "parsed_payload",
+    ]
+    warning_messages = [record.getMessage() for record in caplog.records]
+    assert warning_messages == [
+        "Failed to write Structured LLM debug payload",
+        "Failed to write Structured LLM debug payload",
+        "Failed to write Structured LLM debug payload",
+    ]
+    assert all(record.exc_info is not None for record in caplog.records)

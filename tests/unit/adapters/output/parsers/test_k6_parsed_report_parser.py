@@ -112,6 +112,17 @@ def test_parse_raises_configuration_error_on_invalid_json(tmp_path: Path) -> Non
         parser.parse(service="megatron", report_files=[report_path])
 
 
+def test_parse_raises_configuration_error_when_report_root_is_not_object(tmp_path: Path) -> None:
+    """Parser fails fast when a report JSON document is not object-shaped."""
+    report_path = tmp_path / "list-root.json"
+    report_path.write_text(json.dumps([{"not": "an-object-root"}]), encoding="utf-8")
+
+    parser = K6ParsedReportParser()
+
+    with pytest.raises(ConfigurationError, match="root object"):
+        parser.parse(service="megatron", report_files=[report_path])
+
+
 def test_parse_raises_configuration_error_on_missing_file(tmp_path: Path) -> None:
     """Parser raises a configuration error when report file cannot be read."""
     parser = K6ParsedReportParser()

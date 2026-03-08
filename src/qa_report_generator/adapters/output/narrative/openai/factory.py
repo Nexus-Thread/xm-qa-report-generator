@@ -6,7 +6,6 @@ from dataclasses import dataclass
 from typing import Protocol
 
 import httpx
-
 from openai import OpenAI
 
 from .constants import DEFAULT_BACKOFF_FACTOR, DEFAULT_MAX_RETRIES, DEFAULT_TIMEOUT_SECONDS, DEFAULT_VERIFY_SSL

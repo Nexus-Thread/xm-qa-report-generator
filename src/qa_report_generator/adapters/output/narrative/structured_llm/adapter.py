@@ -97,13 +97,13 @@ class OpenAIStructuredLlmAdapter:
         except (OSError, TypeError, ValueError) as err:
             LOGGER.warning(
                 "Failed to write Structured LLM debug payload",
+                exc_info=err,
                 extra={
                     "component": self.__class__.__name__,
                     "model": self._model,
                     "debug_label": label,
                 },
             )
-            LOGGER.debug("Structured LLM debug payload write error: %s", err)
             return
 
         LOGGER.debug(
