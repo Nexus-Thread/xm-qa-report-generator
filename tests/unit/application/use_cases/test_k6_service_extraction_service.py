@@ -189,7 +189,9 @@ def test_extract_filters_removed_keys_and_returns_validated_payload(tmp_path: Pa
     assert len(result.extracted_runs) == 2
     assert result.extracted_runs[0].extracted["service"] == "megatron"
     assert result.extracted_runs[1].extracted["service"] == "megatron"
+    assert llm.calls[0][0].startswith("You extract structured k6 metrics from a filtered k6 JSON report.")
     extraction_prompt = json.loads(llm.calls[0][1])
+    assert extraction_prompt["task"] == "extract_k6_metrics"
     assert "setup_data" not in extraction_prompt["source"]
     assert "root_group" not in extraction_prompt["source"]
 
@@ -245,10 +247,12 @@ def test_verification_prompt_includes_leaf_metric_mapping_rules(tmp_path: Path) 
         report_paths=[report_path],
     )
 
+    assert llm.calls[1][0].startswith("You verify extracted k6 metrics against source JSON.")
     verification_prompt_payload = json.loads(llm.calls[1][1])
+    assert verification_prompt_payload["task"] == "verify_k6_extraction"
     rules = verification_prompt_payload["rules"]
-    assert any("dropped_iterations" in rule for rule in rules)
     assert any("Do not compare extracted fields against whole metric objects" in rule for rule in rules)
+    assert any("compare against concrete leaf values only" in rule for rule in rules)
 
 
 def test_extract_returns_generic_payload_when_service_definition_is_missing(tmp_path: Path) -> None:

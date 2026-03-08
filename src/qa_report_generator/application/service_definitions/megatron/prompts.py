@@ -1,4 +1,4 @@
-"""Prompt builders for megatron extraction and verification."""
+"""Prompt builders for k6 extraction and verification."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ import json
 from typing import Any
 
 EXTRACTION_SYSTEM_PROMPT = (
-    "You extract structured k6 metrics for service 'megatron'. "
+    "You extract structured k6 metrics from a filtered k6 JSON report. "
     "Return only JSON object that matches the provided schema. "
     "All numeric values must be copied exactly from source without rounding."
 )
@@ -21,7 +21,7 @@ VERIFICATION_SYSTEM_PROMPT = (
 def build_extraction_user_prompt(filtered_source_json: str, schema: dict[str, Any], report_file: str) -> str:
     """Build extraction user prompt payload."""
     payload = {
-        "task": "extract_megatron_metrics",
+        "task": "extract_k6_metrics",
         "report_file": report_file,
         "instructions": [
             "Use scenario-specific metrics by selecting the scenario in execScenarios keys.",
@@ -37,7 +37,7 @@ def build_extraction_user_prompt(filtered_source_json: str, schema: dict[str, An
 def build_verification_user_prompt(filtered_source_json: str, extracted_json: str) -> str:
     """Build verification user prompt payload."""
     payload = {
-        "task": "verify_megatron_extraction",
+        "task": "verify_k6_extraction",
         "source": json.loads(filtered_source_json),
         "extracted": json.loads(extracted_json),
         "rules": [
