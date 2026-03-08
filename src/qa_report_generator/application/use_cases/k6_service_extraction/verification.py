@@ -8,6 +8,17 @@ from qa_report_generator.application.dtos import VerificationMismatch
 from qa_report_generator.domain.exceptions import ExtractionVerificationError
 
 
+def _is_false_positive_mismatch(raw: dict[str, Any]) -> bool:
+    """Return true when verifier reported a successful comparison as a mismatch."""
+    expected = raw.get("expected")
+    actual = raw.get("actual")
+    reason = str(raw.get("reason", "")).lower()
+
+    if expected == actual:
+        return True
+    return "value matches" in reason
+
+
 def parse_mismatches(verification_payload: dict[str, Any]) -> list[VerificationMismatch]:
     """Parse verifier mismatches payload into DTOs."""
     raw_mismatches = verification_payload.get("mismatches", [])
@@ -18,6 +29,8 @@ def parse_mismatches(verification_payload: dict[str, Any]) -> list[VerificationM
     mismatches: list[VerificationMismatch] = []
     for raw in raw_mismatches:
         if not isinstance(raw, dict):
+            continue
+        if _is_false_positive_mismatch(raw):
             continue
         mismatches.append(
             VerificationMismatch(

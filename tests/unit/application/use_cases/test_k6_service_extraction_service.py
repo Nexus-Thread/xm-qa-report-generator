@@ -273,6 +273,9 @@ def test_verification_prompt_includes_leaf_metric_mapping_rules(tmp_path: Path) 
     assert verification_prompt_payload["verification_context"]["report_file"] == "report.json"
     rules = verification_prompt_payload["rules"]
     assert any("Treat missing required fields as mismatches" in rule for rule in rules)
+    assert any("only when expected and actual differ" in rule for rule in rules)
+    assert any("Do not include successful comparisons" in rule for rule in rules)
+    assert any("If a field matches exactly, do not mention it" in rule for rule in rules)
     assert any("coming from verification_context" in rule for rule in rules)
     assert any("context-backed fields" in rule for rule in rules)
     assert any("allows null for a field" in rule for rule in rules)
@@ -390,3 +393,37 @@ def test_extract_returns_generic_payload_when_service_definition_is_missing(tmp_
     assert len(result.extracted_runs) == 1
     assert result.extracted_runs[0].extracted["scenario"]["name"] == "megatron-load"
     assert llm.calls == []
+
+
+def test_extract_ignores_false_positive_match_reports_from_verifier(tmp_path: Path) -> None:
+    """Extraction ignores verifier entries that confirm matching values."""
+    report_path = tmp_path / "report.json"
+    report_path.write_text(json.dumps(_source_payload()), encoding="utf-8")
+
+    llm = StubStructuredLlm(
+        [
+            _extracted_payload(),
+            {
+                "mismatches": [
+                    {
+                        "field": "http_req_duration.avg",
+                        "expected": 200.0,
+                        "actual": 200.0,
+                        "source_jsonpath": "$.source.metrics.http_req_duration.values.avg",
+                        "extracted_jsonpath": "$.extracted.http_req_duration.avg",
+                        "reason": "Extraction should use scenario-tagged metric when present; value matches.",
+                    }
+                ]
+            },
+        ]
+    )
+    parser = StubK6ParsedReportParser(_parsed_report())
+    service = K6ServiceExtractionService(llm=llm, parser=parser)
+
+    result = service.extract(
+        service="megatron",
+        report_paths=[report_path],
+    )
+
+    assert result.service == "megatron"
+    assert len(result.extracted_runs) == 1
