@@ -70,11 +70,13 @@ class StubK6ParsedReportParser:
 def _source_payload() -> dict[str, Any]:
     return {
         "testRunDurationMs": 60000,
+        "env": None,
         "setup_data": {"large": "payload"},
         "root_group": {"ignored": True},
         "execScenarios": {
             "megatron-load": {
-                "env_name": "staging",
+                "env_name": None,
+                "tags": {"env_name": "staging"},
                 "executor": "constant-arrival-rate",
                 "rate": 10,
                 "duration": "1m",
@@ -190,6 +192,7 @@ def test_extract_filters_removed_keys_and_returns_validated_payload(tmp_path: Pa
     assert result.extracted_runs[0].extracted["service"] == "megatron"
     assert result.extracted_runs[1].extracted["service"] == "megatron"
     assert llm.calls[0][0].startswith("You extract structured k6 metrics from a filtered k6 JSON report.")
+    assert "Return only a JSON object that matches the provided schema." in llm.calls[0][0]
     extraction_prompt = json.loads(llm.calls[0][1])
     assert extraction_prompt["task"] == "extract_k6_metrics"
     assert "setup_data" not in extraction_prompt["source"]
@@ -247,12 +250,46 @@ def test_verification_prompt_includes_leaf_metric_mapping_rules(tmp_path: Path) 
         report_paths=[report_path],
     )
 
-    assert llm.calls[1][0].startswith("You verify extracted k6 metrics against source JSON.")
+    assert llm.calls[1][0].startswith("You verify extracted k6 metrics against the source JSON.")
+    assert '{"mismatches": []}' in llm.calls[1][0]
     verification_prompt_payload = json.loads(llm.calls[1][1])
     assert verification_prompt_payload["task"] == "verify_k6_extraction"
+    assert "target_schema" in verification_prompt_payload
     rules = verification_prompt_payload["rules"]
-    assert any("Do not compare extracted fields against whole metric objects" in rule for rule in rules)
-    assert any("compare against concrete leaf values only" in rule for rule in rules)
+    assert any("Treat missing required fields as mismatches" in rule for rule in rules)
+    assert any("source of truth" in rule for rule in rules)
+    assert any("multiple candidate source values" in rule for rule in rules)
+    assert any("unrelated duplicate source fields" in rule for rule in rules)
+    assert any("selected scenario entry" in rule for rule in rules)
+    assert any("exact source and extracted JSONPath" in rule for rule in rules)
+    assert any("never to whole metric objects" in rule for rule in rules)
+    assert any("Do not infer, normalize, or reinterpret values" in rule for rule in rules)
+
+
+def test_verification_prompt_includes_schema_guidance_for_duplicate_values(tmp_path: Path) -> None:
+    """Verification payload includes schema guidance for ambiguous source fields."""
+    report_path = tmp_path / "report.json"
+    report_path.write_text(json.dumps(_source_payload()), encoding="utf-8")
+
+    llm = StubStructuredLlm(
+        [
+            _extracted_payload(),
+            {"mismatches": []},
+        ]
+    )
+    parser = StubK6ParsedReportParser(_parsed_report())
+    service = K6ServiceExtractionService(llm=llm, parser=parser)
+
+    service.extract(
+        service="megatron",
+        report_paths=[report_path],
+    )
+
+    verification_prompt_payload = json.loads(llm.calls[1][1])
+    scenario_properties = verification_prompt_payload["target_schema"]["$defs"]["Scenario"]["properties"]
+    assert verification_prompt_payload["source"]["env"] is None
+    assert verification_prompt_payload["source"]["execScenarios"]["megatron-load"]["tags"]["env_name"] == "staging"
+    assert scenario_properties["env_name"]["description"] == "Use $.execScenarios.<scenario>.tags.env_name"
 
 
 def test_extract_returns_generic_payload_when_service_definition_is_missing(tmp_path: Path) -> None:

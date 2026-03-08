@@ -57,13 +57,14 @@ class K6ServiceExtractionService(ExtractK6ServiceMetricsUseCase):
     ) -> K6ServiceExtractionResult:
         """Run service-specific extraction flow for parsed scenarios."""
         extracted_runs: list[K6ServiceExtractionRun] = []
+        schema = definition.dump_schema()
 
         for scenario in parsed_report.scenarios:
             filtered_source_json = to_canonical_json(scenario.raw_payload)
 
             extraction_prompt = definition.build_extraction_user_prompt(
                 filtered_source_json,
-                definition.dump_schema(),
+                schema,
                 scenario.source_report_file,
             )
             extracted_payload = self._llm.complete_json(
@@ -77,7 +78,11 @@ class K6ServiceExtractionService(ExtractK6ServiceMetricsUseCase):
 
             extracted = extracted_model.model_dump(by_alias=True)
             extracted_json = to_canonical_json(extracted)
-            verification_prompt = definition.build_verification_user_prompt(filtered_source_json, extracted_json)
+            verification_prompt = definition.build_verification_user_prompt(
+                filtered_source_json,
+                extracted_json,
+                schema,
+            )
             verification_payload = self._llm.complete_json(
                 system_prompt=definition.verification_system_prompt,
                 user_prompt=verification_prompt,

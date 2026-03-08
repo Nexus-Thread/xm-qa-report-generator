@@ -7,14 +7,15 @@ from typing import Any
 
 EXTRACTION_SYSTEM_PROMPT = (
     "You extract structured k6 metrics from a filtered k6 JSON report. "
-    "Return only JSON object that matches the provided schema. "
-    "All numeric values must be copied exactly from source without rounding."
+    "Return only a JSON object that matches the provided schema. "
+    "Copy all numeric values exactly from the source without rounding or reformatting."
 )
 
 VERIFICATION_SYSTEM_PROMPT = (
-    "You verify extracted k6 metrics against source JSON. "
-    "Return JSON with key 'mismatches' list. "
-    "Each mismatch item must include: field, expected, actual, source_jsonpath, extracted_jsonpath, reason."
+    "You verify extracted k6 metrics against the source JSON. "
+    "Return only a JSON object with a single key: mismatches. "
+    'If the extraction is correct, return {"mismatches": []}. '
+    "Each mismatch must include: field, expected, actual, source_jsonpath, extracted_jsonpath, and reason."
 )
 
 
@@ -34,17 +35,24 @@ def build_extraction_user_prompt(filtered_source_json: str, schema: dict[str, An
     return json.dumps(payload, ensure_ascii=False, separators=(",", ":"), sort_keys=True)
 
 
-def build_verification_user_prompt(filtered_source_json: str, extracted_json: str) -> str:
+def build_verification_user_prompt(filtered_source_json: str, extracted_json: str, schema: dict[str, Any]) -> str:
     """Build verification user prompt payload."""
     payload = {
         "task": "verify_k6_extraction",
+        "target_schema": schema,
         "source": json.loads(filtered_source_json),
         "extracted": json.loads(extracted_json),
         "rules": [
-            "Compare all numeric fields exactly.",
-            "Ignore minor wording differences in optional text fields.",
-            "Return mismatches for missing or wrong fields with JSONPath references.",
-            "Do not compare extracted fields against whole metric objects such as $.source.metrics.<metric>; compare against concrete leaf values only.",
+            "Compare numeric values exactly.",
+            "Treat missing required fields as mismatches.",
+            "Ignore minor wording differences only in optional text fields.",
+            "Use target_schema field descriptions as the source of truth for where each extracted field must be verified from.",
+            "When multiple candidate source values exist, prefer the source location described by the schema guidance.",
+            "Do not treat unrelated duplicate source fields as mismatches if the extracted value matches the schema-authorized source field.",
+            "For scenario fields, verify against the selected scenario entry rather than similarly named values elsewhere in the payload.",
+            "For every mismatch, return the exact source and extracted JSONPath of the compared leaf values.",
+            "Compare extracted fields only to concrete leaf values, never to whole metric objects such as $.source.metrics.<metric>.",
+            "Do not infer, normalize, or reinterpret values.",
         ],
         "response_schema": {
             "mismatches": [
