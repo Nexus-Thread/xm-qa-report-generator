@@ -270,8 +270,11 @@ def test_verification_prompt_includes_leaf_metric_mapping_rules(tmp_path: Path) 
     verification_prompt_payload = json.loads(llm.calls[1][1])
     assert verification_prompt_payload["task"] == "verify_k6_extraction"
     assert "target_schema" in verification_prompt_payload
+    assert verification_prompt_payload["verification_context"]["report_file"] == "report.json"
     rules = verification_prompt_payload["rules"]
     assert any("Treat missing required fields as mismatches" in rule for rule in rules)
+    assert any("coming from verification_context" in rule for rule in rules)
+    assert any("context-backed fields" in rule for rule in rules)
     assert any("allows null for a field" in rule for rule in rules)
     assert any("optional metric object is absent in source and the extracted value is null" in rule for rule in rules)
     assert any("source of truth" in rule for rule in rules)
@@ -339,6 +342,33 @@ def test_verification_prompt_describes_optional_missing_metric_as_null(tmp_path:
     assert verification_prompt_payload["extracted"]["dropped_iterations"] is None
     assert any("allows null for a field" in rule for rule in rules)
     assert any("optional metric object is absent in source and the extracted value is null" in rule for rule in rules)
+
+
+def test_verification_prompt_includes_report_file_context(tmp_path: Path) -> None:
+    """Verification payload includes external report-file context."""
+    report_path = tmp_path / "megatron-1.json"
+    report_path.write_text(json.dumps(_source_payload()), encoding="utf-8")
+
+    llm = StubStructuredLlm(
+        [
+            {**_extracted_payload(), "report_file": "megatron-1.json"},
+            {"mismatches": []},
+        ]
+    )
+    parser = StubK6ParsedReportParser(_parsed_report(source_report_file="megatron-1.json"))
+    service = K6ServiceExtractionService(llm=llm, parser=parser)
+
+    service.extract(
+        service="megatron",
+        report_paths=[report_path],
+    )
+
+    verification_prompt_payload = json.loads(llm.calls[1][1])
+    assert verification_prompt_payload["verification_context"]["report_file"] == "megatron-1.json"
+    assert verification_prompt_payload["extracted"]["report_file"] == "megatron-1.json"
+    assert verification_prompt_payload["target_schema"]["properties"]["report_file"]["description"] == (
+        "Use verification_context.report_file, populated from the selected scenario source report filename"
+    )
 
 
 def test_extract_returns_generic_payload_when_service_definition_is_missing(tmp_path: Path) -> None:

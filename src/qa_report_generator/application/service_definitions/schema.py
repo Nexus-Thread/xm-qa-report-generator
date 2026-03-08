@@ -14,7 +14,10 @@ def service_name_field(service_name: str) -> Any:
 
 def report_file_field() -> Any:
     """Build a report-file field with reusable extraction guidance."""
-    return Field(min_length=1, description="Use selected scenario source report filename")
+    return Field(
+        min_length=1,
+        description="Use verification_context.report_file, populated from the selected scenario source report filename",
+    )
 
 
 def test_run_duration_ms_field() -> Any:

@@ -35,11 +35,17 @@ def build_extraction_user_prompt(filtered_source_json: str, schema: dict[str, An
     return json.dumps(payload, ensure_ascii=False, separators=(",", ":"), sort_keys=True)
 
 
-def build_verification_user_prompt(filtered_source_json: str, extracted_json: str, schema: dict[str, Any]) -> str:
+def build_verification_user_prompt(
+    filtered_source_json: str,
+    extracted_json: str,
+    schema: dict[str, Any],
+    verification_context: dict[str, Any],
+) -> str:
     """Build verification user prompt payload."""
     payload = {
         "task": "verify_k6_extraction",
         "target_schema": schema,
+        "verification_context": verification_context,
         "source": json.loads(filtered_source_json),
         "extracted": json.loads(extracted_json),
         "rules": [
@@ -47,6 +53,8 @@ def build_verification_user_prompt(filtered_source_json: str, extracted_json: st
             "Treat missing required fields as mismatches.",
             "Ignore minor wording differences only in optional text fields.",
             "Use target_schema field descriptions as the source of truth for where each extracted field must be verified from.",
+            "If target_schema describes a field as coming from verification_context, verify it against verification_context rather than source JSON.",
+            "Do not report a mismatch for context-backed fields solely because they are absent from source JSON.",
             "If target_schema allows null for a field and the schema-authorized source path is absent, treat null as correct rather than as a mismatch.",
             "Do not report a mismatch when an optional metric object is absent in source and the extracted value is null.",
             "When multiple candidate source values exist, prefer the source location described by the schema guidance.",

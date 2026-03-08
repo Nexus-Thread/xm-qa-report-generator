@@ -21,7 +21,7 @@ class ServiceDefinition:
     extraction_system_prompt: str
     verification_system_prompt: str
     build_extraction_user_prompt: Callable[[str, dict[str, Any], str], str]
-    build_verification_user_prompt: Callable[[str, str, dict[str, Any]], str]
+    build_verification_user_prompt: Callable[[str, str, dict[str, Any], dict[str, Any]], str]
     validate_extracted: Callable[[BaseModel], None] | None = None
 
     @property

@@ -97,7 +97,7 @@ def test_megatron_schema_exposes_shared_ai_descriptions() -> None:
     properties = schema["properties"]
 
     assert properties["service"]["description"] == "Use literal service name 'megatron'"
-    assert properties["report_file"]["description"] == "Use selected scenario source report filename"
+    assert properties["report_file"]["description"] == "Use verification_context.report_file, populated from the selected scenario source report filename"
     assert properties["test_run_duration_ms"]["description"] == "Use $.state.testRunDurationMs"
     assert properties["scenario"]["description"] == "Use the selected scenario from $.execScenarios"
     assert properties["checks"]["description"] == "Use $.metrics.checks.values"

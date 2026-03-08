@@ -82,6 +82,7 @@ class K6ServiceExtractionService(ExtractK6ServiceMetricsUseCase):
                 filtered_source_json,
                 extracted_json,
                 schema,
+                {"report_file": scenario.source_report_file},
             )
             verification_payload = self._llm.complete_json(
                 system_prompt=definition.verification_system_prompt,
