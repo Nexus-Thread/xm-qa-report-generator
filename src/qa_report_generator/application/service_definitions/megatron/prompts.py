@@ -44,9 +44,6 @@ def build_verification_user_prompt(filtered_source_json: str, extracted_json: st
             "Compare all numeric fields exactly.",
             "Ignore minor wording differences in optional text fields.",
             "Return mismatches for missing or wrong fields with JSONPath references.",
-            "For counter metrics (http_reqs, iterations, dropped_iterations), compare extracted.<metric>.count/rate only against $.source.metrics.<metric>.values.count/rate.",
-            "For rate metrics (checks, http_req_failed), compare extracted.<metric>.rate/passes/fails only against $.source.metrics.<metric>.values.*.",
-            "For http_req_duration, compare extracted.http_req_duration.* only against $.source.metrics.http_req_duration{test_name:<scenario>}.values.* when present, otherwise $.source.metrics.http_req_duration.values.*.",
             "Do not compare extracted fields against whole metric objects such as $.source.metrics.<metric>; compare against concrete leaf values only.",
         ],
         "response_schema": {

@@ -89,3 +89,20 @@ def test_megatron_schema_rejects_invalid_scenario_bounds() -> None:
     }
     with pytest.raises(ValueError, match="maxVUs must be >= preAllocatedVUs"):
         MegatronExtractedMetrics.model_validate(payload)
+
+
+def test_megatron_schema_exposes_shared_ai_descriptions() -> None:
+    """Megatron schema includes reusable field descriptions for AI extraction."""
+    schema = MegatronExtractedMetrics.model_json_schema()
+    properties = schema["properties"]
+
+    assert properties["service"]["description"] == "Use literal service name 'megatron'"
+    assert properties["report_file"]["description"] == "Use selected scenario source report filename"
+    assert properties["test_run_duration_ms"]["description"] == "Use $.state.testRunDurationMs"
+    assert properties["scenario"]["description"] == "Use the selected scenario from $.execScenarios"
+    assert properties["checks"]["description"] == "Use $.metrics.checks.values"
+    assert (
+        properties["http_req_duration"]["description"]
+        == "Use scenario-tagged $.metrics.http_req_duration{test_name:<scenario>}.values when present, otherwise use $.metrics.http_req_duration.values"
+    )
+    assert properties["thresholds"]["description"] == "Use $.execThresholds"

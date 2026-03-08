@@ -2,9 +2,42 @@
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+
+def service_name_field(service_name: str) -> Any:
+    """Build a service-name field with reusable extraction guidance."""
+    return Field(description=f"Use literal service name '{service_name}'")
+
+
+def report_file_field() -> Any:
+    """Build a report-file field with reusable extraction guidance."""
+    return Field(min_length=1, description="Use selected scenario source report filename")
+
+
+def test_run_duration_ms_field() -> Any:
+    """Build a runtime field with reusable extraction guidance."""
+    return Field(ge=0, description="Use $.state.testRunDurationMs")
+
+
+def scenario_field() -> Any:
+    """Build a scenario field with reusable extraction guidance."""
+    return Field(description="Use the selected scenario from $.execScenarios")
+
+
+def metric_values_field(metric_key: str, *, prefer_scenario_tagged: bool = False) -> Any:
+    """Build a metric field with reusable extraction guidance."""
+    description = f"Use $.metrics.{metric_key}.values"
+    if prefer_scenario_tagged:
+        description = f"Use scenario-tagged $.metrics.{metric_key}{{test_name:<scenario>}}.values when present, otherwise use $.metrics.{metric_key}.values"
+    return Field(description=description)
+
+
+def thresholds_field() -> Any:
+    """Build a thresholds field with reusable extraction guidance."""
+    return Field(description="Use $.execThresholds")
 
 
 class CounterValues(BaseModel):
@@ -134,4 +167,10 @@ __all__ = [
     "ThresholdResult",
     "TrendMetric",
     "TrendValuesMs",
+    "metric_values_field",
+    "report_file_field",
+    "scenario_field",
+    "service_name_field",
+    "test_run_duration_ms_field",
+    "thresholds_field",
 ]

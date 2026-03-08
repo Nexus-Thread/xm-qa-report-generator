@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict
 
 from qa_report_generator.application.service_definitions import schema as k6_schema
 
@@ -14,17 +14,20 @@ class MegatronExtractedMetrics(BaseModel):
 
     model_config = ConfigDict(extra="forbid", populate_by_name=True)
 
-    service: Literal["megatron"]
-    report_file: str = Field(min_length=1)
-    test_run_duration_ms: float = Field(ge=0)
-    scenario: k6_schema.Scenario
-    checks: k6_schema.RateValues
-    http_req_duration: k6_schema.TrendValuesMs
-    http_req_failed: k6_schema.RateValues
-    http_reqs: k6_schema.CounterValues
-    iterations: k6_schema.CounterValues
-    dropped_iterations: k6_schema.CounterValues
-    thresholds: dict[str, list[str]]
+    service: Literal["megatron"] = k6_schema.service_name_field("megatron")
+    report_file: str = k6_schema.report_file_field()
+    test_run_duration_ms: float = k6_schema.test_run_duration_ms_field()
+    scenario: k6_schema.Scenario = k6_schema.scenario_field()
+    checks: k6_schema.RateValues = k6_schema.metric_values_field("checks")
+    http_req_duration: k6_schema.TrendValuesMs = k6_schema.metric_values_field(
+        "http_req_duration",
+        prefer_scenario_tagged=True,
+    )
+    http_req_failed: k6_schema.RateValues = k6_schema.metric_values_field("http_req_failed")
+    http_reqs: k6_schema.CounterValues = k6_schema.metric_values_field("http_reqs")
+    iterations: k6_schema.CounterValues = k6_schema.metric_values_field("iterations")
+    dropped_iterations: k6_schema.CounterValues | None = k6_schema.metric_values_field("dropped_iterations")
+    thresholds: dict[str, list[str]] = k6_schema.thresholds_field()
 
 
 ExtractedMetrics = MegatronExtractedMetrics
