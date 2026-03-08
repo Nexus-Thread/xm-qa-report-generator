@@ -131,6 +131,14 @@ def test_parse_raises_configuration_error_on_missing_file(tmp_path: Path) -> Non
         parser.parse(service="megatron", report_files=[tmp_path / "does-not-exist.json"])
 
 
+def test_parse_raises_configuration_error_when_report_file_list_is_empty() -> None:
+    """Parser rejects empty report file input lists."""
+    parser = K6ParsedReportParser()
+
+    with pytest.raises(ConfigurationError, match="At least one k6 JSON report file is required"):
+        parser.parse(service="megatron", report_files=[])
+
+
 def test_parse_raises_configuration_error_on_missing_exec_scenarios(tmp_path: Path) -> None:
     """Parser raises a configuration error when scenario definitions are absent."""
     report_path = tmp_path / "missing-scenarios.json"

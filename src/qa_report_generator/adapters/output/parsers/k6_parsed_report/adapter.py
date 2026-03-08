@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 
 from qa_report_generator.application.ports.output import K6ParsedReportParserPort
 from qa_report_generator.domain.analytics import K6ParsedReport, K6Scenario
+from qa_report_generator.domain.exceptions import ConfigurationError
 
 from .file_loader import load_json_report
 from .mapping import extract_scenarios, remove_top_level_keys
@@ -26,6 +27,10 @@ class K6ParsedReportParser(K6ParsedReportParserPort):
         remove_keys: frozenset[str] | None = None,
     ) -> K6ParsedReport:
         """Parse report files and return a parsed report with scenario entries."""
+        if not report_files:
+            msg = "At least one k6 JSON report file is required"
+            raise ConfigurationError(msg, suggestion="Provide one or more generated k6 JSON report files")
+
         effective_remove_keys = remove_keys if remove_keys is not None else frozenset()
         scenarios: list[K6Scenario] = []
 
