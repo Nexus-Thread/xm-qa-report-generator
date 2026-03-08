@@ -160,3 +160,60 @@ def test_generate_command_raises_typer_exit_on_empty_service(tmp_path: Path) -> 
 
     with pytest.raises(typer.Exit):
         adapter.generate_command(service="   ", report=[report_path])
+
+
+def test_generate_command_expands_directory_reports_in_sorted_order(tmp_path: Path) -> None:
+    """Generate command expands a directory into sorted JSON report paths."""
+    reports_dir = tmp_path / "reports"
+    reports_dir.mkdir()
+    later_report = reports_dir / "z-report.json"
+    earlier_report = reports_dir / "a-report.json"
+    ignored_file = reports_dir / "notes.txt"
+    later_report.write_text("{}", encoding="utf-8")
+    earlier_report.write_text("{}", encoding="utf-8")
+    ignored_file.write_text("ignore", encoding="utf-8")
+
+    extraction_use_case = SpyExtractionUseCase()
+    adapter = K6CliAdapter(extract_k6_service_metrics_use_case=extraction_use_case)
+
+    adapter.generate_command(service="megatron", report=[reports_dir])
+
+    assert extraction_use_case.calls == [
+        ("megatron", [earlier_report, later_report]),
+    ]
+
+
+def test_generate_command_deduplicates_report_files_from_mixed_inputs(tmp_path: Path) -> None:
+    """Generate command de-duplicates report files gathered from file and directory inputs."""
+    reports_dir = tmp_path / "reports"
+    reports_dir.mkdir()
+    report_path = reports_dir / "report.json"
+    report_path.write_text("{}", encoding="utf-8")
+
+    extraction_use_case = SpyExtractionUseCase()
+    adapter = K6CliAdapter(extract_k6_service_metrics_use_case=extraction_use_case)
+
+    adapter.generate_command(service="megatron", report=[report_path, reports_dir])
+
+    assert extraction_use_case.calls == [
+        ("megatron", [report_path]),
+    ]
+
+
+def test_generate_command_raises_typer_exit_for_empty_report_directory(tmp_path: Path) -> None:
+    """Generate command rejects directories without JSON report files."""
+    empty_reports_dir = tmp_path / "empty-reports"
+    empty_reports_dir.mkdir()
+
+    adapter = K6CliAdapter(extract_k6_service_metrics_use_case=SpyExtractionUseCase())
+
+    with pytest.raises(typer.Exit):
+        adapter.generate_command(service="megatron", report=[empty_reports_dir])
+
+
+def test_generate_command_raises_typer_exit_when_report_list_is_empty() -> None:
+    """Generate command rejects missing report inputs."""
+    adapter = K6CliAdapter(extract_k6_service_metrics_use_case=SpyExtractionUseCase())
+
+    with pytest.raises(typer.Exit):
+        adapter.generate_command(service="megatron", report=[])

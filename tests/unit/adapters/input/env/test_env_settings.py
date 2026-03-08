@@ -135,3 +135,13 @@ def test_env_settings_adapter_raises_configuration_error_for_blank_debug_dir(mon
 
     with pytest.raises(ConfigurationError):
         EnvSettingsAdapter().load()
+
+
+def test_env_settings_adapter_raises_configuration_error_for_blank_llm_model(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Blank LLM_MODEL raises ConfigurationError with field detail."""
+    monkeypatch.setenv("LLM_MODEL", "   ")
+
+    with pytest.raises(ConfigurationError, match=r"LLM_MODEL: Value error, Value must not be blank"):
+        EnvSettingsAdapter().load()

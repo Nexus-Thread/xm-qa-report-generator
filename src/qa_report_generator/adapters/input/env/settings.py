@@ -9,6 +9,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from qa_report_generator.domain.exceptions import ConfigurationError
 
 LOGGER = logging.getLogger(__name__)
+ALLOWED_LOG_LEVELS = frozenset({"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"})
+ALLOWED_LOG_FORMATS = frozenset({"simple", "json"})
 
 
 class EnvSettings(BaseSettings):
@@ -109,9 +111,8 @@ class EnvSettings(BaseSettings):
     def validate_log_level(cls, v: str) -> str:
         """Normalize and validate log level."""
         v = v.strip().upper()
-        allowed_levels = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
-        if v not in allowed_levels:
-            msg = f"Invalid log level: {v}. Must be one of: {', '.join(sorted(allowed_levels))}"
+        if v not in ALLOWED_LOG_LEVELS:
+            msg = f"Invalid log level: {v}. Must be one of: {', '.join(sorted(ALLOWED_LOG_LEVELS))}"
             raise ValueError(msg)
         return v
 
@@ -120,11 +121,15 @@ class EnvSettings(BaseSettings):
     def validate_log_format(cls, v: str) -> str:
         """Normalize and validate log format."""
         v = v.strip().lower()
-        allowed_formats = {"simple", "json"}
-        if v not in allowed_formats:
-            msg = f"Invalid log format: {v}. Must be one of: {', '.join(sorted(allowed_formats))}"
+        if v not in ALLOWED_LOG_FORMATS:
+            msg = f"Invalid log format: {v}. Must be one of: {', '.join(sorted(ALLOWED_LOG_FORMATS))}"
             raise ValueError(msg)
         return v
+
+
+def _build_validation_error_details(error: ValidationError) -> str:
+    """Format pydantic validation errors for configuration failures."""
+    return "; ".join(f"{'.'.join(str(part) for part in validation_error['loc'])}: {validation_error['msg']}" for validation_error in error.errors())
 
 
 def load_settings_from_env() -> EnvSettings:
@@ -132,8 +137,7 @@ def load_settings_from_env() -> EnvSettings:
     try:
         settings = EnvSettings()
     except ValidationError as exc:
-        details = "; ".join(f"{'.'.join(str(part) for part in error['loc'])}: {error['msg']}" for error in exc.errors())
-        message = f"Invalid configuration: {details}"
+        message = f"Invalid configuration: {_build_validation_error_details(exc)}"
         raise ConfigurationError(message) from exc
 
     LOGGER.debug("Configuration loaded from environment")

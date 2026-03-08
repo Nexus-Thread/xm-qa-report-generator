@@ -1,6 +1,7 @@
 """CLI adapter that exposes k6-oriented commands."""
 
 import json
+import logging
 from collections.abc import Callable
 from pathlib import Path
 from typing import Annotated, NoReturn, TypeVar
@@ -14,6 +15,7 @@ from qa_report_generator.application.ports.input import (
 from qa_report_generator.domain.exceptions import ReportingError
 
 _RESULT = TypeVar("_RESULT")
+LOGGER = logging.getLogger(__name__)
 
 
 class K6CliAdapter:
@@ -47,7 +49,16 @@ class K6CliAdapter:
         for report_input in report_inputs:
             resolved_files.update(self._expand_report_input(report_input))
 
-        return sorted(resolved_files)
+        sorted_files = sorted(resolved_files)
+        LOGGER.debug(
+            "Resolved report inputs for CLI extraction",
+            extra={
+                "component": self.__class__.__name__,
+                "report_input_count": len(report_inputs),
+                "resolved_report_count": len(sorted_files),
+            },
+        )
+        return sorted_files
 
     def _expand_report_input(self, report_input: Path) -> list[Path]:
         """Expand one report input into concrete JSON files."""
@@ -129,8 +140,12 @@ class K6CliAdapter:
         try:
             return operation()
         except ReportingError as error:
-            suggestion = f"\n💡 Suggestion: {error.suggestion}" if error.suggestion else ""
-            self._exit_with_error(f"{error}{suggestion}", error=error)
+            self._exit_with_error(self._format_reporting_error_message(error), error=error)
+
+    def _format_reporting_error_message(self, error: ReportingError) -> str:
+        """Build CLI-facing error text from a reporting error."""
+        suggestion = f"\n💡 Suggestion: {error.suggestion}" if error.suggestion else ""
+        return f"{error}{suggestion}"
 
     def _print_json_output(self, *, success_message: str, payload: object, heading: str | None = None) -> None:
         """Print success text and JSON payload."""
@@ -141,6 +156,13 @@ class K6CliAdapter:
 
     def _exit_with_error(self, message: str, *, error: Exception | None = None) -> NoReturn:
         """Print formatted error and stop command execution."""
+        LOGGER.error(
+            "CLI command failed",
+            extra={
+                "component": self.__class__.__name__,
+                "error_type": type(error).__name__ if error is not None else "CliUsageError",
+            },
+        )
         typer.secho(f"❌ {message}", fg=typer.colors.RED)
         if error is None:
             raise typer.Exit(code=1)
