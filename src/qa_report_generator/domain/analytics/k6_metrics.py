@@ -10,8 +10,6 @@ from qa_report_generator.domain.exceptions import (
     MissingK6ScenarioError,
 )
 
-SCENARIO_KEY_JSONPATH = "$.execScenarios"
-
 
 def pick_primary_scenario_name(source: dict[str, Any]) -> str:
     """Pick the single scenario key from execScenarios."""
