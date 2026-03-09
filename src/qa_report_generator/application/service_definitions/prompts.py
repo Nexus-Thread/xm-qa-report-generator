@@ -27,6 +27,7 @@ def build_extraction_user_prompt(filtered_source_json: str, schema: dict[str, An
         "instructions": [
             "Use scenario-specific metrics by selecting the scenario in execScenarios keys.",
             "When both generic and scenario-tagged metrics exist, prefer scenario-tagged keys.",
+            "If the schema names an exact tagged metric key, use that exact metric entry and do not use a generic sibling metric with the same base name.",
             "Keep thresholds exactly as provided.",
         ],
         "target_schema": schema,
@@ -61,6 +62,7 @@ def build_verification_user_prompt(
             "If target_schema allows null for a field and the schema-authorized source path is absent, treat null as correct rather than as a mismatch.",
             "Do not report a mismatch when an optional metric object is absent in source and the extracted value is null.",
             "When multiple candidate source values exist, prefer the source location described by the schema guidance.",
+            "If the schema describes a tagged metric key, treat that exact tagged metric entry as the only authorized source and do not substitute a generic sibling metric with the same base name.",
             "Do not treat unrelated duplicate source fields as mismatches if the extracted value matches the schema-authorized source field.",
             "For scenario fields, verify against the selected scenario entry rather than similarly named values elsewhere in the payload.",
             "For every mismatch, return the exact source and extracted JSONPath of the compared leaf values.",

@@ -51,6 +51,15 @@ def test_metric_values_field_supports_optional_metrics() -> None:
     assert field.description == "Use $.metrics.dropped_iterations.values when present; otherwise use null"
 
 
+def test_metric_values_field_disambiguates_exact_tagged_metrics() -> None:
+    """Metric field guidance requires the exact tagged metric entry."""
+    field = metric_values_field("http_req_failed{test_name:<scenario>}")
+
+    assert field.description == (
+        "Use the exact tagged metric entry $.metrics.http_req_failed{test_name:<scenario>}.values; do not use a generic sibling metric with the same base name"
+    )
+
+
 def test_full_metric_fields_describe_whole_metric_objects() -> None:
     """Full metric helpers point to whole custom metric objects."""
     counter_field = counter_metric_field("custom_counter")

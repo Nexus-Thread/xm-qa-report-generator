@@ -26,6 +26,7 @@ def test_build_extraction_user_prompt_returns_expected_shared_payload() -> None:
     assert payload["report_file"] == "report.json"
     assert payload["target_schema"] == {"type": "object"}
     assert payload["source"] == {"metrics": {"checks": {"values": {"rate": 1.0}}}}
+    assert any("If the schema names an exact tagged metric key, use that exact metric entry" in instruction for instruction in payload["instructions"])
     assert EXTRACTION_SYSTEM_PROMPT.startswith("You extract structured k6 metrics")
 
 
@@ -45,4 +46,7 @@ def test_build_verification_user_prompt_returns_expected_shared_payload() -> Non
     assert payload["source"] == {"metrics": {"checks": {"values": {"rate": 1.0}}}}
     assert payload["extracted"] == {"checks": {"rate": 1.0}}
     assert payload["response_schema"]["mismatches"][0]["reason"] == "string"
+    assert any(
+        "If the schema describes a tagged metric key, treat that exact tagged metric entry as the only authorized source" in rule for rule in payload["rules"]
+    )
     assert VERIFICATION_SYSTEM_PROMPT.startswith("You verify extracted k6 metrics")

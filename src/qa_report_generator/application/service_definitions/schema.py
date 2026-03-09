@@ -38,6 +38,8 @@ def metric_values_field(
 ) -> Any:
     """Build a metric field with reusable extraction guidance."""
     description = f"Use $.metrics.{metric_key}.values"
+    if "{" in metric_key and "}" in metric_key:
+        description = f"Use the exact tagged metric entry $.metrics.{metric_key}.values; do not use a generic sibling metric with the same base name"
     if prefer_scenario_tagged:
         description = f"Use scenario-tagged $.metrics.{metric_key}{{test_name:<scenario>}}.values when present, otherwise use $.metrics.{metric_key}.values"
     if optional:
