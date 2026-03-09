@@ -35,12 +35,8 @@ def get_optional_service_definition(service: str) -> ServiceDefinition | None:
     return REGISTRY.get_optional(service)
 
 
-SERVICE_DEFINITIONS = REGISTRY.definitions
-
-
 __all__ = [
     "REGISTRY",
-    "SERVICE_DEFINITIONS",
     "get_optional_service_definition",
     "get_service_definition",
     "list_service_definitions",

@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Any
 import pytest
 
 from qa_report_generator.application.use_cases.k6_service_extraction import K6ServiceExtractionService
+from qa_report_generator.application.use_cases.k6_service_extraction.verification import parse_mismatches
 from qa_report_generator.domain.analytics import K6ParsedReport, K6Scenario
 from qa_report_generator.domain.exceptions import ExtractionVerificationError
 
@@ -427,3 +428,25 @@ def test_extract_ignores_false_positive_match_reports_from_verifier(tmp_path: Pa
 
     assert result.service == "megatron"
     assert len(result.extracted_runs) == 1
+
+
+def test_parse_mismatches_preserves_numeric_values() -> None:
+    """Mismatch parsing preserves JSON-scalar numeric values."""
+    mismatches = parse_mismatches(
+        {
+            "mismatches": [
+                {
+                    "field": "http_reqs.count",
+                    "expected": 100,
+                    "actual": 101,
+                    "source_jsonpath": "$.metrics.http_reqs.values.count",
+                    "extracted_jsonpath": "$.http_reqs.count",
+                    "reason": "value mismatch",
+                }
+            ]
+        }
+    )
+
+    assert len(mismatches) == 1
+    assert mismatches[0].expected == 100
+    assert mismatches[0].actual == 101

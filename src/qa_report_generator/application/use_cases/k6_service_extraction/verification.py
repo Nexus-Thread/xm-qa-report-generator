@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from qa_report_generator.application.dtos import VerificationMismatch
+from qa_report_generator.application.dtos import JsonScalar, VerificationMismatch
 from qa_report_generator.domain.exceptions import ExtractionVerificationError
 
 
@@ -17,6 +17,13 @@ def _is_false_positive_mismatch(raw: dict[str, Any]) -> bool:
     if expected == actual:
         return True
     return "value matches" in reason
+
+
+def _coerce_json_scalar(value: Any) -> JsonScalar:
+    """Return a JSON-scalar value or a stringified fallback."""
+    if isinstance(value, bool | int | float | str) or value is None:
+        return value
+    return str(value)
 
 
 def parse_mismatches(verification_payload: dict[str, Any]) -> list[VerificationMismatch]:
@@ -35,8 +42,8 @@ def parse_mismatches(verification_payload: dict[str, Any]) -> list[VerificationM
         mismatches.append(
             VerificationMismatch(
                 field=str(raw.get("field", "")),
-                expected=str(raw.get("expected", "")),
-                actual=str(raw.get("actual", "")),
+                expected=_coerce_json_scalar(raw.get("expected")),
+                actual=_coerce_json_scalar(raw.get("actual")),
                 source_jsonpath=str(raw.get("source_jsonpath", "")),
                 extracted_jsonpath=str(raw.get("extracted_jsonpath", "")),
                 reason=str(raw.get("reason", "")),
