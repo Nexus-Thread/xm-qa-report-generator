@@ -68,7 +68,7 @@ Environment variables:
    - `__init__.py`: export `SERVICE_DEFINITION`
 3. No central registry edit is required for in-repo definitions:
    - built-in definitions are discovered automatically from `service_definitions/*` packages.
-   - current built-in examples include `megatron` and `trading`.
+   - current built-in examples include `megatron`, `trading`, `symbolsservice`, `symbolstreeservice`, `tradinghistoricaldata`, `vps`, and `watchlists`.
 4. Keep extraction deterministic:
    - preserve exact numeric values,
    - keep canonical JSON serialization in prompts,

@@ -60,6 +60,16 @@ def trend_metric_field(metric_key: str) -> Any:
     return Field(description=f"Use $.metrics.{metric_key}")
 
 
+def optional_counter_metric_field(metric_key: str) -> Any:
+    """Build an optional typed counter metric field for a full custom metric."""
+    return Field(default=None, description=f"Use $.metrics.{metric_key} when present; otherwise use null")
+
+
+def optional_trend_metric_field(metric_key: str) -> Any:
+    """Build an optional typed trend metric field for a full custom metric."""
+    return Field(default=None, description=f"Use $.metrics.{metric_key} when present; otherwise use null")
+
+
 class CounterValues(BaseModel):
     """k6 counter values."""
 
@@ -215,6 +225,8 @@ __all__ = [
     "TrendValuesMs",
     "counter_metric_field",
     "metric_values_field",
+    "optional_counter_metric_field",
+    "optional_trend_metric_field",
     "report_file_field",
     "scenario_field",
     "service_name_field",
