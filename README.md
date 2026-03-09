@@ -25,6 +25,14 @@ qa-report-generator-k6 generate \
   --report k6_example/megatron
 ```
 
+Another built-in example:
+
+```bash
+qa-report-generator-k6 generate \
+  --service trading \
+  --report k6_example/20260228/trading
+```
+
 Notes:
 - Reports are parsed first into a normalized scenario model.
 - If a service definition exists, extraction is service-scoped and schema-driven.
@@ -60,6 +68,7 @@ Environment variables:
    - `__init__.py`: export `SERVICE_DEFINITION`
 3. No central registry edit is required for in-repo definitions:
    - built-in definitions are discovered automatically from `service_definitions/*` packages.
+   - current built-in examples include `megatron` and `trading`.
 4. Keep extraction deterministic:
    - preserve exact numeric values,
    - keep canonical JSON serialization in prompts,

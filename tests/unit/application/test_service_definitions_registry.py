@@ -25,6 +25,7 @@ if TYPE_CHECKING:
 def test_list_service_definitions_contains_builtin_megatron() -> None:
     """Built-in definitions are discovered without manual registry edits."""
     assert "megatron" in list_service_definitions()
+    assert "trading" in list_service_definitions()
 
 
 def test_register_service_definition_rejects_duplicate_name() -> None:
