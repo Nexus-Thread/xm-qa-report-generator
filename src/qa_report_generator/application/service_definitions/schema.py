@@ -50,6 +50,16 @@ def thresholds_field() -> Any:
     return Field(description="Use $.execThresholds")
 
 
+def counter_metric_field(metric_key: str) -> Any:
+    """Build a typed counter metric field for a full custom metric."""
+    return Field(description=f"Use $.metrics.{metric_key}")
+
+
+def trend_metric_field(metric_key: str) -> Any:
+    """Build a typed trend metric field for a full custom metric."""
+    return Field(description=f"Use $.metrics.{metric_key}")
+
+
 class CounterValues(BaseModel):
     """k6 counter values."""
 
@@ -161,12 +171,38 @@ class TrendMetric(MetricBase):
     thresholds: dict[str, ThresholdResult] | None = Field(default=None, description="Use $.metrics.<metric_key>.thresholds")
 
 
+class FlexibleCounterMetric(BaseModel):
+    """Typed full counter metric with flexible contains value."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    type: Literal["counter"] = Field(description="Use $.metrics.<metric_key>.type")
+    contains: str = Field(description="Use $.metrics.<metric_key>.contains")
+    values: CounterValues = Field(description="Use $.metrics.<metric_key>.values")
+
+
+class FlexibleTrendMetric(BaseModel):
+    """Typed full trend metric with flexible contains value."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    type: Literal["trend"] = Field(description="Use $.metrics.<metric_key>.type")
+    contains: str = Field(description="Use $.metrics.<metric_key>.contains")
+    values: TrendValuesMs = Field(description="Use $.metrics.<metric_key>.values")
+    thresholds: dict[str, ThresholdResult] | None = Field(
+        default=None,
+        description="Use $.metrics.<metric_key>.thresholds",
+    )
+
+
 K6Metric = CounterMetric | GaugeMetric | RateMetric | TrendMetric
 
 
 __all__ = [
     "CounterMetric",
     "CounterValues",
+    "FlexibleCounterMetric",
+    "FlexibleTrendMetric",
     "GaugeMetric",
     "GaugeValues",
     "K6Metric",
@@ -177,10 +213,12 @@ __all__ = [
     "ThresholdResult",
     "TrendMetric",
     "TrendValuesMs",
+    "counter_metric_field",
     "metric_values_field",
     "report_file_field",
     "scenario_field",
     "service_name_field",
     "test_run_duration_ms_field",
     "thresholds_field",
+    "trend_metric_field",
 ]

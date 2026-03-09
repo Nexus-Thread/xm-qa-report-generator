@@ -3,7 +3,9 @@
 from qa_report_generator.application.service_definitions.schema import (
     Scenario,
     TrendValuesMs,
+    counter_metric_field,
     metric_values_field,
+    trend_metric_field,
 )
 
 
@@ -47,3 +49,12 @@ def test_metric_values_field_supports_optional_metrics() -> None:
     field = metric_values_field("dropped_iterations", optional=True)
 
     assert field.description == "Use $.metrics.dropped_iterations.values when present; otherwise use null"
+
+
+def test_full_metric_fields_describe_whole_metric_objects() -> None:
+    """Full metric helpers point to whole custom metric objects."""
+    counter_field = counter_metric_field("custom_counter")
+    trend_field = trend_metric_field("custom_trend")
+
+    assert counter_field.description == "Use $.metrics.custom_counter"
+    assert trend_field.description == "Use $.metrics.custom_trend"
