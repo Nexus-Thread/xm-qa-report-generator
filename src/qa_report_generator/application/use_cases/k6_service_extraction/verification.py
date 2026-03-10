@@ -16,7 +16,15 @@ def _is_false_positive_mismatch(raw: dict[str, Any]) -> bool:
 
     if expected == actual:
         return True
-    return "value matches" in reason
+    if "value matches" in reason:
+        return True
+
+    source_jsonpath = str(raw.get("source_jsonpath", ""))
+    tagged_metric_required = "scenario-tagged" in reason or "tagged metric" in reason
+    untagged_http_req_failed_path = "metrics.http_req_failed.values" in source_jsonpath
+    tagged_http_req_failed_path = "metrics.http_req_failed{" in source_jsonpath
+
+    return tagged_metric_required and untagged_http_req_failed_path and not tagged_http_req_failed_path
 
 
 def _coerce_json_scalar(value: Any) -> JsonScalar:

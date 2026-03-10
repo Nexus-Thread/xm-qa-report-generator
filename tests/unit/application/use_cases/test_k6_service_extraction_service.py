@@ -301,11 +301,37 @@ def test_verification_prompt_includes_leaf_metric_mapping_rules(tmp_path: Path) 
     assert any("optional metric object is absent in source and the extracted value is null" in rule for rule in rules)
     assert any("source of truth" in rule for rule in rules)
     assert any("multiple candidate source values" in rule for rule in rules)
+    assert any("never use an untagged sibling metric" in rule for rule in rules)
+    assert any("reasoning and source_jsonpath consistent" in rule for rule in rules)
+    assert any("reason says a tagged metric should be used" in rule for rule in rules)
     assert any("unrelated duplicate source fields" in rule for rule in rules)
     assert any("selected scenario entry" in rule for rule in rules)
     assert any("exact source and extracted JSONPath" in rule for rule in rules)
     assert any("never to whole metric objects" in rule for rule in rules)
     assert any("Do not infer, normalize, or reinterpret values" in rule for rule in rules)
+
+
+def test_parse_mismatches_ignores_self_contradictory_tagged_metric_mismatch() -> None:
+    """Contradictory tagged-metric mismatch reports are ignored as verifier errors."""
+    mismatches = parse_mismatches(
+        {
+            "mismatches": [
+                {
+                    "field": "http_req_failed.fails",
+                    "expected": 5970,
+                    "actual": 3342,
+                    "source_jsonpath": "$.source.metrics.http_req_failed.values.fails",
+                    "extracted_jsonpath": "$.extracted.http_req_failed.fails",
+                    "reason": (
+                        "Schema requires using scenario-tagged $.metrics.http_req_failed{test_name:<scenario>}.values "
+                        "when present, but source_jsonpath points to the untagged sibling metric."
+                    ),
+                }
+            ]
+        }
+    )
+
+    assert mismatches == []
 
 
 def test_verification_prompt_includes_schema_guidance_for_duplicate_values(tmp_path: Path) -> None:

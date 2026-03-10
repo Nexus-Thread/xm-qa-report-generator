@@ -17,6 +17,7 @@ from qa_report_generator.application.service_definitions import (
     list_service_definitions,
     register_service_definition,
 )
+from qa_report_generator.application.service_definitions.schema import K6HttpExtractedMetrics
 
 if TYPE_CHECKING:
     from qa_report_generator.application.service_definitions.base import ServiceDefinition
@@ -42,6 +43,7 @@ def test_get_service_definition_returns_builtin_definition() -> None:
     definition: ServiceDefinition = get_service_definition("megatron")
 
     assert definition.name == "megatron"
+    assert issubclass(definition.schema_type, K6HttpExtractedMetrics)
 
 
 def test_get_optional_service_definition_returns_none_for_unknown_service() -> None:

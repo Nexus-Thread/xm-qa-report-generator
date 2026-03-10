@@ -210,6 +210,34 @@ class FlexibleTrendMetric(BaseModel):
 K6Metric = CounterMetric | GaugeMetric | RateMetric | TrendMetric
 
 
+class K6HttpExtractedMetrics(BaseModel):
+    """Shared extracted metrics for HTTP-based k6 services."""
+
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+
+    test_run_duration_ms: float = test_run_duration_ms_field()
+    scenario: Scenario = scenario_field()
+    thresholds: dict[str, list[str]] = thresholds_field()
+
+    http_req_duration: TrendValuesMs = metric_values_field("http_req_duration", prefer_scenario_tagged=True)
+    http_req_blocked: TrendValuesMs = metric_values_field("http_req_blocked")
+    http_req_connecting: TrendValuesMs = metric_values_field("http_req_connecting")
+    http_req_receiving: TrendValuesMs = metric_values_field("http_req_receiving")
+    http_req_sending: TrendValuesMs = metric_values_field("http_req_sending")
+    http_req_tls_handshaking: TrendValuesMs = metric_values_field("http_req_tls_handshaking")
+    http_req_waiting: TrendValuesMs = metric_values_field("http_req_waiting")
+    iteration_duration: TrendValuesMs = metric_values_field("iteration_duration")
+
+    http_req_failed: RateValues = metric_values_field("http_req_failed", prefer_scenario_tagged=True)
+    checks: RateValues = metric_values_field("checks")
+
+    http_reqs: CounterValues = metric_values_field("http_reqs")
+    iterations: CounterValues = metric_values_field("iterations")
+    data_received: CounterValues = metric_values_field("data_received")
+    data_sent: CounterValues = metric_values_field("data_sent")
+    dropped_iterations: CounterValues | None = metric_values_field("dropped_iterations", optional=True)
+
+
 __all__ = [
     "CounterMetric",
     "CounterValues",
@@ -217,6 +245,7 @@ __all__ = [
     "FlexibleTrendMetric",
     "GaugeMetric",
     "GaugeValues",
+    "K6HttpExtractedMetrics",
     "K6Metric",
     "MetricBase",
     "RateMetric",
