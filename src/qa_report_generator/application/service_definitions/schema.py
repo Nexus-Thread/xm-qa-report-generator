@@ -41,7 +41,10 @@ def metric_values_field(
     if "{" in metric_key and "}" in metric_key:
         description = f"Use the exact tagged metric entry $.metrics.{metric_key}.values; do not use a generic sibling metric with the same base name"
     if prefer_scenario_tagged:
-        description = f"Use scenario-tagged $.metrics.{metric_key}{{test_name:<scenario>}}.values when present, otherwise use $.metrics.{metric_key}.values"
+        description = (
+            f"Use exact scenario-tagged $.metrics.{metric_key}{{test_name:<scenario>}}.values when present; "
+            f"otherwise use $.metrics.{metric_key}.values. Ignore other tagged variants of {metric_key} that do not use test_name:<scenario>."
+        )
     if optional:
         description = f"{description} when present; otherwise use null"
     return Field(description=description)

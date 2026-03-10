@@ -82,6 +82,7 @@ def _build_grouped_run(
     }
     grouped_payload["test_run_duration_ms"] = duration_values.pop() if len(duration_values) == 1 else max(run.test_run_duration_ms for run in extracted_runs)
     grouped_payload["thresholds"] = _merge_thresholds(name=name, extracted_runs=extracted_runs)
+    grouped_payload["threshold_results"] = _merge_threshold_results(name=name, extracted_runs=extracted_runs)
     for field_name in _TREND_METRIC_FIELDS:
         grouped_payload[field_name] = _merge_trend_metric_values(
             extracted_runs=extracted_runs,
@@ -210,6 +211,47 @@ def _merge_thresholds(
                 if value not in merged_thresholds[normalized_key]:
                     merged_thresholds[normalized_key].append(value)
     return merged_thresholds
+
+
+def _merge_threshold_results(
+    *,
+    name: str,
+    extracted_runs: list[SymbolstreeserviceExtractedMetrics],
+) -> list[dict[str, str]]:
+    """Merge threshold status rows under the grouped scenario name."""
+    merged_results: dict[tuple[str, str], str] = {}
+    for run in extracted_runs:
+        raw_results = getattr(run, "threshold_results", [])
+        if not isinstance(raw_results, list):
+            continue
+        for item in raw_results:
+            if not isinstance(item, dict):
+                continue
+            metric_key = item.get("metric_key")
+            expression = item.get("expression")
+            status = item.get("status")
+            if not isinstance(metric_key, str) or not isinstance(expression, str) or status not in {"pass", "fail", "unknown"}:
+                continue
+            normalized_metric_key = _GROUPED_SCENARIO_NAME_FRAGMENT_PATTERN.sub(name, metric_key)
+            existing_status = merged_results.get((normalized_metric_key, expression))
+            merged_results[(normalized_metric_key, expression)] = _merge_threshold_status(existing_status, status)
+    return [
+        {
+            "metric_key": metric_key,
+            "expression": expression,
+            "status": status,
+        }
+        for (metric_key, expression), status in sorted(merged_results.items())
+    ]
+
+
+def _merge_threshold_status(existing_status: str | None, new_status: str) -> str:
+    """Merge threshold status values with fail taking precedence."""
+    if existing_status == "fail" or new_status == "fail":
+        return "fail"
+    if existing_status == "unknown" or new_status == "unknown":
+        return "unknown"
+    return "pass"
 
 
 def _weighted_average(*, values: list[float], weights: list[int], fallback_divisor: int) -> float:

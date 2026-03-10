@@ -12,6 +12,11 @@ from qa_report_generator.application.dtos import (
 )
 from qa_report_generator.application.ports.input import ExtractK6ServiceMetricsUseCase
 from qa_report_generator.application.service_definitions import get_optional_service_definition
+from qa_report_generator.domain.analytics import (
+    build_overall_executive_summary,
+    build_scenario_executive_summary,
+    build_threshold_summaries_from_source_payload,
+)
 from qa_report_generator.domain.exceptions import ConfigurationError, ExtractionVerificationError
 
 from .json_utils import to_canonical_json
@@ -87,7 +92,12 @@ class K6ServiceExtractionService(ExtractK6ServiceMetricsUseCase):
         extracted_runs = [
             K6ServiceExtractionRun(
                 source_report_files=[run_model.source_report_file],
-                extracted=_to_final_run_payload(run_model.extracted.model_dump(by_alias=True)),
+                extracted=_with_threshold_results(
+                    payload=_to_final_run_payload(run_model.extracted.model_dump(by_alias=True)),
+                    threshold_results=build_threshold_summaries_from_source_payload(
+                        source_payload=run_model.source_payload,
+                    ),
+                ),
             )
             for run_model in extracted_run_models
         ]
@@ -96,11 +106,20 @@ class K6ServiceExtractionService(ExtractK6ServiceMetricsUseCase):
             fallback_runs=extracted_runs,
             extracted_models=[run_model.extracted for run_model in extracted_run_models],
         )
+        scenario_summaries = [
+            build_scenario_executive_summary(
+                run_payload=run.extracted,
+                source_report_files=run.source_report_files,
+            )
+            for run in final_runs
+        ]
 
         return K6ServiceExtractionResult(
             service=parsed_report.service,
             mode="service_specific",
             runs=final_runs,
+            overall_summary=build_overall_executive_summary(scenario_summaries=scenario_summaries),
+            scenario_summaries=scenario_summaries,
         )
 
     def _extract_verified_run_model(
@@ -127,6 +146,7 @@ class K6ServiceExtractionService(ExtractK6ServiceMetricsUseCase):
         )
         return _ExtractedRunModel(
             source_report_file=scenario.source_report_file,
+            source_payload=scenario.raw_payload,
             extracted=extracted_model,
         )
 
@@ -210,6 +230,7 @@ class _ExtractedRunModel:
     """Container for a validated extracted model and its source file."""
 
     source_report_file: str
+    source_payload: dict[str, Any]
     extracted: Any
 
 
@@ -217,4 +238,22 @@ def _to_final_run_payload(payload: dict[str, Any]) -> dict[str, Any]:
     """Remove internal extraction-only fields from final run payloads."""
     final_payload = dict(payload)
     final_payload.pop("report_file", None)
+    return final_payload
+
+
+def _with_threshold_results(
+    *,
+    payload: dict[str, Any],
+    threshold_results: list[Any],
+) -> dict[str, Any]:
+    """Attach threshold results to a final run payload."""
+    final_payload = dict(payload)
+    final_payload["threshold_results"] = [
+        {
+            "metric_key": threshold.metric_key,
+            "expression": threshold.expression,
+            "status": threshold.status,
+        }
+        for threshold in threshold_results
+    ]
     return final_payload

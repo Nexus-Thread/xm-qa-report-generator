@@ -12,6 +12,11 @@ from qa_report_generator.application.dtos import (
     K6ServiceExtractionResult,
     K6ServiceExtractionRun,
 )
+from qa_report_generator.domain.analytics import (
+    K6OverallExecutiveSummary,
+    K6ScenarioExecutiveSummary,
+    K6ThresholdSummary,
+)
 from qa_report_generator.domain.exceptions import ReportingError
 
 if TYPE_CHECKING:
@@ -34,7 +39,47 @@ class SpyExtractionUseCase:
             runs=[
                 K6ServiceExtractionRun(
                     source_report_files=[path.name for path in report_paths],
-                    extracted={"service": service, "scenario": {"name": "grouped-scenario"}},
+                    extracted={
+                        "service": service,
+                        "scenario": {"name": "grouped-scenario"},
+                        "threshold_results": [
+                            {
+                                "metric_key": "checks",
+                                "expression": "rate>0.99",
+                                "status": "pass",
+                            }
+                        ],
+                    },
+                )
+            ],
+            overall_summary=K6OverallExecutiveSummary(
+                status="pass",
+                total_scenarios=1,
+                passed_scenarios=1,
+                failed_scenarios=0,
+                unknown_scenarios=0,
+                scenarios_requiring_attention=[],
+                executive_summary="All 1 scenarios passed their evaluated thresholds.",
+            ),
+            scenario_summaries=[
+                K6ScenarioExecutiveSummary(
+                    scenario_name="grouped-scenario",
+                    env_name=None,
+                    source_report_files=[path.name for path in report_paths],
+                    status="pass",
+                    executor=None,
+                    rate=None,
+                    duration=None,
+                    pre_allocated_vus=None,
+                    max_vus=None,
+                    threshold_results=[
+                        K6ThresholdSummary(
+                            metric_key="checks",
+                            expression="rate>0.99",
+                            status="pass",
+                        )
+                    ],
+                    executive_note="Scenario grouped-scenario met all evaluated thresholds.",
                 )
             ],
         )
@@ -151,6 +196,9 @@ def test_generate_command_prints_success_message_heading_and_json_payload(
     assert "Service: megatron" in captured.out
     assert '"mode": "service_specific"' in captured.out
     assert '"service": "megatron"' in captured.out
+    assert '"overall_summary"' in captured.out
+    assert '"scenario_summaries"' in captured.out
+    assert '"executive_note": "Scenario grouped-scenario met all evaluated thresholds."' in captured.out
     assert '"runs"' in captured.out
     assert '"source_report_files": [' in captured.out
     assert '"name": "grouped-scenario"' in captured.out

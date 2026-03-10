@@ -305,8 +305,17 @@ def test_extract_filters_removed_keys_and_returns_validated_payload(tmp_path: Pa
     assert result.service == "megatron"
     assert result.mode == "service_specific"
     assert len(result.runs) == 2
+    assert result.overall_summary.total_scenarios == 2
+    assert len(result.scenario_summaries) == 2
     assert "report_file" not in result.runs[0].extracted
     assert "report_file" not in result.runs[1].extracted
+    assert result.runs[0].extracted["threshold_results"] == [
+        {
+            "metric_key": "http_req_duration",
+            "expression": "p(95)<1000",
+            "status": "unknown",
+        }
+    ]
     assert result.runs[0].extracted["service"] == "megatron"
     assert result.runs[1].extracted["service"] == "megatron"
     assert llm.calls[0][0].startswith("You extract structured k6 metrics from a filtered k6 JSON report.")
@@ -386,6 +395,8 @@ def test_verification_prompt_includes_leaf_metric_mapping_rules(tmp_path: Path) 
     assert any("source of truth" in rule for rule in rules)
     assert any("multiple candidate source values" in rule for rule in rules)
     assert any("never use an untagged sibling metric" in rule for rule in rules)
+    assert any("exact test_name:<scenario> tagged metrics" in rule for rule in rules)
+    assert any("unrelated tagged variants" in rule for rule in rules)
     assert any("reasoning and source_jsonpath consistent" in rule for rule in rules)
     assert any("reason says a tagged metric should be used" in rule for rule in rules)
     assert any("unrelated duplicate source fields" in rule for rule in rules)
@@ -763,6 +774,8 @@ def test_extract_returns_generic_payload_when_service_definition_is_missing(tmp_
     assert result.service == "unknown-service"
     assert result.mode == "generic"
     assert len(result.runs) == 1
+    assert result.overall_summary.status == "unknown"
+    assert result.scenario_summaries[0].threshold_results[0].metric_key == "http_req_duration"
     assert "report_file" not in result.runs[0].extracted
     assert result.runs[0].extracted["scenario"]["name"] == "megatron-load"
     assert llm.calls == []
@@ -800,6 +813,72 @@ def test_extract_ignores_false_positive_match_reports_from_verifier(tmp_path: Pa
 
     assert result.service == "megatron"
     assert len(result.runs) == 1
+
+
+def test_verification_prompt_prefers_exact_test_name_tag_over_other_tagged_variants(tmp_path: Path) -> None:
+    """Verification guidance ignores unrelated tagged metrics when scenario tag is absent."""
+    report_path = tmp_path / "report.json"
+    source_payload = _source_payload()
+    source_payload["metrics"]["http_req_duration"] = {
+        "values": {
+            "min": 80.0,
+            "avg": 82.82120936664543,
+            "med": 67.061436,
+            "max": 300.0,
+            "p(95)": 172.0713248,
+            "p(99)": 261.9299220200001,
+        }
+    }
+    source_payload["metrics"]["http_req_duration{expected_response:true}"] = {
+        "values": {
+            "min": 80.0,
+            "avg": 82.7747486743537,
+            "med": 67.06140400000001,
+            "max": 300.0,
+            "p(95)": 172.06033974999988,
+            "p(99)": 261.7865649299996,
+        }
+    }
+    report_path.write_text(json.dumps(source_payload), encoding="utf-8")
+
+    llm = StubStructuredLlm([_extracted_payload(), {"mismatches": []}])
+    parser = StubK6ParsedReportParser(_parsed_report_with_source_payload(source_payload=source_payload))
+    service = K6ServiceExtractionService(llm=llm, parser=parser)
+
+    service.extract(service="megatron", report_paths=[report_path])
+
+    verification_prompt_payload = json.loads(llm.calls[1][1])
+    http_req_duration_schema = verification_prompt_payload["target_schema"]["properties"]["http_req_duration"]
+    rules = verification_prompt_payload["rules"]
+
+    assert "Ignore other tagged variants" in http_req_duration_schema["description"]
+    assert any("unrelated tagged variants" in rule for rule in rules)
+    assert any("no exact test_name:<scenario> tagged metric exists" in rule.lower() for rule in rules)
+
+
+def test_parse_mismatches_ignores_unrelated_tagged_metric_false_positive() -> None:
+    """Verifier mismatch is ignored when it prefers an unrelated non-scenario tag."""
+    mismatches = parse_mismatches(
+        {
+            "mismatches": [
+                {
+                    "field": "http_req_duration.avg",
+                    "expected": 82.7747486743537,
+                    "actual": 82.82120936664543,
+                    "extracted_jsonpath": "$.extracted.http_req_duration.avg",
+                    "reason": (
+                        "Schema requires scenario-tagged http_req_duration{test_name:<scenario>} when present; it is absent, "
+                        "so untagged http_req_duration.values should be used. Extracted used untagged values, but source "
+                        "contains an additional tagged variant; per schema guidance, the tagged metric should be preferred, "
+                        "and the only tagged http_req_duration available is {expected_response:true}."
+                    ),
+                    "source_jsonpath": '$.source.metrics["http_req_duration{expected_response:true}"].values.avg',
+                }
+            ]
+        }
+    )
+
+    assert mismatches == []
 
 
 def test_extract_builds_symbolstreeservice_post_processed_group(tmp_path: Path) -> None:
@@ -868,6 +947,7 @@ def test_extract_builds_symbolstreeservice_post_processed_group(tmp_path: Path) 
         "p(99)": 700.0,
     }
     assert grouped_run.extracted["thresholds"] == {"http_req_duration{test_name:getSymbolsTreeInfo}": ["p(95)<1000"]}
+    assert grouped_run.extracted["threshold_results"] == []
 
 
 def test_extract_uses_max_duration_when_grouped_runs_differ(tmp_path: Path) -> None:

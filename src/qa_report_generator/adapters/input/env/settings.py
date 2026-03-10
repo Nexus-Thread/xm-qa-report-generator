@@ -68,7 +68,7 @@ class EnvSettings(BaseSettings):
         description="Exponential backoff multiplier for retries (wait time = factor^attempt)",
     )
     llm_debug_json_enabled: bool = Field(
-        default=False,
+        default=True,
         alias="LLM_DEBUG_JSON_ENABLED",
         description="Enable writing structured LLM request/response/parsed payloads to JSON files",
     )

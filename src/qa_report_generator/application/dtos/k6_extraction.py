@@ -3,7 +3,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Literal, TypeAlias
+from typing import TYPE_CHECKING, Any, Literal, TypeAlias
+
+if TYPE_CHECKING:
+    from qa_report_generator.domain.analytics import (
+        K6OverallExecutiveSummary,
+        K6ScenarioExecutiveSummary,
+    )
 
 JsonScalar: TypeAlias = str | int | float | bool | None
 ExtractionMode: TypeAlias = Literal["generic", "service_specific"]
@@ -24,6 +30,8 @@ class K6ServiceExtractionResult:
     service: str
     mode: ExtractionMode
     runs: list[K6ServiceExtractionRun]
+    overall_summary: K6OverallExecutiveSummary
+    scenario_summaries: list[K6ScenarioExecutiveSummary]
 
 
 @dataclass(frozen=True)

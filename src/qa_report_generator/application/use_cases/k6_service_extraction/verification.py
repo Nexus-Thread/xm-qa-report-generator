@@ -14,6 +14,11 @@ SUCCESS_REASON_MARKERS = (
     "matches the schema authorized",
 )
 
+NON_SCENARIO_TAGGED_REASON_MARKERS = (
+    "the only tagged",
+    "additional tagged variant",
+)
+
 
 def _is_false_positive_mismatch(raw: dict[str, Any]) -> bool:
     """Return true when verifier reported a successful comparison as a mismatch."""
@@ -27,9 +32,18 @@ def _is_false_positive_mismatch(raw: dict[str, Any]) -> bool:
         return True
 
     source_jsonpath = str(raw.get("source_jsonpath", ""))
+    extracted_jsonpath = str(raw.get("extracted_jsonpath", ""))
     tagged_metric_required = "scenario-tagged" in reason or "tagged metric" in reason
     untagged_http_req_failed_path = "metrics.http_req_failed.values" in source_jsonpath
     tagged_http_req_failed_path = "metrics.http_req_failed{" in source_jsonpath
+
+    if (
+        tagged_metric_required
+        and any(marker in reason for marker in NON_SCENARIO_TAGGED_REASON_MARKERS)
+        and "{expected_response:true}" in source_jsonpath
+        and "$.extracted.http_req_duration" in extracted_jsonpath
+    ):
+        return True
 
     return tagged_metric_required and untagged_http_req_failed_path and not tagged_http_req_failed_path
 
