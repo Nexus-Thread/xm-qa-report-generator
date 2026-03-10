@@ -103,11 +103,13 @@ def _source_payload() -> dict[str, Any]:
             "http_req_sending": {"values": {"min": 1.0, "avg": 2.0, "med": 2.0, "max": 3.0, "p(95)": 2.5, "p(99)": 2.9}},
             "http_req_tls_handshaking": {"values": {"min": 1.0, "avg": 2.0, "med": 2.0, "max": 3.0, "p(95)": 2.5, "p(99)": 2.9}},
             "http_req_waiting": {"values": {"min": 1.0, "avg": 2.0, "med": 2.0, "max": 3.0, "p(95)": 2.5, "p(99)": 2.9}},
+            "iteration_duration": {"values": {"min": 1.0, "avg": 2.0, "med": 2.0, "max": 3.0, "p(95)": 2.5, "p(99)": 2.9}},
             "http_req_failed": {"values": {"rate": 0.0, "passes": 100, "fails": 0}},
             "http_reqs": {"values": {"count": 100, "rate": 10.0}},
             "iterations": {"values": {"count": 100, "rate": 10.0}},
             "data_received": {"values": {"count": 1000, "rate": 100.0}},
             "data_sent": {"values": {"count": 500, "rate": 50.0}},
+            "dropped_iterations": {"values": {"count": 0, "rate": 0.0}},
         },
         "thresholds": {"http_req_duration": ["p(95)<1000"]},
     }
@@ -142,11 +144,13 @@ def _extracted_payload() -> dict[str, Any]:
         "http_req_sending": {"min": 1.0, "avg": 2.0, "med": 2.0, "max": 3.0, "p(95)": 2.5, "p(99)": 2.9},
         "http_req_tls_handshaking": {"min": 1.0, "avg": 2.0, "med": 2.0, "max": 3.0, "p(95)": 2.5, "p(99)": 2.9},
         "http_req_waiting": {"min": 1.0, "avg": 2.0, "med": 2.0, "max": 3.0, "p(95)": 2.5, "p(99)": 2.9},
+        "iteration_duration": {"min": 1.0, "avg": 2.0, "med": 2.0, "max": 3.0, "p(95)": 2.5, "p(99)": 2.9},
         "http_req_failed": {"rate": 0.0, "passes": 100, "fails": 0},
         "http_reqs": {"count": 100, "rate": 10.0},
         "iterations": {"count": 100, "rate": 10.0},
         "data_received": {"count": 1000, "rate": 100.0},
         "data_sent": {"count": 500, "rate": 50.0},
+        "dropped_iterations": {"count": 0, "rate": 0.0},
         "thresholds": {"http_req_duration": ["p(95)<1000"]},
     }
 
