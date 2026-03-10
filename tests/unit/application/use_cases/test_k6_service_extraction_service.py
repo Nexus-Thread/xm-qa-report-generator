@@ -418,6 +418,42 @@ def test_parse_mismatches_ignores_self_contradictory_tagged_metric_mismatch() ->
     assert mismatches == []
 
 
+def test_parse_mismatches_ignores_success_note_entries() -> None:
+    """Verifier success notes inside mismatches are ignored."""
+    mismatches = parse_mismatches(
+        {
+            "mismatches": [
+                {
+                    "field": "http_req_failed.fails",
+                    "expected": 3342,
+                    "actual": 3342,
+                    "source_jsonpath": '$.source.metrics["http_req_failed{test_name:getSymbolsTree}"].values.fails',
+                    "extracted_jsonpath": "$.extracted.http_req_failed.fails",
+                    "reason": "Extracted value matches the schema-authorized tagged metric; no mismatch.",
+                },
+                {
+                    "field": "http_req_failed.passes",
+                    "expected": 5659,
+                    "actual": 5659,
+                    "source_jsonpath": '$.source.metrics["http_req_failed{test_name:getSymbolsTree}"].values.passes',
+                    "extracted_jsonpath": "$.extracted.http_req_failed.passes",
+                    "reason": "Extracted value matches the schema-authorized tagged metric; no mismatch.",
+                },
+                {
+                    "field": "http_req_failed.rate",
+                    "expected": 0.6287079213420731,
+                    "actual": 0.6287079213420731,
+                    "source_jsonpath": '$.source.metrics["http_req_failed{test_name:getSymbolsTree}"].values.rate',
+                    "extracted_jsonpath": "$.extracted.http_req_failed.rate",
+                    "reason": "Extracted value matches the schema-authorized tagged metric; no mismatch.",
+                },
+            ]
+        }
+    )
+
+    assert mismatches == []
+
+
 def test_verification_prompt_includes_schema_guidance_for_duplicate_values(tmp_path: Path) -> None:
     """Verification payload includes schema guidance for ambiguous source fields."""
     report_path = tmp_path / "report.json"

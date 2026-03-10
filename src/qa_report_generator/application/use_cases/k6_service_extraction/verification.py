@@ -7,6 +7,13 @@ from typing import Any
 from qa_report_generator.application.dtos import JsonScalar, VerificationMismatch
 from qa_report_generator.domain.exceptions import ExtractionVerificationError
 
+SUCCESS_REASON_MARKERS = (
+    "value matches",
+    "no mismatch",
+    "matches the schema-authorized",
+    "matches the schema authorized",
+)
+
 
 def _is_false_positive_mismatch(raw: dict[str, Any]) -> bool:
     """Return true when verifier reported a successful comparison as a mismatch."""
@@ -16,7 +23,7 @@ def _is_false_positive_mismatch(raw: dict[str, Any]) -> bool:
 
     if expected == actual:
         return True
-    if "value matches" in reason:
+    if any(marker in reason for marker in SUCCESS_REASON_MARKERS):
         return True
 
     source_jsonpath = str(raw.get("source_jsonpath", ""))

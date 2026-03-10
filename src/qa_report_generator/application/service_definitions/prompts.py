@@ -56,6 +56,8 @@ def build_verification_user_prompt(
             "Return entries in mismatches only when expected and actual differ, or when a required verification target is missing.",
             "Do not include successful comparisons, confirmations, or informational notes in mismatches.",
             "If a field matches exactly, do not mention it in the response.",
+            "Never emit a mismatches entry whose expected and actual values are equal.",
+            "Never emit explanatory notes such as 'no mismatch', 'matches', or other success wording inside mismatches.",
             "Use target_schema field descriptions as the source of truth for where each extracted field must be verified from.",
             "If target_schema describes a field as coming from verification_context, verify it against verification_context rather than source JSON.",
             "Do not report a mismatch for context-backed fields solely because they are absent from source JSON.",
