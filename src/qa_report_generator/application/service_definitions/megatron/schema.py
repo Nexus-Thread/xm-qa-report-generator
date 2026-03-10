@@ -28,6 +28,7 @@ class MegatronExtractedMetrics(BaseModel):
     http_req_sending: k6_schema.TrendValuesMs = k6_schema.metric_values_field("http_req_sending")
     http_req_tls_handshaking: k6_schema.TrendValuesMs = k6_schema.metric_values_field("http_req_tls_handshaking")
     http_req_waiting: k6_schema.TrendValuesMs = k6_schema.metric_values_field("http_req_waiting")
+    iteration_duration: k6_schema.TrendValuesMs = k6_schema.metric_values_field("iteration_duration")
 
     http_req_failed: k6_schema.RateValues = k6_schema.metric_values_field("http_req_failed", prefer_scenario_tagged=True)
     checks: k6_schema.RateValues = k6_schema.metric_values_field("checks")
@@ -36,6 +37,7 @@ class MegatronExtractedMetrics(BaseModel):
     iterations: k6_schema.CounterValues = k6_schema.metric_values_field("iterations")
     data_received: k6_schema.CounterValues = k6_schema.metric_values_field("data_received")
     data_sent: k6_schema.CounterValues = k6_schema.metric_values_field("data_sent")
+    dropped_iterations: k6_schema.CounterValues | None = k6_schema.metric_values_field("dropped_iterations", optional=True)
 
 
 ExtractedMetrics = MegatronExtractedMetrics
