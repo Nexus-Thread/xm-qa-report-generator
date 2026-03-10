@@ -97,10 +97,17 @@ def _source_payload() -> dict[str, Any]:
                     "p(99)": 700.0,
                 }
             },
+            "http_req_blocked": {"values": {"min": 1.0, "avg": 2.0, "med": 2.0, "max": 3.0, "p(95)": 2.5, "p(99)": 2.9}},
+            "http_req_connecting": {"values": {"min": 1.0, "avg": 2.0, "med": 2.0, "max": 3.0, "p(95)": 2.5, "p(99)": 2.9}},
+            "http_req_receiving": {"values": {"min": 1.0, "avg": 2.0, "med": 2.0, "max": 3.0, "p(95)": 2.5, "p(99)": 2.9}},
+            "http_req_sending": {"values": {"min": 1.0, "avg": 2.0, "med": 2.0, "max": 3.0, "p(95)": 2.5, "p(99)": 2.9}},
+            "http_req_tls_handshaking": {"values": {"min": 1.0, "avg": 2.0, "med": 2.0, "max": 3.0, "p(95)": 2.5, "p(99)": 2.9}},
+            "http_req_waiting": {"values": {"min": 1.0, "avg": 2.0, "med": 2.0, "max": 3.0, "p(95)": 2.5, "p(99)": 2.9}},
             "http_req_failed": {"values": {"rate": 0.0, "passes": 100, "fails": 0}},
             "http_reqs": {"values": {"count": 100, "rate": 10.0}},
             "iterations": {"values": {"count": 100, "rate": 10.0}},
-            "dropped_iterations": {"values": {"count": 0, "rate": 0.0}},
+            "data_received": {"values": {"count": 1000, "rate": 100.0}},
+            "data_sent": {"values": {"count": 500, "rate": 50.0}},
         },
         "thresholds": {"http_req_duration": ["p(95)<1000"]},
     }
@@ -129,10 +136,17 @@ def _extracted_payload() -> dict[str, Any]:
             "p(95)": 400.0,
             "p(99)": 700.0,
         },
+        "http_req_blocked": {"min": 1.0, "avg": 2.0, "med": 2.0, "max": 3.0, "p(95)": 2.5, "p(99)": 2.9},
+        "http_req_connecting": {"min": 1.0, "avg": 2.0, "med": 2.0, "max": 3.0, "p(95)": 2.5, "p(99)": 2.9},
+        "http_req_receiving": {"min": 1.0, "avg": 2.0, "med": 2.0, "max": 3.0, "p(95)": 2.5, "p(99)": 2.9},
+        "http_req_sending": {"min": 1.0, "avg": 2.0, "med": 2.0, "max": 3.0, "p(95)": 2.5, "p(99)": 2.9},
+        "http_req_tls_handshaking": {"min": 1.0, "avg": 2.0, "med": 2.0, "max": 3.0, "p(95)": 2.5, "p(99)": 2.9},
+        "http_req_waiting": {"min": 1.0, "avg": 2.0, "med": 2.0, "max": 3.0, "p(95)": 2.5, "p(99)": 2.9},
         "http_req_failed": {"rate": 0.0, "passes": 100, "fails": 0},
         "http_reqs": {"count": 100, "rate": 10.0},
         "iterations": {"count": 100, "rate": 10.0},
-        "dropped_iterations": {"count": 0, "rate": 0.0},
+        "data_received": {"count": 1000, "rate": 100.0},
+        "data_sent": {"count": 500, "rate": 50.0},
         "thresholds": {"http_req_duration": ["p(95)<1000"]},
     }
 
@@ -319,21 +333,228 @@ def test_verification_prompt_includes_schema_guidance_for_duplicate_values(tmp_p
 def test_verification_prompt_describes_optional_missing_metric_as_null(tmp_path: Path) -> None:
     """Verification payload explains that absent optional metrics should validate as null."""
     report_path = tmp_path / "report.json"
-    source_payload = _source_payload()
-    source_payload["metrics"].pop("dropped_iterations", None)
+    source_payload: dict[str, Any] = {
+        "testRunDurationMs": 60000,
+        "env": None,
+        "execScenarios": {
+            "getVpsEligible": {
+                "env_name": None,
+                "tags": {"env_name": "staging"},
+                "executor": "constant-arrival-rate",
+                "rate": 10,
+                "duration": "1m",
+                "preAllocatedVUs": 10,
+                "maxVUs": 20,
+            }
+        },
+        "metrics": {
+            "checks": {"values": {"rate": 1.0, "passes": 100, "fails": 0}},
+            "http_req_duration{test_name:getVpsEligible}": {
+                "values": {
+                    "min": 1.0,
+                    "avg": 2.0,
+                    "med": 2.0,
+                    "max": 3.0,
+                    "p(95)": 2.5,
+                    "p(99)": 2.9,
+                }
+            },
+            "http_req_blocked": {
+                "values": {
+                    "min": 1.0,
+                    "avg": 2.0,
+                    "med": 2.0,
+                    "max": 3.0,
+                    "p(95)": 2.5,
+                    "p(99)": 2.9,
+                }
+            },
+            "http_req_connecting": {
+                "values": {
+                    "min": 1.0,
+                    "avg": 2.0,
+                    "med": 2.0,
+                    "max": 3.0,
+                    "p(95)": 2.5,
+                    "p(99)": 2.9,
+                }
+            },
+            "http_req_receiving": {
+                "values": {
+                    "min": 1.0,
+                    "avg": 2.0,
+                    "med": 2.0,
+                    "max": 3.0,
+                    "p(95)": 2.5,
+                    "p(99)": 2.9,
+                }
+            },
+            "http_req_sending": {
+                "values": {
+                    "min": 1.0,
+                    "avg": 2.0,
+                    "med": 2.0,
+                    "max": 3.0,
+                    "p(95)": 2.5,
+                    "p(99)": 2.9,
+                }
+            },
+            "http_req_tls_handshaking": {
+                "values": {
+                    "min": 1.0,
+                    "avg": 2.0,
+                    "med": 2.0,
+                    "max": 3.0,
+                    "p(95)": 2.5,
+                    "p(99)": 2.9,
+                }
+            },
+            "http_req_waiting": {
+                "values": {
+                    "min": 1.0,
+                    "avg": 2.0,
+                    "med": 2.0,
+                    "max": 3.0,
+                    "p(95)": 2.5,
+                    "p(99)": 2.9,
+                }
+            },
+            "iteration_duration": {
+                "values": {
+                    "min": 1.0,
+                    "avg": 2.0,
+                    "med": 2.0,
+                    "max": 3.0,
+                    "p(95)": 2.5,
+                    "p(99)": 2.9,
+                }
+            },
+            "http_req_failed{test_name:getVpsEligible}": {"values": {"rate": 0.0, "passes": 100, "fails": 0}},
+            "http_reqs": {"values": {"count": 100, "rate": 10.0}},
+            "iterations": {"values": {"count": 100, "rate": 10.0}},
+            "data_received": {"values": {"count": 1000, "rate": 100.0}},
+            "data_sent": {"values": {"count": 500, "rate": 50.0}},
+        },
+        "thresholds": {"http_req_failed{test_name:getVpsEligible}": ["rate<0.01"]},
+    }
     report_path.write_text(json.dumps(source_payload), encoding="utf-8")
 
     llm = StubStructuredLlm(
         [
-            {**_extracted_payload(), "dropped_iterations": None},
+            {
+                "service": "vps",
+                "report_file": "report.json",
+                "test_run_duration_ms": 60000,
+                "scenario": {
+                    "name": "getVpsEligible",
+                    "env_name": "staging",
+                    "executor": "constant-arrival-rate",
+                    "rate": 10,
+                    "duration": "1m",
+                    "preAllocatedVUs": 10,
+                    "maxVUs": 20,
+                },
+                "checks": {"rate": 1.0, "passes": 100, "fails": 0},
+                "http_req_duration": {
+                    "min": 1.0,
+                    "avg": 2.0,
+                    "med": 2.0,
+                    "max": 3.0,
+                    "p(95)": 2.5,
+                    "p(99)": 2.9,
+                },
+                "http_req_blocked": {
+                    "min": 1.0,
+                    "avg": 2.0,
+                    "med": 2.0,
+                    "max": 3.0,
+                    "p(95)": 2.5,
+                    "p(99)": 2.9,
+                },
+                "http_req_connecting": {
+                    "min": 1.0,
+                    "avg": 2.0,
+                    "med": 2.0,
+                    "max": 3.0,
+                    "p(95)": 2.5,
+                    "p(99)": 2.9,
+                },
+                "http_req_receiving": {
+                    "min": 1.0,
+                    "avg": 2.0,
+                    "med": 2.0,
+                    "max": 3.0,
+                    "p(95)": 2.5,
+                    "p(99)": 2.9,
+                },
+                "http_req_sending": {
+                    "min": 1.0,
+                    "avg": 2.0,
+                    "med": 2.0,
+                    "max": 3.0,
+                    "p(95)": 2.5,
+                    "p(99)": 2.9,
+                },
+                "http_req_tls_handshaking": {
+                    "min": 1.0,
+                    "avg": 2.0,
+                    "med": 2.0,
+                    "max": 3.0,
+                    "p(95)": 2.5,
+                    "p(99)": 2.9,
+                },
+                "http_req_waiting": {
+                    "min": 1.0,
+                    "avg": 2.0,
+                    "med": 2.0,
+                    "max": 3.0,
+                    "p(95)": 2.5,
+                    "p(99)": 2.9,
+                },
+                "iteration_duration": {
+                    "min": 1.0,
+                    "avg": 2.0,
+                    "med": 2.0,
+                    "max": 3.0,
+                    "p(95)": 2.5,
+                    "p(99)": 2.9,
+                },
+                "http_req_failed": {"rate": 0.0, "passes": 100, "fails": 0},
+                "http_reqs": {"count": 100, "rate": 10.0},
+                "iterations": {"count": 100, "rate": 10.0},
+                "data_received": {"count": 1000, "rate": 100.0},
+                "data_sent": {"count": 500, "rate": 50.0},
+                "dropped_iterations": None,
+                "thresholds": {"http_req_failed{test_name:getVpsEligible}": ["rate<0.01"]},
+            },
             {"mismatches": []},
         ]
     )
-    parser = StubK6ParsedReportParser(_parsed_report_with_source_payload(source_payload=source_payload))
+    parser = StubK6ParsedReportParser(
+        K6ParsedReport(
+            service="vps",
+            scenarios=[
+                K6Scenario(
+                    source_report_file="report.json",
+                    name="getVpsEligible",
+                    env_name="staging",
+                    executor="constant-arrival-rate",
+                    rate=10.0,
+                    duration="1m",
+                    pre_allocated_vus=10,
+                    max_vus=20,
+                    test_run_duration_ms=60000.0,
+                    thresholds={"http_req_failed{test_name:getVpsEligible}": ["rate<0.01"]},
+                    metrics=source_payload["metrics"],
+                    raw_payload=source_payload,
+                )
+            ],
+        )
+    )
     service = K6ServiceExtractionService(llm=llm, parser=parser)
 
     service.extract(
-        service="megatron",
+        service="vps",
         report_paths=[report_path],
     )
 
