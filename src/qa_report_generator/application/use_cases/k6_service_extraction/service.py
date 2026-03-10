@@ -16,6 +16,7 @@ from qa_report_generator.domain.analytics import (
     build_overall_executive_summary,
     build_scenario_executive_summary,
     build_threshold_summaries_from_source_payload,
+    pick_metric,
 )
 from qa_report_generator.domain.exceptions import ConfigurationError, ExtractionVerificationError
 
@@ -195,6 +196,10 @@ class K6ServiceExtractionService(ExtractK6ServiceMetricsUseCase):
             system_prompt=definition.extraction_system_prompt,
             user_prompt=extraction_prompt,
         )
+        extracted_payload = _apply_schema_authorized_metric_overrides(
+            extracted_payload=extracted_payload,
+            scenario=scenario,
+        )
 
         extracted_model = validate_with_schema(definition.schema_model, extracted_payload)
         if definition.validate_extracted is not None:
@@ -324,3 +329,21 @@ def _to_summary_payload(result: K6ServiceExtractionResult) -> dict[str, object]:
             for summary in result.scenario_summaries
         ],
     }
+
+
+def _apply_schema_authorized_metric_overrides(
+    *,
+    extracted_payload: dict[str, Any],
+    scenario: K6Scenario,
+) -> dict[str, Any]:
+    """Override extracted metrics with schema-authorized scenario metric values."""
+    normalized_payload = dict(extracted_payload)
+    for metric_key in ("http_req_duration", "http_req_failed"):
+        if metric_key not in normalized_payload:
+            continue
+        normalized_payload[metric_key] = pick_metric(
+            scenario.raw_payload,
+            metric_key,
+            scenario.name,
+        ).get("values", normalized_payload[metric_key])
+    return normalized_payload

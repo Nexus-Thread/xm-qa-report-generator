@@ -272,13 +272,14 @@ def _parsed_report_with_source_payload(
     scenario_payload = deepcopy(source_payload)
     scenario_payload.pop("setup_data", None)
     scenario_payload.pop("root_group", None)
+    scenario_name = next(iter(source_payload["execScenarios"].keys()))
 
     return K6ParsedReport(
         service=service,
         scenarios=[
             K6Scenario(
                 source_report_file=source_report_file,
-                name="megatron-load",
+                name=scenario_name,
                 env_name="staging",
                 executor="constant-arrival-rate",
                 rate=10.0,
@@ -828,6 +829,101 @@ def test_extract_ignores_false_positive_match_reports_from_verifier(tmp_path: Pa
 
     assert result.service == "megatron"
     assert len(result.runs) == 1
+
+
+def test_extract_overrides_http_req_failed_with_exact_scenario_tagged_metric(tmp_path: Path) -> None:
+    """Extraction uses exact scenario-tagged http_req_failed values when present."""
+    report_path = tmp_path / "report.json"
+    source_payload = _source_payload()
+    source_payload["execScenarios"] = {
+        "thdGetOrders": {
+            "env_name": None,
+            "tags": {"env_name": "staging"},
+            "executor": "constant-arrival-rate",
+            "rate": 10,
+            "duration": "1m",
+            "preAllocatedVUs": 10,
+            "maxVUs": 20,
+        }
+    }
+    source_payload["metrics"]["http_req_duration"] = {
+        "values": {
+            "min": 44.675271,
+            "avg": 100.49421802188276,
+            "med": 80.37146150000001,
+            "max": 10075.100155,
+            "p(95)": 177.24301234999987,
+            "p(99)": 242.1808502500002,
+        }
+    }
+    source_payload["metrics"]["http_req_duration{test_name:thdGetOrders}"] = {
+        "values": {
+            "min": 44.675271,
+            "avg": 100.06499275127425,
+            "med": 80.3342385,
+            "max": 10075.100155,
+            "p(95)": 176.82212119999994,
+            "p(99)": 238.19634724000014,
+        }
+    }
+    source_payload["metrics"]["http_req_failed"] = {"values": {"rate": 0.000133248730964467, "passes": 21, "fails": 157579}}
+    source_payload["metrics"]["http_req_failed{test_name:thdGetOrders}"] = {"values": {"rate": 0.00013333333333333334, "passes": 21, "fails": 157479}}
+    report_path.write_text(json.dumps(source_payload), encoding="utf-8")
+
+    extracted_payload = _extracted_payload()
+    extracted_payload["service"] = "tradinghistoricaldata"
+    extracted_payload["scenario"]["name"] = "thdGetOrders"
+    extracted_payload["http_req_duration"] = source_payload["metrics"]["http_req_duration"]["values"]
+    extracted_payload["http_req_failed"] = source_payload["metrics"]["http_req_failed"]["values"]
+
+    llm = StubStructuredLlm([extracted_payload, {"mismatches": []}])
+    parser = StubK6ParsedReportParser(
+        _parsed_report_with_source_payload(
+            source_payload=source_payload,
+            service="tradinghistoricaldata",
+        )
+    )
+    service = K6ServiceExtractionService(llm=llm, parser=parser)
+
+    result = service.extract(service="tradinghistoricaldata", report_paths=[report_path])
+
+    assert result.runs[0].extracted["http_req_failed"] == {
+        "rate": 0.00013333333333333334,
+        "passes": 21,
+        "fails": 157479,
+    }
+    assert result.runs[0].extracted["http_req_duration"] == {
+        "min": 44.675271,
+        "avg": 100.06499275127425,
+        "med": 80.3342385,
+        "max": 10075.100155,
+        "p(95)": 176.82212119999994,
+        "p(99)": 238.19634724000014,
+    }
+
+
+def test_extract_keeps_generic_http_req_failed_when_exact_scenario_tagged_metric_is_absent(tmp_path: Path) -> None:
+    """Extraction falls back to generic http_req_failed when no exact tag exists."""
+    report_path = tmp_path / "report.json"
+    source_payload = _source_payload()
+    source_payload["metrics"]["http_req_failed"] = {"values": {"rate": 0.25, "passes": 75, "fails": 25}}
+    source_payload["metrics"]["http_req_failed{expected_response:true}"] = {"values": {"rate": 0.5, "passes": 50, "fails": 50}}
+    report_path.write_text(json.dumps(source_payload), encoding="utf-8")
+
+    extracted_payload = _extracted_payload()
+    extracted_payload["http_req_failed"] = {"rate": 0.5, "passes": 50, "fails": 50}
+
+    llm = StubStructuredLlm([extracted_payload, {"mismatches": []}])
+    parser = StubK6ParsedReportParser(_parsed_report_with_source_payload(source_payload=source_payload))
+    service = K6ServiceExtractionService(llm=llm, parser=parser)
+
+    result = service.extract(service="megatron", report_paths=[report_path])
+
+    assert result.runs[0].extracted["http_req_failed"] == {
+        "rate": 0.25,
+        "passes": 75,
+        "fails": 25,
+    }
 
 
 def test_verification_prompt_prefers_exact_test_name_tag_over_other_tagged_variants(tmp_path: Path) -> None:
