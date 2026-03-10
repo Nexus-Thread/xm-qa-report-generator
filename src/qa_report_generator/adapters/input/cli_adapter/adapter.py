@@ -4,7 +4,7 @@ import json
 import logging
 from collections.abc import Callable
 from pathlib import Path
-from typing import Annotated, NoReturn, TypeVar
+from typing import Annotated, Literal, NoReturn, TypeVar
 
 import typer
 
@@ -12,7 +12,10 @@ from qa_report_generator.application.dtos import K6ServiceExtractionResult
 from qa_report_generator.application.ports.input import (
     ExtractK6ServiceMetricsUseCase,
 )
+from qa_report_generator.application.ports.output import DebugJsonWriterPort
 from qa_report_generator.domain.exceptions import ReportingError
+
+OutputMode = Literal["summary", "full"]
 
 _RESULT = TypeVar("_RESULT")
 LOGGER = logging.getLogger(__name__)
@@ -24,9 +27,15 @@ class K6CliAdapter:
     def __init__(
         self,
         extract_k6_service_metrics_use_case: ExtractK6ServiceMetricsUseCase,
+        output_mode: OutputMode = "summary",
+        model_debug_json_writer: DebugJsonWriterPort | None = None,
+        model_debug_json_enabled: bool = False,
     ) -> None:
         """Initialize k6-focused CLI adapter."""
         self._extract_k6_service_metrics_use_case = extract_k6_service_metrics_use_case
+        self._output_mode = output_mode
+        self._model_debug_json_writer = model_debug_json_writer
+        self._model_debug_json_enabled = model_debug_json_enabled
 
         self._app = typer.Typer(
             help="Generate deterministic service metrics from k6 reports",
@@ -97,17 +106,26 @@ class K6CliAdapter:
                 dir_okay=True,
             ),
         ],
+        output: Annotated[
+            OutputMode | None,
+            typer.Option(
+                "--output",
+                help="Output mode: 'summary' for executive summary only or 'full' for detailed runs",
+            ),
+        ] = None,
     ) -> None:
         """Generate and print service-specific deterministic metrics from one or more k6 JSON reports."""
         normalized_service = self._normalize_service(service)
         report_files = self._resolve_report_files(report)
+        output_mode = output or self._output_mode
         result = self._execute_or_exit(
             lambda: self._extract_k6_service_metrics_use_case.extract(
                 service=normalized_service,
                 report_paths=report_files,
             )
         )
-        payload = self._build_extraction_payload(result)
+        payload = self._build_extraction_payload(result, output_mode=output_mode)
+        self._write_model_debug_payload(payload=payload, output_mode=output_mode)
         self._print_json_output(
             success_message="Generated service metrics",
             payload=payload,
@@ -121,9 +139,14 @@ class K6CliAdapter:
             self._exit_with_error("--service cannot be empty")
         return normalized_service
 
-    def _build_extraction_payload(self, result: K6ServiceExtractionResult) -> dict[str, object]:
+    def _build_extraction_payload(
+        self,
+        result: K6ServiceExtractionResult,
+        *,
+        output_mode: OutputMode,
+    ) -> dict[str, object]:
         """Build extraction JSON payload for CLI output."""
-        return {
+        summary_payload: dict[str, object] = {
             "service": result.service,
             "mode": result.mode,
             "overall_summary": {
@@ -158,6 +181,12 @@ class K6CliAdapter:
                 }
                 for summary in result.scenario_summaries
             ],
+        }
+        if output_mode == "summary":
+            return summary_payload
+
+        return {
+            **summary_payload,
             "runs": [
                 {
                     "source_report_files": run.source_report_files,
@@ -166,6 +195,27 @@ class K6CliAdapter:
                 for run in result.runs
             ],
         }
+
+    def _write_model_debug_payload(self, *, payload: object, output_mode: OutputMode) -> None:
+        """Persist final model payload when model JSON debug output is enabled."""
+        if not self._model_debug_json_enabled or self._model_debug_json_writer is None:
+            return
+
+        try:
+            if output_mode == "full":
+                self._model_debug_json_writer.write_json(
+                    label="full_output",
+                    payload=payload,
+                )
+        except (OSError, TypeError, ValueError) as err:
+            LOGGER.warning(
+                "Failed to write model debug payload",
+                exc_info=err,
+                extra={
+                    "component": self.__class__.__name__,
+                    "output_mode": output_mode,
+                },
+            )
 
     def _execute_or_exit(self, operation: Callable[[], _RESULT]) -> _RESULT:
         """Execute operation and convert domain/system errors to CLI exits."""

@@ -24,6 +24,9 @@ def test_env_settings_adapter_loads_defaults_when_environment_is_empty(
     monkeypatch.delenv("LLM_RETRY_BACKOFF_FACTOR", raising=False)
     monkeypatch.delenv("LLM_DEBUG_JSON_ENABLED", raising=False)
     monkeypatch.delenv("LLM_DEBUG_JSON_DIR", raising=False)
+    monkeypatch.delenv("MODEL_DEBUG_JSON_ENABLED", raising=False)
+    monkeypatch.delenv("MODEL_DEBUG_JSON_DIR", raising=False)
+    monkeypatch.delenv("OUTPUT_MODE", raising=False)
     monkeypatch.delenv("LOG_LEVEL", raising=False)
     monkeypatch.delenv("LOG_FORMAT", raising=False)
 
@@ -39,6 +42,9 @@ def test_env_settings_adapter_loads_defaults_when_environment_is_empty(
     assert settings.llm_retry_backoff_factor == 2.0
     assert settings.llm_debug_json_enabled is False
     assert settings.llm_debug_json_dir == Path("out/debug/llm")
+    assert settings.output_mode == "summary"
+    assert settings.model_debug_json_enabled is True
+    assert settings.model_debug_json_dir == Path("out/debug/models")
 
 
 def test_env_settings_adapter_loads_minimal_required_settings(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -51,6 +57,9 @@ def test_env_settings_adapter_loads_minimal_required_settings(monkeypatch: pytes
     monkeypatch.setenv("LLM_RETRY_BACKOFF_FACTOR", "1.5")
     monkeypatch.setenv("LLM_DEBUG_JSON_ENABLED", "true")
     monkeypatch.setenv("LLM_DEBUG_JSON_DIR", "out/debug/custom")
+    monkeypatch.delenv("MODEL_DEBUG_JSON_ENABLED", raising=False)
+    monkeypatch.delenv("MODEL_DEBUG_JSON_DIR", raising=False)
+    monkeypatch.delenv("OUTPUT_MODE", raising=False)
     monkeypatch.setenv("LOG_LEVEL", "debug")
     monkeypatch.setenv("LOG_FORMAT", "JSON")
 
@@ -66,6 +75,30 @@ def test_env_settings_adapter_loads_minimal_required_settings(monkeypatch: pytes
     assert settings.llm_retry_backoff_factor == 1.5
     assert settings.llm_debug_json_enabled is True
     assert settings.llm_debug_json_dir == Path("out/debug/custom")
+    assert settings.output_mode == "summary"
+    assert settings.model_debug_json_enabled is True
+    assert settings.model_debug_json_dir == Path("out/debug/models")
+
+
+def test_env_settings_adapter_loads_output_configuration(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Adapter loads output mode and model debug settings."""
+    monkeypatch.setenv("OUTPUT_MODE", "full")
+    monkeypatch.setenv("MODEL_DEBUG_JSON_ENABLED", "true")
+    monkeypatch.setenv("MODEL_DEBUG_JSON_DIR", "out/debug/models-custom")
+
+    settings = EnvSettingsAdapter().load()
+
+    assert settings.output_mode == "full"
+    assert settings.model_debug_json_enabled is True
+    assert settings.model_debug_json_dir == Path("out/debug/models-custom")
+
+
+def test_env_settings_adapter_rejects_invalid_output_mode(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Invalid OUTPUT_MODE raises ConfigurationError."""
+    monkeypatch.setenv("OUTPUT_MODE", "parsed")
+
+    with pytest.raises(ConfigurationError):
+        EnvSettingsAdapter().load()
 
 
 def test_env_settings_adapter_raises_configuration_error_for_invalid_log_level(monkeypatch: pytest.MonkeyPatch) -> None:

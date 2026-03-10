@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+import json
+from pathlib import Path
 
 import pytest
 import typer
@@ -18,9 +19,6 @@ from qa_report_generator.domain.analytics import (
     K6ThresholdSummary,
 )
 from qa_report_generator.domain.exceptions import ReportingError
-
-if TYPE_CHECKING:
-    from pathlib import Path
 
 
 class SpyExtractionUseCase:
@@ -107,6 +105,19 @@ class CrashingExtractionUseCase:
         del service, report_paths
         msg = "unexpected boom"
         raise RuntimeError(msg)
+
+
+class SpyDebugJsonWriter:
+    """Spy writer for persisted model JSON payloads."""
+
+    def __init__(self) -> None:
+        """Store persisted debug calls."""
+        self.calls: list[tuple[str, object]] = []
+
+    def write_json(self, *, label: str, payload: object) -> Path:
+        """Record one debug JSON write call."""
+        self.calls.append((label, payload))
+        return Path(f"out/test-debug/{label}.json")
 
 
 def test_generate_command_passes_service_and_report_to_use_case(tmp_path: Path) -> None:
@@ -199,9 +210,66 @@ def test_generate_command_prints_success_message_heading_and_json_payload(
     assert '"overall_summary"' in captured.out
     assert '"scenario_summaries"' in captured.out
     assert '"executive_note": "Scenario grouped-scenario met all evaluated thresholds."' in captured.out
+    assert '"runs"' not in captured.out
+
+
+def test_generate_command_prints_full_output_when_requested(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Generate command includes detailed runs when full output is requested."""
+    report_path = tmp_path / "report.json"
+    report_path.write_text("{}", encoding="utf-8")
+
+    adapter = K6CliAdapter(
+        extract_k6_service_metrics_use_case=SpyExtractionUseCase(),
+    )
+
+    adapter.generate_command(service="megatron", report=[report_path], output="full")
+
+    captured = capsys.readouterr()
     assert '"runs"' in captured.out
     assert '"source_report_files": [' in captured.out
     assert '"name": "grouped-scenario"' in captured.out
+
+
+def test_generate_command_writes_model_debug_payload_when_enabled(tmp_path: Path) -> None:
+    """Generate command persists final model JSON when configured."""
+    report_path = tmp_path / "report.json"
+    report_path.write_text("{}", encoding="utf-8")
+    debug_writer = SpyDebugJsonWriter()
+
+    adapter = K6CliAdapter(
+        extract_k6_service_metrics_use_case=SpyExtractionUseCase(),
+        model_debug_json_writer=debug_writer,
+        model_debug_json_enabled=True,
+    )
+
+    adapter.generate_command(service="megatron", report=[report_path])
+
+    assert debug_writer.calls == []
+
+
+def test_generate_command_writes_full_output_debug_payload_when_enabled(tmp_path: Path) -> None:
+    """Generate command persists the final full output payload when requested."""
+    report_path = tmp_path / "report.json"
+    report_path.write_text("{}", encoding="utf-8")
+    debug_writer = SpyDebugJsonWriter()
+
+    adapter = K6CliAdapter(
+        extract_k6_service_metrics_use_case=SpyExtractionUseCase(),
+        model_debug_json_writer=debug_writer,
+        model_debug_json_enabled=True,
+    )
+
+    adapter.generate_command(service="megatron", report=[report_path], output="full")
+
+    assert len(debug_writer.calls) == 1
+    label, payload = debug_writer.calls[0]
+    assert label == "full_output"
+    payload_dict = json.loads(json.dumps(payload))
+    assert payload_dict["service"] == "megatron"
+    assert "runs" in payload_dict
 
 
 def test_generate_command_raises_typer_exit_on_empty_service(tmp_path: Path) -> None:

@@ -26,4 +26,7 @@ class EnvSettingsAdapter:
             llm_retry_backoff_factor=settings.llm_retry_backoff_factor,
             llm_debug_json_enabled=settings.llm_debug_json_enabled,
             llm_debug_json_dir=settings.llm_debug_json_dir,
+            output_mode=settings.output_mode,
+            model_debug_json_enabled=settings.model_debug_json_enabled,
+            model_debug_json_dir=settings.model_debug_json_dir,
         )

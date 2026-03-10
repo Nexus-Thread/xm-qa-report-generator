@@ -17,6 +17,21 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 
+class SpyDebugJsonWriter:
+    """Spy writer for model snapshot persistence."""
+
+    def __init__(self) -> None:
+        """Store write calls."""
+        self.calls: list[tuple[str, object]] = []
+
+    def write_json(self, *, label: str, payload: object) -> Path:
+        """Record one model snapshot write call."""
+        from pathlib import Path as _Path
+
+        self.calls.append((label, payload))
+        return _Path(f"out/test-debug/{label}.json")
+
+
 class StubStructuredLlm:
     """Stub deterministic LLM port for extraction tests."""
 
@@ -985,6 +1000,54 @@ def test_extract_uses_max_duration_when_grouped_runs_differ(tmp_path: Path) -> N
 
     assert len(result.runs) == 1
     assert result.runs[0].extracted["test_run_duration_ms"] == 62000
+
+
+def test_extract_writes_model_snapshots_for_service_specific_flow(tmp_path: Path) -> None:
+    """Extraction writes extraction, post-processed, and summary snapshots."""
+    report_path = tmp_path / "report.json"
+    report_path.write_text(json.dumps(_source_payload()), encoding="utf-8")
+    llm = StubStructuredLlm([_extracted_payload(), {"mismatches": []}])
+    parser = StubK6ParsedReportParser(_parsed_report())
+    debug_writer = SpyDebugJsonWriter()
+    service = K6ServiceExtractionService(
+        llm=llm,
+        parser=parser,
+        model_debug_json_writer=debug_writer,
+        model_debug_json_enabled=True,
+    )
+
+    result = service.extract(service="megatron", report_paths=[report_path])
+
+    assert result.service == "megatron"
+    assert [label for label, _ in debug_writer.calls] == [
+        "extraction_runs",
+        "post_processed_runs",
+        "summary_output",
+    ]
+
+
+def test_extract_writes_model_snapshots_for_generic_flow(tmp_path: Path) -> None:
+    """Generic extraction writes consistent model snapshots."""
+    report_path = tmp_path / "report.json"
+    report_path.write_text(json.dumps(_source_payload()), encoding="utf-8")
+    llm = StubStructuredLlm([])
+    parser = StubK6ParsedReportParser(_parsed_report(service="unknown-service"))
+    debug_writer = SpyDebugJsonWriter()
+    service = K6ServiceExtractionService(
+        llm=llm,
+        parser=parser,
+        model_debug_json_writer=debug_writer,
+        model_debug_json_enabled=True,
+    )
+
+    result = service.extract(service="unknown-service", report_paths=[report_path])
+
+    assert result.mode == "generic"
+    assert [label for label, _ in debug_writer.calls] == [
+        "extraction_runs",
+        "post_processed_runs",
+        "summary_output",
+    ]
 
 
 def test_parse_mismatches_preserves_numeric_values() -> None:

@@ -27,7 +27,11 @@ from .verification import parse_mismatches
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from qa_report_generator.application.ports.output import K6ParsedReportParserPort, StructuredLlmPort
+    from qa_report_generator.application.ports.output import (
+        DebugJsonWriterPort,
+        K6ParsedReportParserPort,
+        StructuredLlmPort,
+    )
     from qa_report_generator.application.service_definitions.base import ServiceDefinition
     from qa_report_generator.domain.analytics import K6ParsedReport, K6Scenario
 
@@ -35,10 +39,19 @@ if TYPE_CHECKING:
 class K6ServiceExtractionService(ExtractK6ServiceMetricsUseCase):
     """Extract deterministic structured metrics for one service from a k6 summary JSON."""
 
-    def __init__(self, *, llm: StructuredLlmPort, parser: K6ParsedReportParserPort) -> None:
+    def __init__(
+        self,
+        *,
+        llm: StructuredLlmPort,
+        parser: K6ParsedReportParserPort,
+        model_debug_json_writer: DebugJsonWriterPort | None = None,
+        model_debug_json_enabled: bool = False,
+    ) -> None:
         """Store adapter dependencies."""
         self._llm = llm
         self._parser = parser
+        self._model_debug_json_writer = model_debug_json_writer
+        self._model_debug_json_enabled = model_debug_json_enabled
 
     def extract(self, *, service: str, report_paths: list[Path]) -> K6ServiceExtractionResult:
         """Run two-step extraction + verification and return validated payloads."""
@@ -54,7 +67,11 @@ class K6ServiceExtractionService(ExtractK6ServiceMetricsUseCase):
         )
 
         if definition is None:
-            return build_generic_result(parsed_report=parsed_report)
+            result = build_generic_result(parsed_report=parsed_report)
+            self._write_model_snapshot(label="extraction_runs", payload=result.runs)
+            self._write_model_snapshot(label="post_processed_runs", payload=result.runs)
+            self._write_model_snapshot(label="summary_output", payload=_to_summary_payload(result))
+            return result
 
         return self._extract_service_specific(parsed_report=parsed_report, definition=definition)
 
@@ -101,11 +118,13 @@ class K6ServiceExtractionService(ExtractK6ServiceMetricsUseCase):
             )
             for run_model in extracted_run_models
         ]
+        self._write_model_snapshot(label="extraction_runs", payload=extracted_runs)
         final_runs = self._post_process_runs(
             definition=definition,
             fallback_runs=extracted_runs,
             extracted_models=[run_model.extracted for run_model in extracted_run_models],
         )
+        self._write_model_snapshot(label="post_processed_runs", payload=final_runs)
         scenario_summaries = [
             build_scenario_executive_summary(
                 run_payload=run.extracted,
@@ -114,13 +133,21 @@ class K6ServiceExtractionService(ExtractK6ServiceMetricsUseCase):
             for run in final_runs
         ]
 
-        return K6ServiceExtractionResult(
+        result = K6ServiceExtractionResult(
             service=parsed_report.service,
             mode="service_specific",
             runs=final_runs,
             overall_summary=build_overall_executive_summary(scenario_summaries=scenario_summaries),
             scenario_summaries=scenario_summaries,
         )
+        self._write_model_snapshot(label="summary_output", payload=_to_summary_payload(result))
+        return result
+
+    def _write_model_snapshot(self, *, label: str, payload: object) -> None:
+        """Persist a model snapshot when model debug JSON output is enabled."""
+        if not self._model_debug_json_enabled or self._model_debug_json_writer is None:
+            return
+        self._model_debug_json_writer.write_json(label=label, payload=payload)
 
     def _extract_verified_run_model(
         self,
@@ -257,3 +284,43 @@ def _with_threshold_results(
         for threshold in threshold_results
     ]
     return final_payload
+
+
+def _to_summary_payload(result: K6ServiceExtractionResult) -> dict[str, object]:
+    """Build the summary-stage payload from the extraction result."""
+    return {
+        "service": result.service,
+        "mode": result.mode,
+        "overall_summary": {
+            "status": result.overall_summary.status,
+            "total_scenarios": result.overall_summary.total_scenarios,
+            "passed_scenarios": result.overall_summary.passed_scenarios,
+            "failed_scenarios": result.overall_summary.failed_scenarios,
+            "unknown_scenarios": result.overall_summary.unknown_scenarios,
+            "scenarios_requiring_attention": result.overall_summary.scenarios_requiring_attention,
+            "executive_summary": result.overall_summary.executive_summary,
+        },
+        "scenario_summaries": [
+            {
+                "scenario_name": summary.scenario_name,
+                "env_name": summary.env_name,
+                "source_report_files": summary.source_report_files,
+                "status": summary.status,
+                "executor": summary.executor,
+                "rate": summary.rate,
+                "duration": summary.duration,
+                "pre_allocated_vus": summary.pre_allocated_vus,
+                "max_vus": summary.max_vus,
+                "threshold_results": [
+                    {
+                        "metric_key": threshold.metric_key,
+                        "expression": threshold.expression,
+                        "status": threshold.status,
+                    }
+                    for threshold in summary.threshold_results
+                ],
+                "executive_note": summary.executive_note,
+            }
+            for summary in result.scenario_summaries
+        ],
+    }

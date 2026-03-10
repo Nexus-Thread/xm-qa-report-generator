@@ -1,5 +1,7 @@
 """Composition root for the k6-only CLI."""
 
+from typing import Literal, cast
+
 from qa_report_generator.adapters.input.cli_adapter import K6CliAdapter
 from qa_report_generator.adapters.input.env import EnvSettingsAdapter
 from qa_report_generator.adapters.output.narrative.openai import OpenAIClientSettings, build_client
@@ -28,6 +30,7 @@ def create_cli_adapter() -> K6CliAdapter:
         )
     )
     debug_json_writer = JsonFileDebugWriterAdapter(base_dir=config.llm_debug_json_dir)
+    model_debug_json_writer = JsonFileDebugWriterAdapter(base_dir=config.model_debug_json_dir)
     structured_llm = OpenAIStructuredLlmAdapter(
         client=openai_client,
         model=config.llm_model,
@@ -39,6 +42,9 @@ def create_cli_adapter() -> K6CliAdapter:
 
     return K6CliAdapter(
         extract_k6_service_metrics_use_case=k6_service_extraction_use_case,
+        output_mode=cast("Literal['summary', 'full']", config.output_mode),
+        model_debug_json_writer=model_debug_json_writer,
+        model_debug_json_enabled=config.model_debug_json_enabled,
     )
 
 
