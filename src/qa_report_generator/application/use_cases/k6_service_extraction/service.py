@@ -20,6 +20,7 @@ from qa_report_generator.domain.analytics import (
 )
 from qa_report_generator.domain.exceptions import ConfigurationError, ExtractionVerificationError
 
+from .config import K6ServiceExtractionDebugConfig
 from .json_utils import to_canonical_json
 from .result_builders import build_generic_result
 from .schema_validation import validate_with_schema
@@ -29,7 +30,6 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     from qa_report_generator.application.ports.output import (
-        DebugJsonWriterPort,
         K6ParsedReportParserPort,
         StructuredLlmPort,
     )
@@ -45,14 +45,12 @@ class K6ServiceExtractionService(ExtractK6ServiceMetricsUseCase):
         *,
         llm: StructuredLlmPort,
         parser: K6ParsedReportParserPort,
-        model_debug_json_writer: DebugJsonWriterPort | None = None,
-        model_debug_json_enabled: bool = False,
+        debug_config: K6ServiceExtractionDebugConfig | None = None,
     ) -> None:
         """Store adapter dependencies."""
         self._llm = llm
         self._parser = parser
-        self._model_debug_json_writer = model_debug_json_writer
-        self._model_debug_json_enabled = model_debug_json_enabled
+        self._debug_config = debug_config or K6ServiceExtractionDebugConfig()
 
     def extract(self, *, service: str, report_paths: list[Path]) -> K6ServiceExtractionResult:
         """Run two-step extraction + verification and return validated payloads."""
@@ -146,9 +144,9 @@ class K6ServiceExtractionService(ExtractK6ServiceMetricsUseCase):
 
     def _write_model_snapshot(self, *, label: str, payload: object) -> None:
         """Persist a model snapshot when model debug JSON output is enabled."""
-        if not self._model_debug_json_enabled or self._model_debug_json_writer is None:
+        if not self._debug_config.model_debug_json_enabled or self._debug_config.model_debug_json_writer is None:
             return
-        self._model_debug_json_writer.write_json(label=label, payload=payload)
+        self._debug_config.model_debug_json_writer.write_json(label=label, payload=payload)
 
     def _extract_verified_run_model(
         self,

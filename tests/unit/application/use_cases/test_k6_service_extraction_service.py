@@ -8,7 +8,10 @@ from typing import TYPE_CHECKING, Any
 
 import pytest
 
-from qa_report_generator.application.use_cases.k6_service_extraction import K6ServiceExtractionService
+from qa_report_generator.application.use_cases.k6_service_extraction import (
+    K6ServiceExtractionDebugConfig,
+    K6ServiceExtractionService,
+)
 from qa_report_generator.application.use_cases.k6_service_extraction.verification import parse_mismatches
 from qa_report_generator.domain.analytics import K6ParsedReport, K6Scenario
 from qa_report_generator.domain.exceptions import ExtractionVerificationError
@@ -1108,8 +1111,10 @@ def test_extract_writes_model_snapshots_for_service_specific_flow(tmp_path: Path
     service = K6ServiceExtractionService(
         llm=llm,
         parser=parser,
-        model_debug_json_writer=debug_writer,
-        model_debug_json_enabled=True,
+        debug_config=K6ServiceExtractionDebugConfig(
+            model_debug_json_writer=debug_writer,
+            model_debug_json_enabled=True,
+        ),
     )
 
     result = service.extract(service="megatron", report_paths=[report_path])
@@ -1132,8 +1137,10 @@ def test_extract_writes_model_snapshots_for_generic_flow(tmp_path: Path) -> None
     service = K6ServiceExtractionService(
         llm=llm,
         parser=parser,
-        model_debug_json_writer=debug_writer,
-        model_debug_json_enabled=True,
+        debug_config=K6ServiceExtractionDebugConfig(
+            model_debug_json_writer=debug_writer,
+            model_debug_json_enabled=True,
+        ),
     )
 
     result = service.extract(service="unknown-service", report_paths=[report_path])

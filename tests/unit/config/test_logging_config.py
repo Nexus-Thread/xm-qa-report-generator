@@ -25,7 +25,6 @@ def _build_settings(*, log_level: str = "INFO", log_format: str = "simple") -> A
         llm_retry_backoff_factor=2.0,
         llm_debug_json_enabled=False,
         llm_debug_json_dir=Path("out/debug/llm"),
-        output_mode="summary",
         model_debug_json_enabled=False,
         model_debug_json_dir=Path("out/debug/models"),
     )

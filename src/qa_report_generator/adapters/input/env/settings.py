@@ -77,11 +77,6 @@ class EnvSettings(BaseSettings):
         alias="LLM_DEBUG_JSON_DIR",
         description="Directory where structured LLM debug JSON payload files are written",
     )
-    output_mode: str = Field(
-        default="summary",
-        alias="OUTPUT_MODE",
-        description="CLI output mode: 'summary' for executive summary only, 'full' for all runs",
-    )
     model_debug_json_enabled: bool = Field(
         default=True,
         alias="MODEL_DEBUG_JSON_ENABLED",
@@ -140,17 +135,6 @@ class EnvSettings(BaseSettings):
             msg = f"Invalid log format: {v}. Must be one of: {', '.join(sorted(ALLOWED_LOG_FORMATS))}"
             raise ValueError(msg)
         return v
-
-    @field_validator("output_mode")
-    @classmethod
-    def validate_output_mode(cls, value: str) -> str:
-        """Normalize and validate CLI output mode."""
-        normalized = value.strip().lower()
-        allowed_values = {"summary", "full"}
-        if normalized not in allowed_values:
-            msg = f"Invalid output mode: {normalized}. Must be one of: {', '.join(sorted(allowed_values))}"
-            raise ValueError(msg)
-        return normalized
 
     @field_validator("model_debug_json_dir", mode="before")
     @classmethod

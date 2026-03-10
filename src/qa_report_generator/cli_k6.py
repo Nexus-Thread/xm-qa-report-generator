@@ -1,7 +1,5 @@
 """Composition root for the k6-only CLI."""
 
-from typing import Literal, cast
-
 from qa_report_generator.adapters.input.cli_adapter import K6CliAdapter
 from qa_report_generator.adapters.input.env import EnvSettingsAdapter
 from qa_report_generator.adapters.output.narrative.openai import OpenAIClientSettings, build_client
@@ -9,6 +7,7 @@ from qa_report_generator.adapters.output.narrative.structured_llm import OpenAIS
 from qa_report_generator.adapters.output.parsers import K6ParsedReportParser
 from qa_report_generator.adapters.output.persistence import JsonFileDebugWriterAdapter
 from qa_report_generator.application.use_cases import (
+    K6ServiceExtractionDebugConfig,
     K6ServiceExtractionService,
 )
 from qa_report_generator.config import setup_logging
@@ -38,13 +37,17 @@ def create_cli_adapter() -> K6CliAdapter:
         debug_json_enabled=config.llm_debug_json_enabled,
     )
     parsed_report_parser = K6ParsedReportParser()
-    k6_service_extraction_use_case = K6ServiceExtractionService(llm=structured_llm, parser=parsed_report_parser)
+    service_metrics_extractor = K6ServiceExtractionService(
+        llm=structured_llm,
+        parser=parsed_report_parser,
+        debug_config=K6ServiceExtractionDebugConfig(
+            model_debug_json_writer=model_debug_json_writer,
+            model_debug_json_enabled=config.model_debug_json_enabled,
+        ),
+    )
 
     return K6CliAdapter(
-        extract_k6_service_metrics_use_case=k6_service_extraction_use_case,
-        output_mode=cast("Literal['summary', 'full']", config.output_mode),
-        model_debug_json_writer=model_debug_json_writer,
-        model_debug_json_enabled=config.model_debug_json_enabled,
+        service_metrics_extractor=service_metrics_extractor,
     )
 
 
