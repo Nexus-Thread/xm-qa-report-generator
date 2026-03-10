@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from qa_report_generator.application.service_definitions.base import ServiceDefinition
 
+from .post_processing import build_post_processed_runs
 from .prompts import (
     EXTRACTION_SYSTEM_PROMPT,
     VERIFICATION_SYSTEM_PROMPT,
@@ -20,4 +21,5 @@ SERVICE_DEFINITION = ServiceDefinition(
     verification_system_prompt=VERIFICATION_SYSTEM_PROMPT,
     build_extraction_user_prompt=build_extraction_user_prompt,
     build_verification_user_prompt=build_verification_user_prompt,
+    post_process_extracted=build_post_processed_runs,
 )

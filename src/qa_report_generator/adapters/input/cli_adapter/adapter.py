@@ -126,12 +126,12 @@ class K6CliAdapter:
         return {
             "service": result.service,
             "mode": result.mode,
-            "extracted_runs": [
+            "runs": [
                 {
-                    "report_file": run.report_file,
+                    "source_report_files": run.source_report_files,
                     "extracted": run.extracted,
                 }
-                for run in result.extracted_runs
+                for run in result.runs
             ],
         }
 

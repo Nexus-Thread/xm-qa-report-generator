@@ -11,9 +11,9 @@ ExtractionMode: TypeAlias = Literal["generic", "service_specific"]
 
 @dataclass(frozen=True)
 class K6ServiceExtractionRun:
-    """Validated extraction payload for one input report file."""
+    """Final extraction payload for one output run."""
 
-    report_file: str
+    source_report_files: list[str]
     extracted: dict[str, Any]
 
 
@@ -23,7 +23,7 @@ class K6ServiceExtractionResult:
 
     service: str
     mode: ExtractionMode
-    extracted_runs: list[K6ServiceExtractionRun]
+    runs: list[K6ServiceExtractionRun]
 
 
 @dataclass(frozen=True)

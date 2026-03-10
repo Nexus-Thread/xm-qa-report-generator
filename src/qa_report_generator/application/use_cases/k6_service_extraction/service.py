@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 from qa_report_generator.application.dtos import (
@@ -75,31 +76,43 @@ class K6ServiceExtractionService(ExtractK6ServiceMetricsUseCase):
     ) -> K6ServiceExtractionResult:
         """Run service-specific extraction flow for parsed scenarios."""
         schema = definition.dump_schema()
-        extracted_runs = [
-            self._extract_verified_run(
+        extracted_run_models = [
+            self._extract_verified_run_model(
                 scenario=scenario,
                 definition=definition,
                 schema=schema,
             )
             for scenario in parsed_report.scenarios
         ]
+        extracted_runs = [
+            K6ServiceExtractionRun(
+                source_report_files=[run_model.source_report_file],
+                extracted=_to_final_run_payload(run_model.extracted.model_dump(by_alias=True)),
+            )
+            for run_model in extracted_run_models
+        ]
+        final_runs = self._post_process_runs(
+            definition=definition,
+            fallback_runs=extracted_runs,
+            extracted_models=[run_model.extracted for run_model in extracted_run_models],
+        )
 
         return K6ServiceExtractionResult(
             service=parsed_report.service,
             mode="service_specific",
-            extracted_runs=extracted_runs,
+            runs=final_runs,
         )
 
-    def _extract_verified_run(
+    def _extract_verified_run_model(
         self,
         *,
         scenario: K6Scenario,
         definition: ServiceDefinition,
         schema: dict[str, Any],
-    ) -> K6ServiceExtractionRun:
+    ) -> _ExtractedRunModel:
         """Extract, validate, and verify one scenario payload."""
         filtered_source_json = to_canonical_json(scenario.raw_payload)
-        extracted = self._extract_payload(
+        extracted_model = self._extract_payload(
             scenario=scenario,
             definition=definition,
             schema=schema,
@@ -110,9 +123,12 @@ class K6ServiceExtractionService(ExtractK6ServiceMetricsUseCase):
             definition=definition,
             schema=schema,
             filtered_source_json=filtered_source_json,
-            extracted=extracted,
+            extracted=extracted_model.model_dump(by_alias=True),
         )
-        return K6ServiceExtractionRun(report_file=scenario.source_report_file, extracted=extracted)
+        return _ExtractedRunModel(
+            source_report_file=scenario.source_report_file,
+            extracted=extracted_model,
+        )
 
     def _extract_payload(
         self,
@@ -121,7 +137,7 @@ class K6ServiceExtractionService(ExtractK6ServiceMetricsUseCase):
         definition: ServiceDefinition,
         schema: dict[str, Any],
         filtered_source_json: str,
-    ) -> dict[str, Any]:
+    ) -> Any:
         """Extract and validate one scenario payload."""
         extraction_prompt = definition.build_extraction_user_prompt(
             filtered_source_json,
@@ -136,7 +152,19 @@ class K6ServiceExtractionService(ExtractK6ServiceMetricsUseCase):
         extracted_model = validate_with_schema(definition.schema_model, extracted_payload)
         if definition.validate_extracted is not None:
             definition.validate_extracted(extracted_model)
-        return extracted_model.model_dump(by_alias=True)
+        return extracted_model
+
+    def _post_process_runs(
+        self,
+        *,
+        definition: ServiceDefinition,
+        fallback_runs: list[K6ServiceExtractionRun],
+        extracted_models: list[Any],
+    ) -> list[K6ServiceExtractionRun]:
+        """Build final runs after optional post-processing."""
+        if definition.post_process_extracted is None:
+            return fallback_runs
+        return definition.post_process_extracted(extracted_models)
 
     def _verify_extraction(
         self,
@@ -175,3 +203,18 @@ class K6ServiceExtractionService(ExtractK6ServiceMetricsUseCase):
             msg,
             suggestion="Inspect source and extracted payloads for mapping drift",
         )
+
+
+@dataclass(frozen=True)
+class _ExtractedRunModel:
+    """Container for a validated extracted model and its source file."""
+
+    source_report_file: str
+    extracted: Any
+
+
+def _to_final_run_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    """Remove internal extraction-only fields from final run payloads."""
+    final_payload = dict(payload)
+    final_payload.pop("report_file", None)
+    return final_payload

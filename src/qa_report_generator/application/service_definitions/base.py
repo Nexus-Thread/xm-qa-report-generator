@@ -10,6 +10,8 @@ if TYPE_CHECKING:
 
     from pydantic import BaseModel
 
+    from qa_report_generator.application.dtos import K6ServiceExtractionRun
+
 
 @dataclass(frozen=True)
 class ServiceDefinition:
@@ -23,6 +25,7 @@ class ServiceDefinition:
     build_extraction_user_prompt: Callable[[str, dict[str, Any], str], str]
     build_verification_user_prompt: Callable[[str, str, dict[str, Any], dict[str, Any]], str]
     validate_extracted: Callable[[BaseModel], None] | None = None
+    post_process_extracted: Callable[[list[BaseModel]], list[K6ServiceExtractionRun]] | None = None
 
     @property
     def schema_type(self) -> type[BaseModel]:

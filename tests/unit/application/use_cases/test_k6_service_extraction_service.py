@@ -155,6 +155,88 @@ def _extracted_payload() -> dict[str, Any]:
     }
 
 
+def _symbolstreeservice_extracted_payload(*, scenario_name: str, report_file: str) -> dict[str, Any]:
+    """Build symbolstreeservice extraction payload for one numbered scenario."""
+    return {
+        "service": "symbolstreeservice",
+        "report_file": report_file,
+        "test_run_duration_ms": 60000,
+        "scenario": {
+            "name": scenario_name,
+            "env_name": "staging",
+            "executor": "constant-arrival-rate",
+            "rate": 10,
+            "duration": "1m",
+            "preAllocatedVUs": 10,
+            "maxVUs": 20,
+        },
+        "checks": {"rate": 1.0, "passes": 100, "fails": 0},
+        "http_req_duration": {
+            "min": 100.0,
+            "avg": 200.0,
+            "med": 150.0,
+            "max": 900.0,
+            "p(95)": 400.0,
+            "p(99)": 700.0,
+        },
+        "http_req_blocked": {"min": 1.0, "avg": 2.0, "med": 2.0, "max": 3.0, "p(95)": 2.5, "p(99)": 2.9},
+        "http_req_connecting": {"min": 1.0, "avg": 2.0, "med": 2.0, "max": 3.0, "p(95)": 2.5, "p(99)": 2.9},
+        "http_req_receiving": {"min": 1.0, "avg": 2.0, "med": 2.0, "max": 3.0, "p(95)": 2.5, "p(99)": 2.9},
+        "http_req_sending": {"min": 1.0, "avg": 2.0, "med": 2.0, "max": 3.0, "p(95)": 2.5, "p(99)": 2.9},
+        "http_req_tls_handshaking": {"min": 1.0, "avg": 2.0, "med": 2.0, "max": 3.0, "p(95)": 2.5, "p(99)": 2.9},
+        "http_req_waiting": {"min": 1.0, "avg": 2.0, "med": 2.0, "max": 3.0, "p(95)": 2.5, "p(99)": 2.9},
+        "iteration_duration": {"min": 1.0, "avg": 2.0, "med": 2.0, "max": 3.0, "p(95)": 2.5, "p(99)": 2.9},
+        "http_req_failed": {"rate": 0.0, "passes": 100, "fails": 0},
+        "http_reqs": {"count": 100, "rate": 10.0},
+        "iterations": {"count": 100, "rate": 10.0},
+        "data_received": {"count": 1000, "rate": 100.0},
+        "data_sent": {"count": 500, "rate": 50.0},
+        "dropped_iterations": {"count": 0, "rate": 0.0},
+        "thresholds": {f"http_req_duration{{test_name:{scenario_name}}}": ["p(95)<1000"]},
+    }
+
+
+def _symbolstreeservice_passthrough_payload(*, report_file: str) -> dict[str, Any]:
+    """Build symbolstreeservice extraction payload for the non-grouped scenario."""
+    return {
+        "service": "symbolstreeservice",
+        "report_file": report_file,
+        "test_run_duration_ms": 61000,
+        "scenario": {
+            "name": "getSymbolsTree",
+            "env_name": "staging",
+            "executor": "constant-arrival-rate",
+            "rate": 11,
+            "duration": "1m",
+            "preAllocatedVUs": 11,
+            "maxVUs": 21,
+        },
+        "checks": {"rate": 0.2, "passes": 80, "fails": 20},
+        "http_req_duration": {
+            "min": 5.0,
+            "avg": 50.0,
+            "med": 40.0,
+            "max": 500.0,
+            "p(95)": 450.0,
+            "p(99)": 490.0,
+        },
+        "http_req_blocked": {"min": 1.0, "avg": 2.0, "med": 2.0, "max": 3.0, "p(95)": 2.5, "p(99)": 2.9},
+        "http_req_connecting": {"min": 1.0, "avg": 2.0, "med": 2.0, "max": 3.0, "p(95)": 2.5, "p(99)": 2.9},
+        "http_req_receiving": {"min": 1.0, "avg": 2.0, "med": 2.0, "max": 3.0, "p(95)": 2.5, "p(99)": 2.9},
+        "http_req_sending": {"min": 1.0, "avg": 2.0, "med": 2.0, "max": 3.0, "p(95)": 2.5, "p(99)": 2.9},
+        "http_req_tls_handshaking": {"min": 1.0, "avg": 2.0, "med": 2.0, "max": 3.0, "p(95)": 2.5, "p(99)": 2.9},
+        "http_req_waiting": {"min": 1.0, "avg": 2.0, "med": 2.0, "max": 3.0, "p(95)": 2.5, "p(99)": 2.9},
+        "iteration_duration": {"min": 1.0, "avg": 2.0, "med": 2.0, "max": 3.0, "p(95)": 2.5, "p(99)": 2.9},
+        "http_req_failed": {"rate": 0.2, "passes": 80, "fails": 20},
+        "http_reqs": {"count": 100, "rate": 10.0},
+        "iterations": {"count": 100, "rate": 10.0},
+        "data_received": {"count": 1000, "rate": 100.0},
+        "data_sent": {"count": 500, "rate": 50.0},
+        "dropped_iterations": {"count": 1, "rate": 0.1},
+        "thresholds": {"http_req_duration{test_name:getSymbolsTree}": ["p(95)<1000"]},
+    }
+
+
 def _parsed_report(*, service: str = "megatron", source_report_file: str = "report.json") -> K6ParsedReport:
     """Build parsed report fixture for service extraction tests."""
     return _parsed_report_with_source_payload(
@@ -222,9 +304,11 @@ def test_extract_filters_removed_keys_and_returns_validated_payload(tmp_path: Pa
 
     assert result.service == "megatron"
     assert result.mode == "service_specific"
-    assert len(result.extracted_runs) == 2
-    assert result.extracted_runs[0].extracted["service"] == "megatron"
-    assert result.extracted_runs[1].extracted["service"] == "megatron"
+    assert len(result.runs) == 2
+    assert "report_file" not in result.runs[0].extracted
+    assert "report_file" not in result.runs[1].extracted
+    assert result.runs[0].extracted["service"] == "megatron"
+    assert result.runs[1].extracted["service"] == "megatron"
     assert llm.calls[0][0].startswith("You extract structured k6 metrics from a filtered k6 JSON report.")
     assert "Return only a JSON object that matches the provided schema." in llm.calls[0][0]
     extraction_prompt = json.loads(llm.calls[0][1])
@@ -642,8 +726,9 @@ def test_extract_returns_generic_payload_when_service_definition_is_missing(tmp_
 
     assert result.service == "unknown-service"
     assert result.mode == "generic"
-    assert len(result.extracted_runs) == 1
-    assert result.extracted_runs[0].extracted["scenario"]["name"] == "megatron-load"
+    assert len(result.runs) == 1
+    assert "report_file" not in result.runs[0].extracted
+    assert result.runs[0].extracted["scenario"]["name"] == "megatron-load"
     assert llm.calls == []
 
 
@@ -678,7 +763,112 @@ def test_extract_ignores_false_positive_match_reports_from_verifier(tmp_path: Pa
     )
 
     assert result.service == "megatron"
-    assert len(result.extracted_runs) == 1
+    assert len(result.runs) == 1
+
+
+def test_extract_builds_symbolstreeservice_post_processed_group(tmp_path: Path) -> None:
+    """Extraction returns grouped derived runs for numbered symbol tree scenarios."""
+    report_path_1 = tmp_path / "symbolstreeservice-1.json"
+    report_path_2 = tmp_path / "symbolstreeservice-2.json"
+    report_path_3 = tmp_path / "symbolstreeservice-3.json"
+    report_path_1.write_text(json.dumps(_source_payload()), encoding="utf-8")
+    report_path_2.write_text(json.dumps(_source_payload()), encoding="utf-8")
+    report_path_3.write_text(json.dumps(_source_payload()), encoding="utf-8")
+
+    llm = StubStructuredLlm(
+        [
+            _symbolstreeservice_extracted_payload(
+                scenario_name="getSymbolsTreeInfo1",
+                report_file="symbolstreeservice-1.json",
+            ),
+            {"mismatches": []},
+            _symbolstreeservice_extracted_payload(
+                scenario_name="getSymbolsTreeInfo7",
+                report_file="symbolstreeservice-2.json",
+            ),
+            {"mismatches": []},
+            _symbolstreeservice_passthrough_payload(report_file="symbolstreeservice-3.json"),
+            {"mismatches": []},
+        ]
+    )
+    parser = StubK6ParsedReportParser(_parsed_report(service="symbolstreeservice"))
+    service = K6ServiceExtractionService(llm=llm, parser=parser)
+
+    result = service.extract(
+        service="symbolstreeservice",
+        report_paths=[report_path_1, report_path_2, report_path_3],
+    )
+
+    assert len(result.runs) == 2
+    assert [run.extracted["scenario"]["name"] for run in result.runs] == ["getSymbolsTree", "getSymbolsTreeInfo"]
+    passthrough_run = result.runs[0]
+    assert passthrough_run.source_report_files == ["symbolstreeservice-3.json"]
+    assert "report_file" not in passthrough_run.extracted
+    assert passthrough_run.extracted["scenario"]["name"] == "getSymbolsTree"
+
+    grouped_run = result.runs[1]
+    assert grouped_run.source_report_files == ["symbolstreeservice-1.json", "symbolstreeservice-2.json"]
+    assert "report_file" not in grouped_run.extracted
+    assert grouped_run.extracted["scenario"]["name"] == "getSymbolsTreeInfo"
+    assert grouped_run.extracted["group_size"] == 2
+    assert grouped_run.extracted["source_scenarios"] == ["getSymbolsTreeInfo1", "getSymbolsTreeInfo7"]
+    assert grouped_run.extracted["scenario"]["rate"] == 20
+    assert grouped_run.extracted["scenario"]["preAllocatedVUs"] == 10
+    assert grouped_run.extracted["scenario"]["maxVUs"] == 20
+    assert grouped_run.extracted["test_run_duration_ms"] == 60000
+    assert grouped_run.extracted["iterations"] == {"count": 200, "rate": 20.0}
+    assert grouped_run.extracted["http_reqs"] == {"count": 200, "rate": 20.0}
+    assert grouped_run.extracted["data_received"] == {"count": 2000, "rate": 200.0}
+    assert grouped_run.extracted["data_sent"] == {"count": 1000, "rate": 100.0}
+    assert grouped_run.extracted["dropped_iterations"] == {"count": 0, "rate": 0.0}
+    assert grouped_run.extracted["checks"] == {"rate": 0.0, "passes": 200, "fails": 0}
+    assert grouped_run.extracted["http_req_failed"] == {"rate": 0.0, "passes": 200, "fails": 0}
+    assert grouped_run.extracted["http_req_duration"] == {
+        "min": 100.0,
+        "avg": 200.0,
+        "med": 150.0,
+        "max": 900.0,
+        "p(95)": 400.0,
+        "p(99)": 700.0,
+    }
+    assert grouped_run.extracted["thresholds"] == {"http_req_duration{test_name:getSymbolsTreeInfo}": ["p(95)<1000"]}
+
+
+def test_extract_uses_max_duration_when_grouped_runs_differ(tmp_path: Path) -> None:
+    """Grouped duration uses max when source run durations differ."""
+    report_path_1 = tmp_path / "symbolstreeservice-1.json"
+    report_path_2 = tmp_path / "symbolstreeservice-2.json"
+    report_path_1.write_text(json.dumps(_source_payload()), encoding="utf-8")
+    report_path_2.write_text(json.dumps(_source_payload()), encoding="utf-8")
+
+    first_payload = _symbolstreeservice_extracted_payload(
+        scenario_name="getSymbolsTreeInfo1",
+        report_file="symbolstreeservice-1.json",
+    )
+    second_payload = _symbolstreeservice_extracted_payload(
+        scenario_name="getSymbolsTreeInfo7",
+        report_file="symbolstreeservice-2.json",
+    )
+    second_payload["test_run_duration_ms"] = 62000
+
+    llm = StubStructuredLlm(
+        [
+            first_payload,
+            {"mismatches": []},
+            second_payload,
+            {"mismatches": []},
+        ]
+    )
+    parser = StubK6ParsedReportParser(_parsed_report(service="symbolstreeservice"))
+    service = K6ServiceExtractionService(llm=llm, parser=parser)
+
+    result = service.extract(
+        service="symbolstreeservice",
+        report_paths=[report_path_1, report_path_2],
+    )
+
+    assert len(result.runs) == 1
+    assert result.runs[0].extracted["test_run_duration_ms"] == 62000
 
 
 def test_parse_mismatches_preserves_numeric_values() -> None:

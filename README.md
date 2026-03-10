@@ -38,7 +38,11 @@ Notes:
 - If a service definition exists, extraction is service-scoped and schema-driven.
 - If a service definition does not exist, CLI returns generic parsed scenario output.
 - Verification is strict-fail: any numeric mismatch fails the run.
-- Output is printed as one consolidated envelope with `mode` and `extracted_runs`.
+- Output is printed as one consolidated envelope with `mode` and `runs`.
+- `runs` always contains the final consumer-facing result after the pipeline finishes.
+- For services without custom post-processing, `runs` contains the extracted scenarios as-is.
+- For services with custom post-processing, `runs` contains the post-processed result in the same interface.
+- `symbolstreeservice` currently uses this step to merge numbered `getSymbolsTreeInfo{number}` scenarios into grouped final runs.
 
 ### Optional structured LLM debug JSON dumps
 

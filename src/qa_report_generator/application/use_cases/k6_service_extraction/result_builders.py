@@ -12,9 +12,9 @@ if TYPE_CHECKING:
 
 def build_generic_result(*, parsed_report: K6ParsedReport) -> K6ServiceExtractionResult:
     """Build generic parsed output when no service definition exists."""
-    extracted_runs = [
+    runs = [
         K6ServiceExtractionRun(
-            report_file=scenario.source_report_file,
+            source_report_files=[scenario.source_report_file],
             extracted={
                 "service": parsed_report.service,
                 "scenario": {
@@ -36,5 +36,5 @@ def build_generic_result(*, parsed_report: K6ParsedReport) -> K6ServiceExtractio
     return K6ServiceExtractionResult(
         service=parsed_report.service,
         mode="generic",
-        extracted_runs=extracted_runs,
+        runs=runs,
     )

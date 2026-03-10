@@ -31,7 +31,12 @@ class SpyExtractionUseCase:
         return K6ServiceExtractionResult(
             service=service,
             mode="service_specific",
-            extracted_runs=[K6ServiceExtractionRun(report_file=path.name, extracted={"service": service}) for path in report_paths],
+            runs=[
+                K6ServiceExtractionRun(
+                    source_report_files=[path.name for path in report_paths],
+                    extracted={"service": service, "scenario": {"name": "grouped-scenario"}},
+                )
+            ],
         )
 
 
@@ -146,7 +151,9 @@ def test_generate_command_prints_success_message_heading_and_json_payload(
     assert "Service: megatron" in captured.out
     assert '"mode": "service_specific"' in captured.out
     assert '"service": "megatron"' in captured.out
-    assert '"report_file": "report.json"' in captured.out
+    assert '"runs"' in captured.out
+    assert '"source_report_files": [' in captured.out
+    assert '"name": "grouped-scenario"' in captured.out
 
 
 def test_generate_command_raises_typer_exit_on_empty_service(tmp_path: Path) -> None:
