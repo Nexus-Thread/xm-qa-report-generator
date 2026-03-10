@@ -37,6 +37,7 @@ Notes:
 - Reports are parsed first into a normalized scenario model.
 - If a service definition exists, extraction is service-scoped and schema-driven.
 - If a service definition does not exist, CLI returns generic parsed scenario output.
+- `LLM_API_KEY` must be provided in the environment.
 - Verification is strict-fail: any numeric mismatch fails the run.
 - Output is printed as one consolidated envelope with `mode` and `runs`.
 - `runs` always contains the final consumer-facing result after the pipeline finishes.
@@ -49,6 +50,7 @@ Notes:
 You can persist low-level structured LLM payloads (request, response content, parsed JSON) into files:
 
 ```bash
+LLM_API_KEY=your-api-key \
 LLM_DEBUG_JSON_ENABLED=true \
 LLM_DEBUG_JSON_DIR=out/debug/llm \
 qa-report-generator-k6 generate \
@@ -57,6 +59,7 @@ qa-report-generator-k6 generate \
 ```
 
 Environment variables:
+- `LLM_API_KEY` (required)
 - `LLM_DEBUG_JSON_ENABLED` (default: `false`)
 - `LLM_DEBUG_JSON_DIR` (default: `out/debug/llm`)
 

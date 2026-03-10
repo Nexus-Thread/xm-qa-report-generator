@@ -1,7 +1,7 @@
 """Composition root for the k6-only CLI."""
 
 from qa_report_generator.adapters.input.cli_adapter import K6CliAdapter
-from qa_report_generator.adapters.input.env import EnvSettingsAdapter
+from qa_report_generator.adapters.input.env_settings_adapter import EnvSettingsAdapter
 from qa_report_generator.adapters.output.narrative.openai import OpenAIClientSettings, build_client
 from qa_report_generator.adapters.output.narrative.structured_llm import OpenAIStructuredLlmAdapter
 from qa_report_generator.adapters.output.parsers import K6ParsedReportParser

@@ -6,51 +6,42 @@ from pathlib import Path
 
 import pytest
 
-from qa_report_generator.adapters.input.env import EnvSettingsAdapter
+from qa_report_generator.adapters.input.env_settings_adapter import EnvSettingsAdapter
+from qa_report_generator.application.dtos import AppSettings
 from qa_report_generator.domain.exceptions import ConfigurationError
 
+ENV_SETTING_NAMES = (
+    "LLM_MODEL",
+    "LLM_BASE_URL",
+    "LLM_API_KEY",
+    "LLM_TIMEOUT",
+    "LLM_MAX_RETRIES",
+    "LLM_RETRY_BACKOFF_FACTOR",
+    "LLM_DEBUG_JSON_ENABLED",
+    "LLM_DEBUG_JSON_DIR",
+    "MODEL_DEBUG_JSON_ENABLED",
+    "MODEL_DEBUG_JSON_DIR",
+    "LOG_LEVEL",
+    "LOG_FORMAT",
+)
 
-def test_env_settings_adapter_loads_defaults_when_environment_is_empty(
-    monkeypatch: pytest.MonkeyPatch,
-    tmp_path: Path,
-) -> None:
+
+@pytest.fixture(autouse=True)
+def isolate_env_settings(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """Reset environment-backed settings for each test."""
+    monkeypatch.chdir(tmp_path)
+    for setting_name in ENV_SETTING_NAMES:
+        monkeypatch.delenv(setting_name, raising=False)
+
+
+def test_env_settings_adapter_loads_defaults_when_environment_is_empty() -> None:
     """Adapter uses default values when environment overrides are absent."""
-    monkeypatch.chdir(tmp_path)
-    monkeypatch.delenv("LLM_MODEL", raising=False)
-    monkeypatch.delenv("LLM_BASE_URL", raising=False)
-    monkeypatch.delenv("LLM_API_KEY", raising=False)
-    monkeypatch.delenv("LLM_TIMEOUT", raising=False)
-    monkeypatch.delenv("LLM_MAX_RETRIES", raising=False)
-    monkeypatch.delenv("LLM_RETRY_BACKOFF_FACTOR", raising=False)
-    monkeypatch.delenv("LLM_DEBUG_JSON_ENABLED", raising=False)
-    monkeypatch.delenv("LLM_DEBUG_JSON_DIR", raising=False)
-    monkeypatch.delenv("MODEL_DEBUG_JSON_ENABLED", raising=False)
-    monkeypatch.delenv("MODEL_DEBUG_JSON_DIR", raising=False)
-    monkeypatch.delenv("LOG_LEVEL", raising=False)
-    monkeypatch.delenv("LOG_FORMAT", raising=False)
-
-    settings = EnvSettingsAdapter().load()
-
-    assert settings.log_level == "INFO"
-    assert settings.log_format == "simple"
-    assert settings.llm_model == "gpt-5.2"
-    assert settings.llm_base_url == "https://api.openai.com/v1"
-    assert settings.llm_api_key == "not-needed"
-    assert settings.llm_timeout == 100.0
-    assert settings.llm_max_retries == 3
-    assert settings.llm_retry_backoff_factor == 2.0
-    assert settings.llm_debug_json_enabled is False
-    assert settings.llm_debug_json_dir == Path("out/debug/llm")
-    assert settings.model_debug_json_enabled is True
-    assert settings.model_debug_json_dir == Path("out/debug/models")
+    with pytest.raises(ConfigurationError, match=r"LLM_API_KEY: Field required"):
+        EnvSettingsAdapter().load()
 
 
-def test_env_settings_adapter_loads_minimal_required_settings(
-    monkeypatch: pytest.MonkeyPatch,
-    tmp_path: Path,
-) -> None:
-    """Adapter loads minimal required settings into AppSettings."""
-    monkeypatch.chdir(tmp_path)
+def test_env_settings_adapter_loads_environment_overrides_into_app_settings(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Adapter loads normalized environment overrides into AppSettings."""
     monkeypatch.setenv("LLM_MODEL", "gpt-test")
     monkeypatch.setenv("LLM_BASE_URL", "https://example.test/v1")
     monkeypatch.setenv("LLM_API_KEY", "secret")
@@ -59,64 +50,64 @@ def test_env_settings_adapter_loads_minimal_required_settings(
     monkeypatch.setenv("LLM_RETRY_BACKOFF_FACTOR", "1.5")
     monkeypatch.setenv("LLM_DEBUG_JSON_ENABLED", "true")
     monkeypatch.setenv("LLM_DEBUG_JSON_DIR", "out/debug/custom")
-    monkeypatch.delenv("MODEL_DEBUG_JSON_ENABLED", raising=False)
-    monkeypatch.delenv("MODEL_DEBUG_JSON_DIR", raising=False)
+    monkeypatch.setenv("MODEL_DEBUG_JSON_ENABLED", "false")
+    monkeypatch.setenv("MODEL_DEBUG_JSON_DIR", "out/debug/models-custom")
     monkeypatch.setenv("LOG_LEVEL", "debug")
     monkeypatch.setenv("LOG_FORMAT", "JSON")
 
     settings = EnvSettingsAdapter().load()
 
-    assert settings.log_level == "DEBUG"
-    assert settings.log_format == "json"
-    assert settings.llm_model == "gpt-test"
-    assert settings.llm_base_url == "https://example.test/v1"
-    assert settings.llm_api_key == "secret"
-    assert settings.llm_timeout == 30.0
-    assert settings.llm_max_retries == 2
-    assert settings.llm_retry_backoff_factor == 1.5
-    assert settings.llm_debug_json_enabled is True
-    assert settings.llm_debug_json_dir == Path("out/debug/custom")
-    assert settings.model_debug_json_enabled is True
-    assert settings.model_debug_json_dir == Path("out/debug/models")
+    assert settings == AppSettings(
+        llm_api_key="secret",
+        log_level="DEBUG",
+        log_format="json",
+        llm_model="gpt-test",
+        llm_base_url="https://example.test/v1",
+        llm_timeout=30.0,
+        llm_max_retries=2,
+        llm_retry_backoff_factor=1.5,
+        llm_debug_json_enabled=True,
+        llm_debug_json_dir=Path("out/debug/custom"),
+        model_debug_json_enabled=False,
+        model_debug_json_dir=Path("out/debug/models-custom"),
+    )
 
 
-def test_env_settings_adapter_raises_configuration_error_for_invalid_log_level(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Invalid LOG_LEVEL raises ConfigurationError."""
-    monkeypatch.setenv("LOG_LEVEL", "invalid")
+def test_env_settings_adapter_preserves_dto_defaults_for_unset_values(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Adapter passes only explicit env overrides to AppSettings."""
+    monkeypatch.setenv("LLM_MODEL", "gpt-override")
+    monkeypatch.setenv("LLM_API_KEY", "secret")
 
-    with pytest.raises(ConfigurationError):
+    settings = EnvSettingsAdapter().load()
+
+    assert settings == AppSettings(llm_api_key="secret", llm_model="gpt-override")
+
+
+def test_env_settings_adapter_requires_llm_api_key_when_not_provided(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Adapter raises ConfigurationError when LLM_API_KEY is missing."""
+    monkeypatch.setenv("LLM_MODEL", "gpt-override")
+
+    with pytest.raises(ConfigurationError, match=r"LLM_API_KEY: Field required"):
         EnvSettingsAdapter().load()
 
 
-def test_env_settings_adapter_raises_configuration_error_for_invalid_log_format(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Invalid LOG_FORMAT raises ConfigurationError."""
-    monkeypatch.setenv("LOG_FORMAT", "yaml")
-
-    with pytest.raises(ConfigurationError):
-        EnvSettingsAdapter().load()
-
-
-def test_env_settings_adapter_raises_configuration_error_for_non_positive_timeout(
+@pytest.mark.parametrize(
+    ("setting_name", "value"),
+    [
+        ("LOG_LEVEL", "invalid"),
+        ("LOG_FORMAT", "yaml"),
+        ("LLM_TIMEOUT", "0"),
+        ("LLM_MAX_RETRIES", "11"),
+        ("LLM_RETRY_BACKOFF_FACTOR", "0.9"),
+    ],
+)
+def test_env_settings_adapter_raises_configuration_error_for_invalid_values(
     monkeypatch: pytest.MonkeyPatch,
+    setting_name: str,
+    value: str,
 ) -> None:
-    """Non-positive LLM_TIMEOUT raises ConfigurationError."""
-    monkeypatch.setenv("LLM_TIMEOUT", "0")
-
-    with pytest.raises(ConfigurationError):
-        EnvSettingsAdapter().load()
-
-
-def test_env_settings_adapter_raises_configuration_error_for_retry_limit(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Out-of-range LLM_MAX_RETRIES raises ConfigurationError."""
-    monkeypatch.setenv("LLM_MAX_RETRIES", "11")
-
-    with pytest.raises(ConfigurationError):
-        EnvSettingsAdapter().load()
-
-
-def test_env_settings_adapter_raises_configuration_error_for_backoff_limit(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Out-of-range LLM_RETRY_BACKOFF_FACTOR raises ConfigurationError."""
-    monkeypatch.setenv("LLM_RETRY_BACKOFF_FACTOR", "0.9")
+    """Invalid environment values raise ConfigurationError."""
+    monkeypatch.setenv(setting_name, value)
 
     with pytest.raises(ConfigurationError):
         EnvSettingsAdapter().load()
@@ -128,6 +119,7 @@ def test_env_settings_adapter_trims_string_values(monkeypatch: pytest.MonkeyPatc
     monkeypatch.setenv("LLM_BASE_URL", "  https://example.test/v1  ")
     monkeypatch.setenv("LLM_API_KEY", "  token  ")
     monkeypatch.setenv("LLM_DEBUG_JSON_DIR", "  out/debug/trimmed  ")
+    monkeypatch.setenv("MODEL_DEBUG_JSON_DIR", "  out/debug/models-trimmed  ")
     monkeypatch.setenv("LOG_LEVEL", "  info  ")
     monkeypatch.setenv("LOG_FORMAT", "  JSON  ")
 
@@ -137,15 +129,20 @@ def test_env_settings_adapter_trims_string_values(monkeypatch: pytest.MonkeyPatc
     assert settings.llm_base_url == "https://example.test/v1"
     assert settings.llm_api_key == "token"
     assert settings.llm_debug_json_dir == Path("out/debug/trimmed")
+    assert settings.model_debug_json_dir == Path("out/debug/models-trimmed")
     assert settings.log_level == "INFO"
     assert settings.log_format == "json"
 
 
-def test_env_settings_adapter_raises_configuration_error_for_blank_debug_dir(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Blank LLM_DEBUG_JSON_DIR raises ConfigurationError."""
-    monkeypatch.setenv("LLM_DEBUG_JSON_DIR", "   ")
+@pytest.mark.parametrize("setting_name", ["LLM_DEBUG_JSON_DIR", "MODEL_DEBUG_JSON_DIR"])
+def test_env_settings_adapter_raises_configuration_error_for_blank_debug_dir(
+    monkeypatch: pytest.MonkeyPatch,
+    setting_name: str,
+) -> None:
+    """Blank debug output directories raise ConfigurationError."""
+    monkeypatch.setenv(setting_name, "   ")
 
-    with pytest.raises(ConfigurationError):
+    with pytest.raises(ConfigurationError, match=rf"{setting_name}: Value error, {setting_name} must not be blank"):
         EnvSettingsAdapter().load()
 
 
@@ -156,4 +153,14 @@ def test_env_settings_adapter_raises_configuration_error_for_blank_llm_model(
     monkeypatch.setenv("LLM_MODEL", "   ")
 
     with pytest.raises(ConfigurationError, match=r"LLM_MODEL: Value error, Value must not be blank"):
+        EnvSettingsAdapter().load()
+
+
+def test_env_settings_adapter_raises_configuration_error_for_blank_llm_api_key(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Blank LLM_API_KEY raises ConfigurationError with field detail."""
+    monkeypatch.setenv("LLM_API_KEY", "   ")
+
+    with pytest.raises(ConfigurationError, match=r"LLM_API_KEY: Value error, Value must not be blank"):
         EnvSettingsAdapter().load()
