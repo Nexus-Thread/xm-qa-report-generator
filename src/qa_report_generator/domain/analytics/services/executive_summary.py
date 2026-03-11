@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 from qa_report_generator.domain.analytics.models import (
     K6OverallExecutiveSummary,
@@ -12,7 +15,7 @@ from qa_report_generator.domain.analytics.models import (
 )
 
 
-def build_scenario_executive_summary(*, run_payload: dict[str, Any], source_report_files: list[str]) -> K6ScenarioExecutiveSummary:
+def build_scenario_executive_summary(*, run_payload: dict[str, Any], source_report_files: Sequence[str]) -> K6ScenarioExecutiveSummary:
     """Build an executive summary row from one final run payload."""
     scenario = _as_dict(run_payload.get("scenario"))
     threshold_results = _build_threshold_summaries(run_payload=run_payload)

@@ -27,7 +27,7 @@ def build_generic_result(*, parsed_report: K6ParsedReport) -> K6ServiceExtractio
     """Build generic parsed output when no service definition exists."""
     runs = [
         K6ServiceExtractionRun(
-            source_report_files=[scenario.source_report_file],
+            source_report_files=(scenario.source_report_file,),
             extracted={
                 "service": parsed_report.service,
                 "scenario": _build_generic_scenario_payload(scenario=scenario),

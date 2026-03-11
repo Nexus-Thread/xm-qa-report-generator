@@ -43,7 +43,7 @@ def build_result(*, service: str, report_paths: list[Path]) -> K6ServiceExtracti
         mode="service_specific",
         runs=[
             K6ServiceExtractionRun(
-                source_report_files=[path.name for path in report_paths],
+                source_report_files=tuple(path.name for path in report_paths),
                 extracted={
                     "service": service,
                     "scenario": {"name": "grouped-scenario"},

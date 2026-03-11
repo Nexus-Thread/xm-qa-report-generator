@@ -73,7 +73,7 @@ class K6ServiceExtractionService(ExtractK6ServiceMetricsUseCase):
             result = build_generic_result(parsed_report=parsed_report)
             self._write_model_snapshot(label="extraction_runs", payload=result.runs)
             self._write_model_snapshot(label="post_processed_runs", payload=result.runs)
-            self._write_model_snapshot(label="summary_output", payload=_to_summary_payload(result))
+            self._write_model_snapshot(label="summary_output", payload=result.to_summary_payload())
             return result
 
         return self._extract_service_specific(parsed_report=parsed_report, definition=definition)
@@ -110,13 +110,11 @@ class K6ServiceExtractionService(ExtractK6ServiceMetricsUseCase):
             for scenario in parsed_report.scenarios
         ]
         extracted_runs = [
-            K6ServiceExtractionRun(
-                source_report_files=[run_model.source_report_file],
-                extracted=_with_threshold_results(
-                    payload=_to_final_run_payload(run_model.extracted.model_dump(by_alias=True)),
-                    threshold_results=build_threshold_summaries_from_source_payload(
-                        source_payload=run_model.source_payload,
-                    ),
+            K6ServiceExtractionRun.from_extracted_payload(
+                source_report_files=(run_model.source_report_file,),
+                extracted=run_model.extracted.model_dump(by_alias=True),
+                threshold_results=build_threshold_summaries_from_source_payload(
+                    source_payload=run_model.source_payload,
                 ),
             )
             for run_model in extracted_run_models
@@ -143,7 +141,7 @@ class K6ServiceExtractionService(ExtractK6ServiceMetricsUseCase):
             overall_summary=build_overall_executive_summary(scenario_summaries=scenario_summaries),
             scenario_summaries=scenario_summaries,
         )
-        self._write_model_snapshot(label="summary_output", payload=_to_summary_payload(result))
+        self._write_model_snapshot(label="summary_output", payload=result.to_summary_payload())
         return result
 
     def _write_model_snapshot(self, *, label: str, payload: object) -> None:
@@ -270,71 +268,6 @@ class _ExtractedRunModel:
     source_report_file: str
     source_payload: dict[str, Any]
     extracted: Any
-
-
-def _to_final_run_payload(payload: dict[str, Any]) -> dict[str, Any]:
-    """Remove internal extraction-only fields from final run payloads."""
-    final_payload = dict(payload)
-    final_payload.pop("report_file", None)
-    return final_payload
-
-
-def _with_threshold_results(
-    *,
-    payload: dict[str, Any],
-    threshold_results: list[Any],
-) -> dict[str, Any]:
-    """Attach threshold results to a final run payload."""
-    final_payload = dict(payload)
-    final_payload["threshold_results"] = [
-        {
-            "metric_key": threshold.metric_key,
-            "expression": threshold.expression,
-            "status": threshold.status,
-        }
-        for threshold in threshold_results
-    ]
-    return final_payload
-
-
-def _to_summary_payload(result: K6ServiceExtractionResult) -> dict[str, object]:
-    """Build the summary-stage payload from the extraction result."""
-    return {
-        "service": result.service,
-        "mode": result.mode,
-        "overall_summary": {
-            "status": result.overall_summary.status,
-            "total_scenarios": result.overall_summary.total_scenarios,
-            "passed_scenarios": result.overall_summary.passed_scenarios,
-            "failed_scenarios": result.overall_summary.failed_scenarios,
-            "unknown_scenarios": result.overall_summary.unknown_scenarios,
-            "scenarios_requiring_attention": result.overall_summary.scenarios_requiring_attention,
-            "executive_summary": result.overall_summary.executive_summary,
-        },
-        "scenario_summaries": [
-            {
-                "scenario_name": summary.scenario_name,
-                "env_name": summary.env_name,
-                "source_report_files": summary.source_report_files,
-                "status": summary.status,
-                "executor": summary.executor,
-                "rate": summary.rate,
-                "duration": summary.duration,
-                "pre_allocated_vus": summary.pre_allocated_vus,
-                "max_vus": summary.max_vus,
-                "threshold_results": [
-                    {
-                        "metric_key": threshold.metric_key,
-                        "expression": threshold.expression,
-                        "status": threshold.status,
-                    }
-                    for threshold in summary.threshold_results
-                ],
-                "executive_note": summary.executive_note,
-            }
-            for summary in result.scenario_summaries
-        ],
-    }
 
 
 def _apply_schema_authorized_metric_overrides(

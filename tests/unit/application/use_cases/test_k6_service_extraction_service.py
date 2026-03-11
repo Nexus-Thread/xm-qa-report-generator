@@ -1145,12 +1145,12 @@ def test_extract_builds_symbolstreeservice_post_processed_group(tmp_path: Path) 
     assert len(result.runs) == 2
     assert [run.extracted["scenario"]["name"] for run in result.runs] == ["getSymbolsTree", "getSymbolsTreeInfo"]
     passthrough_run = result.runs[0]
-    assert passthrough_run.source_report_files == ["symbolstreeservice-3.json"]
+    assert passthrough_run.source_report_files == ("symbolstreeservice-3.json",)
     assert "report_file" not in passthrough_run.extracted
     assert passthrough_run.extracted["scenario"]["name"] == "getSymbolsTree"
 
     grouped_run = result.runs[1]
-    assert grouped_run.source_report_files == ["symbolstreeservice-1.json", "symbolstreeservice-2.json"]
+    assert grouped_run.source_report_files == ("symbolstreeservice-1.json", "symbolstreeservice-2.json")
     assert "report_file" not in grouped_run.extracted
     assert grouped_run.extracted["scenario"]["name"] == "getSymbolsTreeInfo"
     assert grouped_run.extracted["group_size"] == 2

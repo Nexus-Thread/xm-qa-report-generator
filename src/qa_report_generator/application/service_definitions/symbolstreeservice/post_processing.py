@@ -46,9 +46,9 @@ def build_post_processed_runs(
         match = _GROUPED_SCENARIO_PATTERN.match(extracted_run.scenario.name)
         if match is None:
             passthrough_runs.append(
-                K6ServiceExtractionRun(
-                    source_report_files=[extracted_run.report_file],
-                    extracted=_to_final_run_payload(extracted_run.model_dump(by_alias=True)),
+                K6ServiceExtractionRun.from_extracted_payload(
+                    source_report_files=(extracted_run.report_file,),
+                    extracted=extracted_run.model_dump(by_alias=True),
                 )
             )
             continue
@@ -108,9 +108,9 @@ def _build_grouped_run(
     grouped_payload["source_report_files"] = source_report_files
     grouped_payload.pop("report_file", None)
 
-    return K6ServiceExtractionRun(
+    return K6ServiceExtractionRun.from_extracted_payload(
         source_report_files=source_report_files,
-        extracted=_to_final_run_payload(grouped_payload),
+        extracted=grouped_payload,
     )
 
 
@@ -260,10 +260,3 @@ def _weighted_average(*, values: list[float], weights: list[int], fallback_divis
     if fallback_divisor <= 0:
         return 0.0
     return weighted_sum / fallback_divisor
-
-
-def _to_final_run_payload(payload: dict[str, object]) -> dict[str, object]:
-    """Remove internal extraction-only fields from final run payloads."""
-    final_payload = dict(payload)
-    final_payload.pop("report_file", None)
-    return final_payload

@@ -7,6 +7,7 @@ from .k6_extraction import (
     K6ServiceExtractionResult,
     K6ServiceExtractionRun,
     VerificationMismatch,
+    normalize_k6_extracted_payload,
 )
 
 __all__ = [
@@ -16,4 +17,5 @@ __all__ = [
     "K6ServiceExtractionResult",
     "K6ServiceExtractionRun",
     "VerificationMismatch",
+    "normalize_k6_extracted_payload",
 ]
