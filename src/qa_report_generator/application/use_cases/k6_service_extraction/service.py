@@ -10,6 +10,10 @@ from qa_report_generator.application.dtos import (
     K6ServiceExtractionRun,
     VerificationMismatch,
 )
+from qa_report_generator.application.exceptions import (
+    ConfigurationError,
+    ExtractionVerificationError,
+)
 from qa_report_generator.application.ports.input import ExtractK6ServiceMetricsUseCase
 from qa_report_generator.application.service_definitions import get_optional_service_definition
 from qa_report_generator.domain.analytics import (
@@ -18,11 +22,7 @@ from qa_report_generator.domain.analytics import (
     build_threshold_summaries_from_source_payload,
     pick_metric,
 )
-from qa_report_generator.domain.exceptions import (
-    ConfigurationError,
-    ExtractionVerificationError,
-    MissingK6MetricError,
-)
+from qa_report_generator.domain.exceptions import MissingK6MetricError
 
 from .config import K6ServiceExtractionDebugConfig
 from .json_utils import to_canonical_json

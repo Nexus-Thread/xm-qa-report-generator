@@ -22,7 +22,11 @@ class K6ParsedReport:
     """Parsed k6 report grouped as scenario records for one service."""
 
     service: str
-    scenarios: list[K6Scenario]
+    scenarios: tuple[K6Scenario, ...]
+
+    def __post_init__(self) -> None:
+        """Normalize mutable collections into immutable tuples."""
+        object.__setattr__(self, "scenarios", tuple(self.scenarios))
 
 
 @dataclass(frozen=True)
@@ -40,15 +44,20 @@ class K6ScenarioExecutiveSummary:
 
     scenario_name: str
     env_name: str | None
-    source_report_files: list[str]
+    source_report_files: tuple[str, ...]
     status: K6Status
     executor: str | None
     rate: float | None
     duration: str | None
     pre_allocated_vus: int | None
     max_vus: int | None
-    threshold_results: list[K6ThresholdSummary]
+    threshold_results: tuple[K6ThresholdSummary, ...]
     executive_note: str
+
+    def __post_init__(self) -> None:
+        """Normalize mutable collections into immutable tuples."""
+        object.__setattr__(self, "source_report_files", tuple(self.source_report_files))
+        object.__setattr__(self, "threshold_results", tuple(self.threshold_results))
 
 
 @dataclass(frozen=True)
@@ -60,5 +69,9 @@ class K6OverallExecutiveSummary:
     passed_scenarios: int
     failed_scenarios: int
     unknown_scenarios: int
-    scenarios_requiring_attention: list[str]
+    scenarios_requiring_attention: tuple[str, ...]
     executive_summary: str
+
+    def __post_init__(self) -> None:
+        """Normalize mutable collections into immutable tuples."""
+        object.__setattr__(self, "scenarios_requiring_attention", tuple(self.scenarios_requiring_attention))

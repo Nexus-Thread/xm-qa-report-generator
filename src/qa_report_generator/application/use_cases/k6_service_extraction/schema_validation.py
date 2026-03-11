@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel, ValidationError
 
-from qa_report_generator.domain.exceptions import ExtractionVerificationError
+from qa_report_generator.application.exceptions import ExtractionVerificationError
 
 
 def validate_with_schema(schema_type: type[BaseModel], payload: dict[str, object]) -> BaseModel:

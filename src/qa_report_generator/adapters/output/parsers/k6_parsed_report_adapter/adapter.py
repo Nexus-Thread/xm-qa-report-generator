@@ -7,9 +7,9 @@ from typing import TYPE_CHECKING
 
 from pydantic import ValidationError
 
+from qa_report_generator.application.exceptions import ConfigurationError
 from qa_report_generator.application.ports.output import K6ParsedReportParserPort
 from qa_report_generator.domain.analytics import K6ParsedReport, K6Scenario
-from qa_report_generator.domain.exceptions import ConfigurationError
 
 from .mapper import build_scenarios
 from .schema import K6RawSummary
@@ -44,7 +44,7 @@ class K6ParsedReportParser(K6ParsedReportParserPort):
                 )
             )
 
-        return K6ParsedReport(service=service, scenarios=scenarios)
+        return K6ParsedReport(service=service, scenarios=tuple(scenarios))
 
     def _parse_report_file(
         self,

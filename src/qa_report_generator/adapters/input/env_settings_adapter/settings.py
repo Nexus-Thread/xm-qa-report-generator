@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING
 from pydantic import Field, ValidationError, ValidationInfo, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from qa_report_generator.domain.exceptions import ConfigurationError
+from qa_report_generator.application.exceptions import ConfigurationError
 
 if TYPE_CHECKING:
     from collections.abc import Callable

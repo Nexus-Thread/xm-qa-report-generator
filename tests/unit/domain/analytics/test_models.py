@@ -74,7 +74,7 @@ def test_k6_models_are_immutable_domain_records() -> None:
             },
         },
     )
-    parsed_report = K6ParsedReport(service="megatron", scenarios=[scenario])
+    parsed_report = K6ParsedReport(service="megatron", scenarios=(scenario,))
     mutable_report = cast("Any", parsed_report)
 
     with pytest.raises(FrozenInstanceError):

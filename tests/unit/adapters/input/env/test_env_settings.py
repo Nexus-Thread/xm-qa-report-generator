@@ -8,7 +8,7 @@ import pytest
 
 from qa_report_generator.adapters.input.env_settings_adapter import EnvSettingsAdapter
 from qa_report_generator.application.dtos import AppSettings
-from qa_report_generator.domain.exceptions import ConfigurationError
+from qa_report_generator.application.exceptions import ConfigurationError
 
 ENV_SETTING_NAMES = (
     "LLM_MODEL",

@@ -11,7 +11,7 @@ from typing import Any, cast
 import pytest
 
 from qa_report_generator.adapters.output.narrative.structured_llm_adapter import OpenAIStructuredLlmAdapter
-from qa_report_generator.domain.exceptions import ExtractionVerificationError
+from qa_report_generator.application.exceptions import ExtractionVerificationError
 
 LOGGER_NAME = "qa_report_generator.adapters.output.narrative.structured_llm_adapter.adapter"
 

@@ -8,13 +8,13 @@ from typing import TYPE_CHECKING, Any
 
 import pytest
 
+from qa_report_generator.application.exceptions import ExtractionVerificationError
 from qa_report_generator.application.use_cases.k6_service_extraction import (
     K6ServiceExtractionDebugConfig,
     K6ServiceExtractionService,
 )
 from qa_report_generator.application.use_cases.k6_service_extraction.verification import parse_mismatches
 from qa_report_generator.domain.analytics import K6ParsedReport, K6Scenario
-from qa_report_generator.domain.exceptions import ExtractionVerificationError
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -75,7 +75,7 @@ class StubK6ParsedReportParser:
             )
             for report_file in report_files
         ]
-        return K6ParsedReport(service=service, scenarios=scenarios)
+        return K6ParsedReport(service=service, scenarios=tuple(scenarios))
 
 
 def _source_payload() -> dict[str, Any]:
@@ -270,13 +270,13 @@ def _parsed_report_with_source_payload(
 
     return K6ParsedReport(
         service=service,
-        scenarios=[
+        scenarios=(
             K6Scenario(
                 source_report_file=source_report_file,
                 name=scenario_name,
                 source_payload=filtered_source_payload,
-            )
-        ],
+            ),
+        ),
     )
 
 
@@ -695,13 +695,13 @@ def test_verification_prompt_describes_optional_missing_metric_as_null(tmp_path:
     parser = StubK6ParsedReportParser(
         K6ParsedReport(
             service="vps",
-            scenarios=[
+            scenarios=(
                 K6Scenario(
                     source_report_file="report.json",
                     name="getVpsEligible",
                     source_payload=source_payload,
-                )
-            ],
+                ),
+            ),
         )
     )
     service = K6ServiceExtractionService(llm=llm, parser=parser)

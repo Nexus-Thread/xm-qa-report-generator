@@ -64,7 +64,7 @@ def test_build_scenario_executive_summary_uses_prebuilt_threshold_results() -> N
 
     assert result.scenario_name == "megatron-load"
     assert result.status == "fail"
-    assert result.source_report_files == ["report.json"]
+    assert result.source_report_files == ("report.json",)
     assert len(result.threshold_results) == 2
     assert "checks:rate>0.99" in result.executive_note
 
@@ -94,4 +94,4 @@ def test_build_overall_executive_summary_rolls_up_attention_scenarios() -> None:
     assert result.total_scenarios == 2
     assert result.passed_scenarios == 1
     assert result.failed_scenarios == 1
-    assert result.scenarios_requiring_attention == ["scenario-b"]
+    assert result.scenarios_requiring_attention == ("scenario-b",)

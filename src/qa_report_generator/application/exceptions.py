@@ -2,9 +2,19 @@
 
 from __future__ import annotations
 
+from qa_report_generator.domain.exceptions import ReportingError
 
-class ApplicationError(Exception):
+
+class ApplicationError(ReportingError):
     """Base error for application-layer failures."""
+
+
+class ConfigurationError(ApplicationError):
+    """Raised when application configuration or report input is invalid."""
+
+
+class ExtractionVerificationError(ApplicationError):
+    """Raised when extraction or verification payloads are invalid."""
 
 
 class ServiceDefinitionRegistryError(ApplicationError):

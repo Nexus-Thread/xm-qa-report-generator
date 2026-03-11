@@ -111,13 +111,13 @@ def _load_parser_class() -> type[ParsedReportParser] | None:
 
 def _load_debug_writer(*, dump_dir: Path) -> DebugJsonWriter | None:
     try:
-        from qa_report_generator.adapters.output.persistence import JsonFileDebugWriterAdapter
+        from qa_report_generator.adapters.output.persistence import JsonFileWriterAdapter
     except ImportError as err:
         _write_error(f"ERROR: unable to import JSON debug writer adapter: {err}")
         _write_error("Hint: run from repository root or set PYTHONPATH=src")
         return None
 
-    return JsonFileDebugWriterAdapter(base_dir=dump_dir)
+    return JsonFileWriterAdapter(base_dir=dump_dir)
 
 
 def main() -> int:
@@ -240,7 +240,7 @@ def _parse_services(
 
 
 def _parse_one_file(*, parser: ParsedReportParser, service: str, report_file: Path) -> ParseResultWithDumpEntry:
-    from qa_report_generator.domain.exceptions import ConfigurationError
+    from qa_report_generator.application.exceptions import ConfigurationError
 
     try:
         source = _load_json(report_file)
@@ -349,6 +349,8 @@ def _load_json(path: Path) -> dict[str, object] | None:
 
 
 def _compare_parsed_to_source(*, source: dict[str, object], parsed: K6ParsedReport, report_file: Path) -> tuple[list[str], int, int]:
+    from qa_report_generator.domain.analytics.source_payload import extract_env_name, pick_test_run_duration_ms
+
     checks: list[tuple[str, bool]] = []
 
     raw_exec = _as_dict(source.get("execScenarios"))
@@ -377,27 +379,31 @@ def _compare_parsed_to_source(*, source: dict[str, object], parsed: K6ParsedRepo
         if scenario is None:
             continue
 
-        tags = _as_dict(raw_config.get("tags"))
-        raw_env = tags.get("env_name")
-        raw_env_name = raw_env if isinstance(raw_env, str) and raw_env else None
+        parsed_scenarios = _as_dict(scenario.source_payload.get("execScenarios"))
+        parsed_config = _as_dict(parsed_scenarios.get(scenario_name))
 
         checks.extend(
             [
                 (f"{scenario_name}: source_report_file", scenario.source_report_file == report_file.name),
-                (f"{scenario_name}: env_name", scenario.env_name == raw_env_name),
-                (f"{scenario_name}: executor", scenario.executor == raw_config.get("executor")),
-                (f"{scenario_name}: rate", scenario.rate == _as_float(raw_config.get("rate"))),
-                (f"{scenario_name}: duration", scenario.duration == raw_config.get("duration")),
-                (f"{scenario_name}: preAllocatedVUs", scenario.pre_allocated_vus == _as_int(raw_config.get("preAllocatedVUs"))),
-                (f"{scenario_name}: maxVUs", scenario.max_vus == _as_int(raw_config.get("maxVUs"))),
-                (f"{scenario_name}: testRunDurationMs", scenario.test_run_duration_ms == raw_duration),
+                (
+                    f"{scenario_name}: scenario payload preserves config",
+                    _normalize_json_like(parsed_config) == _normalize_json_like(raw_config),
+                ),
+                (
+                    f"{scenario_name}: env_name derivation",
+                    extract_env_name(scenario_config=parsed_config) == extract_env_name(scenario_config=raw_config),
+                ),
+                (
+                    f"{scenario_name}: testRunDurationMs derivation",
+                    pick_test_run_duration_ms(source_payload=scenario.source_payload) == raw_duration,
+                ),
                 (
                     f"{scenario_name}: thresholds deep equality",
-                    _normalize_json_like(scenario.thresholds) == _normalize_json_like(raw_thresholds),
+                    _normalize_json_like(_as_dict(scenario.source_payload.get("execThresholds"))) == _normalize_json_like(raw_thresholds),
                 ),
                 (
                     f"{scenario_name}: metrics deep equality",
-                    _normalize_json_like(scenario.metrics) == _normalize_json_like(raw_metrics),
+                    _normalize_json_like(_as_dict(scenario.source_payload.get("metrics"))) == _normalize_json_like(raw_metrics),
                 ),
             ]
         )
@@ -418,16 +424,6 @@ def _as_float(value: object) -> float:
     if isinstance(value, (int, float)):
         return float(value)
     return 0.0
-
-
-def _as_int(value: object) -> int:
-    if isinstance(value, bool):
-        return 0
-    if isinstance(value, int):
-        return value
-    if isinstance(value, float) and value.is_integer():
-        return int(value)
-    return 0
 
 
 def _normalize_json_like(value: object) -> object:

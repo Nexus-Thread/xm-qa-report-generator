@@ -6,7 +6,7 @@ import json
 from typing import Any
 
 from qa_report_generator.adapters.output.narrative.openai_adapter import OpenAIResponseError, extract_message_content
-from qa_report_generator.domain.exceptions import ExtractionVerificationError
+from qa_report_generator.application.exceptions import ExtractionVerificationError
 
 
 def extract_structured_content(response: object) -> str:

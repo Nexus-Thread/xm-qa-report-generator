@@ -17,14 +17,6 @@ class ReportingError(Exception):
         return self.message
 
 
-class ConfigurationError(ReportingError):
-    """Raised when application configuration is invalid."""
-
-
-class ExtractionVerificationError(ReportingError):
-    """Raised when LLM verification detects numeric mismatches."""
-
-
 class InvalidK6MetricPayloadError(ReportingError):
     """Raised when a k6 metric payload has an invalid shape."""
 

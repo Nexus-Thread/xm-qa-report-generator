@@ -5,8 +5,8 @@ from __future__ import annotations
 from copy import deepcopy
 from typing import TYPE_CHECKING, Any
 
+from qa_report_generator.application.exceptions import ConfigurationError
 from qa_report_generator.domain.analytics import K6Scenario
-from qa_report_generator.domain.exceptions import ConfigurationError
 
 if TYPE_CHECKING:
     from .schema import K6RawSummary

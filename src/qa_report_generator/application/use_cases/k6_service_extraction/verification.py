@@ -6,7 +6,7 @@ import re
 from typing import Any
 
 from qa_report_generator.application.dtos import JsonScalar, VerificationMismatch
-from qa_report_generator.domain.exceptions import ExtractionVerificationError
+from qa_report_generator.application.exceptions import ExtractionVerificationError
 
 SUCCESS_REASON_MARKERS = (
     "value matches",

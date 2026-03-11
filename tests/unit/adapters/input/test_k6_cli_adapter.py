@@ -63,27 +63,27 @@ def build_result(*, service: str, report_paths: list[Path]) -> K6ServiceExtracti
             passed_scenarios=1,
             failed_scenarios=0,
             unknown_scenarios=0,
-            scenarios_requiring_attention=[],
+            scenarios_requiring_attention=(),
             executive_summary="All 1 scenarios passed their evaluated thresholds.",
         ),
         scenario_summaries=[
             K6ScenarioExecutiveSummary(
                 scenario_name="grouped-scenario",
                 env_name=None,
-                source_report_files=[path.name for path in report_paths],
+                source_report_files=tuple(path.name for path in report_paths),
                 status="pass",
                 executor=None,
                 rate=None,
                 duration=None,
                 pre_allocated_vus=None,
                 max_vus=None,
-                threshold_results=[
+                threshold_results=(
                     K6ThresholdSummary(
                         metric_key="checks",
                         expression="rate>0.99",
                         status="pass",
-                    )
-                ],
+                    ),
+                ),
                 executive_note="Scenario grouped-scenario met all evaluated thresholds.",
             )
         ],

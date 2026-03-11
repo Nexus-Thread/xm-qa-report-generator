@@ -8,7 +8,9 @@ from .dtos import (
 )
 from .exceptions import (
     ApplicationError,
+    ConfigurationError,
     DuplicateServiceDefinitionError,
+    ExtractionVerificationError,
     InvalidServiceDefinitionError,
     ServiceDefinitionRegistryError,
     UnknownServiceDefinitionError,
@@ -17,7 +19,9 @@ from .exceptions import (
 __all__ = [
     "AppSettings",
     "ApplicationError",
+    "ConfigurationError",
     "DuplicateServiceDefinitionError",
+    "ExtractionVerificationError",
     "InvalidServiceDefinitionError",
     "K6ServiceExtractionResult",
     "K6ServiceExtractionRun",
