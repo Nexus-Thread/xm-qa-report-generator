@@ -19,15 +19,15 @@ from qa_report_generator.application.service_definitions import get_optional_ser
 from qa_report_generator.domain.analytics import (
     build_overall_executive_summary,
     build_scenario_executive_summary,
-    build_threshold_summaries_from_source_payload,
-    pick_metric,
 )
 from qa_report_generator.domain.exceptions import MissingK6MetricError
 
 from .config import K6ServiceExtractionDebugConfig
 from .json_utils import to_canonical_json
+from .metric_selection import pick_metric
 from .result_builders import build_generic_result
 from .schema_validation import validate_with_schema
+from .thresholds import build_threshold_summaries_from_source_payload
 from .verification import parse_mismatches
 
 if TYPE_CHECKING:

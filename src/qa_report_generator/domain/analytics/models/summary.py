@@ -1,32 +1,11 @@
-"""Analytics models for comparing report runs."""
+"""Domain summary models for k6 reporting outcomes."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Literal, TypeAlias
+from typing import Literal, TypeAlias
 
 K6Status: TypeAlias = Literal["pass", "fail", "unknown"]
-
-
-@dataclass(frozen=True)
-class K6Scenario:
-    """Parsed k6 scenario with provenance and raw source payload."""
-
-    source_report_file: str
-    name: str
-    source_payload: dict[str, Any]
-
-
-@dataclass(frozen=True)
-class K6ParsedReport:
-    """Parsed k6 report grouped as scenario records for one service."""
-
-    service: str
-    scenarios: tuple[K6Scenario, ...]
-
-    def __post_init__(self) -> None:
-        """Normalize mutable collections into immutable tuples."""
-        object.__setattr__(self, "scenarios", tuple(self.scenarios))
 
 
 @dataclass(frozen=True)

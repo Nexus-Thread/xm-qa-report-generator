@@ -1,4 +1,4 @@
-"""Helpers for reading scenario-oriented k6 metric payloads."""
+"""Application helpers for selecting scenario-specific metrics from raw k6 payloads."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ from qa_report_generator.domain.exceptions import (
 
 
 def pick_primary_scenario_name(source: dict[str, Any]) -> str:
-    """Pick the single scenario key from execScenarios."""
+    """Pick the single scenario key from ``execScenarios``."""
     scenarios = source.get("execScenarios", {})
     if not isinstance(scenarios, dict) or not scenarios:
         msg = "Missing execScenarios object"
@@ -21,7 +21,7 @@ def pick_primary_scenario_name(source: dict[str, Any]) -> str:
 
 
 def scenario_metric_key(metric_prefix: str, scenario_name: str) -> str:
-    """Build scenario-tagged metric key."""
+    """Build a scenario-tagged metric key."""
     return f"{metric_prefix}{{test_name:{scenario_name}}}"
 
 

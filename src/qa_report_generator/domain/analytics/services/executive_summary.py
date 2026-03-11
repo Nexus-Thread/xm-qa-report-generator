@@ -1,14 +1,14 @@
-"""Executive summary builders for final k6 runs."""
+"""Domain services for scenario and overall executive summaries."""
 
 from __future__ import annotations
 
 from typing import Any, cast
 
-from .models import K6OverallExecutiveSummary, K6ScenarioExecutiveSummary, K6Status, K6ThresholdSummary
-from .source_payload import (
-    collect_threshold_statuses,
-    normalize_threshold_definitions,
-    normalize_threshold_definitions_from_source_payload,
+from qa_report_generator.domain.analytics.models import (
+    K6OverallExecutiveSummary,
+    K6ScenarioExecutiveSummary,
+    K6Status,
+    K6ThresholdSummary,
 )
 
 
@@ -85,8 +85,8 @@ def _build_threshold_summaries(*, run_payload: dict[str, Any]) -> list[K6Thresho
     if isinstance(prebuilt_threshold_results, list):
         return _prebuilt_threshold_summaries(prebuilt_threshold_results)
 
-    threshold_definitions = normalize_threshold_definitions(run_payload.get("thresholds"))
-    threshold_statuses = collect_threshold_statuses(metric_payloads=run_payload)
+    threshold_definitions = _normalize_threshold_definitions(run_payload.get("thresholds"))
+    threshold_statuses = _collect_threshold_statuses(metric_payloads=run_payload)
 
     summaries: list[K6ThresholdSummary] = []
     for metric_key, expressions in sorted(threshold_definitions.items()):
@@ -101,23 +101,34 @@ def _build_threshold_summaries(*, run_payload: dict[str, Any]) -> list[K6Thresho
     return summaries
 
 
-def build_threshold_summaries_from_source_payload(*, source_payload: dict[str, Any]) -> list[K6ThresholdSummary]:
-    """Build threshold summaries directly from raw source payload."""
-    threshold_definitions = normalize_threshold_definitions_from_source_payload(source_payload=source_payload)
-    threshold_statuses = collect_threshold_statuses(metric_payloads=_as_dict(source_payload.get("metrics")))
+def _normalize_threshold_definitions(value: Any) -> dict[str, tuple[str, ...]]:
+    """Normalize threshold definitions into a string-tuple mapping."""
+    if not isinstance(value, dict):
+        return {}
 
-    summaries: list[K6ThresholdSummary] = []
-    for metric_key, expressions in sorted(threshold_definitions.items()):
-        summaries.extend(
-            K6ThresholdSummary(
-                metric_key=metric_key,
-                expression=expression,
-                status=threshold_statuses.get((metric_key, expression), "unknown"),
-            )
-            for expression in expressions
-        )
+    normalized: dict[str, tuple[str, ...]] = {}
+    for metric_key, expressions in value.items():
+        if not isinstance(metric_key, str) or not isinstance(expressions, list):
+            continue
+        normalized[metric_key] = tuple(expression for expression in expressions if isinstance(expression, str))
+    return normalized
 
-    return summaries
+
+def _collect_threshold_statuses(*, metric_payloads: dict[str, Any]) -> dict[tuple[str, str], K6Status]:
+    """Collect threshold statuses from metric payloads when present."""
+    statuses: dict[tuple[str, str], K6Status] = {}
+    for metric_key, metric_payload in metric_payloads.items():
+        if not isinstance(metric_payload, dict):
+            continue
+        thresholds = metric_payload.get("thresholds")
+        if not isinstance(thresholds, dict):
+            continue
+        for expression, evaluation in thresholds.items():
+            if not isinstance(expression, str):
+                continue
+            if isinstance(evaluation, dict) and isinstance(evaluation.get("ok"), bool):
+                statuses[(metric_key, expression)] = "pass" if evaluation["ok"] else "fail"
+    return statuses
 
 
 def _prebuilt_threshold_summaries(value: list[Any]) -> list[K6ThresholdSummary]:

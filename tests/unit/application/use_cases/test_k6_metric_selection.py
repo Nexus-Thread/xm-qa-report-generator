@@ -1,4 +1,4 @@
-"""Unit tests for k6 domain metric helpers."""
+"""Unit tests for raw k6 metric selection helpers."""
 
 from __future__ import annotations
 
@@ -6,8 +6,16 @@ from typing import Any
 
 import pytest
 
-from qa_report_generator.domain.analytics import pick_metric, pick_primary_scenario_name, scenario_metric_key
-from qa_report_generator.domain.exceptions import InvalidK6MetricPayloadError, MissingK6MetricError, MissingK6ScenarioError
+from qa_report_generator.application.use_cases.k6_service_extraction.metric_selection import (
+    pick_metric,
+    pick_primary_scenario_name,
+    scenario_metric_key,
+)
+from qa_report_generator.domain.exceptions import (
+    InvalidK6MetricPayloadError,
+    MissingK6MetricError,
+    MissingK6ScenarioError,
+)
 
 
 def test_pick_primary_scenario_name_returns_only_scenario_key() -> None:

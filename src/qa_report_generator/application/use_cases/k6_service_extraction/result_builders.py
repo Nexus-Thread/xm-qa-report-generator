@@ -8,15 +8,16 @@ from qa_report_generator.application.dtos import K6ServiceExtractionResult, K6Se
 from qa_report_generator.domain.analytics import (
     build_overall_executive_summary,
     build_scenario_executive_summary,
-    build_threshold_summaries_from_source_payload,
 )
-from qa_report_generator.domain.analytics.source_payload import (
+
+from .source_payload import (
     extract_env_name,
     normalize_metric_payloads_copy,
     normalize_threshold_definitions_from_source_payload,
     pick_scenario_config,
     pick_test_run_duration_ms,
 )
+from .thresholds import build_threshold_summaries_from_source_payload
 
 if TYPE_CHECKING:
     from qa_report_generator.domain.analytics import K6ParsedReport, K6Scenario

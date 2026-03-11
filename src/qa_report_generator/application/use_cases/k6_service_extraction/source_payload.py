@@ -1,4 +1,4 @@
-"""Helpers for reading raw k6 source payload structures."""
+"""Application helpers for interpreting raw k6 source payload structures."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any
 from qa_report_generator.domain.exceptions import MissingK6ScenarioError
 
 if TYPE_CHECKING:
-    from .models import K6Status
+    from qa_report_generator.domain.analytics import K6Status
 
 
 def pick_scenario_config(*, source_payload: dict[str, Any], scenario_name: str) -> dict[str, Any]:
