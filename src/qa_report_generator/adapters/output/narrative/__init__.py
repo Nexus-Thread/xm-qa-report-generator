@@ -1,5 +1,5 @@
 """Narrative output adapter exports."""
 
-from .structured_llm import OpenAIStructuredLlmAdapter
+from .structured_llm_adapter import OpenAIStructuredLlmAdapter
 
 __all__ = ["OpenAIStructuredLlmAdapter"]

@@ -3,7 +3,7 @@
 from qa_report_generator.adapters.input.cli_adapter import K6CliAdapter
 from qa_report_generator.adapters.input.env_settings_adapter import EnvSettingsAdapter
 from qa_report_generator.adapters.output.narrative.openai_adapter import OpenAIClientSettings, build_client
-from qa_report_generator.adapters.output.narrative.structured_llm import OpenAIStructuredLlmAdapter
+from qa_report_generator.adapters.output.narrative.structured_llm_adapter import OpenAIStructuredLlmAdapter
 from qa_report_generator.adapters.output.parsers import K6ParsedReportParser
 from qa_report_generator.adapters.output.persistence import JsonFileWriterAdapter
 from qa_report_generator.application.use_cases import (

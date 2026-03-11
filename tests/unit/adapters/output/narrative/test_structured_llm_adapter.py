@@ -10,8 +10,10 @@ from typing import Any, cast
 
 import pytest
 
-from qa_report_generator.adapters.output.narrative.structured_llm import OpenAIStructuredLlmAdapter
+from qa_report_generator.adapters.output.narrative.structured_llm_adapter import OpenAIStructuredLlmAdapter
 from qa_report_generator.domain.exceptions import ExtractionVerificationError
+
+LOGGER_NAME = "qa_report_generator.adapters.output.narrative.structured_llm_adapter.adapter"
 
 
 @dataclass(frozen=True)
@@ -126,11 +128,10 @@ def test_complete_json_raises_when_message_content_missing() -> None:
 
 def test_complete_json_logs_request_response_and_payload(caplog: pytest.LogCaptureFixture) -> None:
     """Structured adapter emits debug logs for request and response lifecycle."""
-    logger_name = "qa_report_generator.adapters.output.narrative.structured_llm.adapter"
     client = _StubClient([_Response(choices=[_Choice(message=_Message(content='{"ok": true}'))])])
     adapter = OpenAIStructuredLlmAdapter(client=client, model="gpt-test")
 
-    with caplog.at_level(logging.DEBUG, logger=logger_name):
+    with caplog.at_level(logging.DEBUG, logger=LOGGER_NAME):
         payload = adapter.complete_json(system_prompt="system", user_prompt="user")
 
     assert payload == {"ok": True}
@@ -151,13 +152,12 @@ def test_complete_json_logs_request_response_and_payload(caplog: pytest.LogCaptu
 
 def test_complete_json_truncates_large_request_and_response_logs(caplog: pytest.LogCaptureFixture) -> None:
     """Structured adapter truncates oversized payloads in debug logs."""
-    logger_name = "qa_report_generator.adapters.output.narrative.structured_llm.adapter"
     long_text = "x" * 2_100_000
     content = json.dumps({"summary": long_text})
     client = _StubClient([_Response(choices=[_Choice(message=_Message(content=content))])])
     adapter = OpenAIStructuredLlmAdapter(client=client, model="gpt-test")
 
-    with caplog.at_level(logging.DEBUG, logger=logger_name):
+    with caplog.at_level(logging.DEBUG, logger=LOGGER_NAME):
         adapter.complete_json(system_prompt="system", user_prompt=long_text)
 
     request_record = next(record for record in caplog.records if record.getMessage().startswith("Structured LLM request payload"))
@@ -215,7 +215,6 @@ def test_complete_json_skips_debug_files_when_disabled() -> None:
 
 def test_complete_json_continues_when_debug_write_fails(caplog: pytest.LogCaptureFixture) -> None:
     """Structured adapter continues when optional debug payload persistence fails."""
-    logger_name = "qa_report_generator.adapters.output.narrative.structured_llm.adapter"
     debug_writer = _FailingDebugJsonWriter(OSError("disk full"))
     client = _StubClient([_Response(choices=[_Choice(message=_Message(content='{"ok": true}'))])])
     adapter = OpenAIStructuredLlmAdapter(
@@ -225,7 +224,7 @@ def test_complete_json_continues_when_debug_write_fails(caplog: pytest.LogCaptur
         debug_json_enabled=True,
     )
 
-    with caplog.at_level(logging.WARNING, logger=logger_name):
+    with caplog.at_level(logging.WARNING, logger=LOGGER_NAME):
         payload = adapter.complete_json(system_prompt="system", user_prompt="user")
 
     assert payload == {"ok": True}
