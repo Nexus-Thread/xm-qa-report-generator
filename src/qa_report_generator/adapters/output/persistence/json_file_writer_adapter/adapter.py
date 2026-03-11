@@ -31,10 +31,8 @@ class JsonFileWriterAdapter:
         """Write one labeled JSON payload and return file path."""
         safe_label = self._sanitize_label(label)
         file_path = self._build_file_path(safe_label=safe_label)
-        file_path.parent.mkdir(parents=True, exist_ok=True)
-
-        serialized_payload = self._serialize_payload(payload)
-        file_path.write_text(f"{serialized_payload}\n", encoding="utf-8")
+        normalized_payload = _normalize_json_value(payload)
+        self._write_payload(file_path=file_path, payload=normalized_payload)
         LOGGER.debug(
             "Wrote JSON payload to file: %s",
             file_path,
@@ -57,48 +55,38 @@ class JsonFileWriterAdapter:
         return self._base_dir / f"{timestamp}_{safe_label}.json"
 
     @staticmethod
-    def _serialize_payload(payload: Any) -> str:
-        """Serialize payload into formatted JSON text."""
-        normalized_payload = _normalize_json_value(payload)
-        return json.dumps(normalized_payload, ensure_ascii=False, indent=2, sort_keys=True)
+    def _write_payload(*, file_path: Path, payload: JsonValue) -> None:
+        """Write one normalized JSON payload to disk."""
+        file_path.parent.mkdir(parents=True, exist_ok=True)
+        with file_path.open("w", encoding="utf-8") as file_handle:
+            json.dump(payload, file_handle, ensure_ascii=False, indent=2, sort_keys=True)
+            file_handle.write("\n")
 
 
-def _normalize_json_value(value: Any) -> JsonValue:
+def _normalize_json_value(value: object) -> JsonValue:
     """Normalize common model objects into JSON-serializable values."""
     if value is None or isinstance(value, str | int | float | bool):
-        return value
+        normalized_value: JsonValue = value
+    elif is_dataclass(value) and not isinstance(value, type):
+        normalized_value = _normalize_json_value(asdict(value))
+    else:
+        model_dump = getattr(value, "model_dump", None)
+        if callable(model_dump):
+            normalized_value = _normalize_json_value(model_dump(by_alias=True))
+        elif isinstance(value, Mapping):
+            normalized_value = {str(key): _normalize_json_value(item) for key, item in value.items()}
+        elif isinstance(value, list | tuple):
+            normalized_value = [_normalize_json_value(item) for item in value]
+        elif isinstance(value, set | frozenset):
+            normalized_items = [_normalize_json_value(item) for item in value]
+            normalized_value = sorted(normalized_items, key=_json_sort_key)
+        elif isinstance(value, PathLike):
+            normalized_value = fspath(value)
+        else:
+            msg = f"Unsupported JSON payload type: {type(value).__name__}"
+            raise TypeError(msg)
 
-    normalized_model = _normalize_model_like(value)
-    if normalized_model is not value:
-        return _normalize_json_value(normalized_model)
-
-    if isinstance(value, Mapping):
-        return {str(key): _normalize_json_value(item) for key, item in value.items()}
-
-    if isinstance(value, list | tuple):
-        return [_normalize_json_value(item) for item in value]
-
-    if isinstance(value, set | frozenset):
-        normalized_items = [_normalize_json_value(item) for item in value]
-        return sorted(normalized_items, key=_json_sort_key)
-
-    if isinstance(value, PathLike):
-        return fspath(value)
-
-    msg = f"Unsupported JSON payload type: {type(value).__name__}"
-    raise TypeError(msg)
-
-
-def _normalize_model_like(value: Any) -> Any:
-    """Convert model-like inputs into basic Python containers."""
-    if is_dataclass(value) and not isinstance(value, type):
-        return asdict(value)
-
-    model_dump = getattr(value, "model_dump", None)
-    if callable(model_dump):
-        return model_dump(by_alias=True)
-
-    return value
+    return normalized_value
 
 
 def _json_sort_key(value: JsonValue) -> str:
