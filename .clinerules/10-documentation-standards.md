@@ -1,33 +1,47 @@
-# Documentation standards: clear, concise, no fluff
+# Documentation standards: clear, concise, useful
 
 Use these rules to keep documentation helpful without being verbose.
 
 This file governs documentation written inside source code. Requirements for README updates, ADRs, and changelog notes live in `04-docs-and-adr.md`.
 
+## Documentation principles
+- Prefer concise explanations of contracts, invariants, side effects, and intent.
+- Docstrings should add information that names and type hints do not already make obvious.
+- Use Google-style docstrings.
+- Public APIs and non-obvious behavior deserve better documentation than trivial private helpers.
+- Document units, timezones, encodings, mutability/ownership expectations, or security/trust-boundary assumptions when callers need them to use the API correctly.
+
 ## Module docstrings
-- **One line** stating the module's purpose
-- No bullet lists, feature descriptions, or implementation notes
-- Examples belong in README or docstrings of specific functions
+- Use a short summary for public modules or modules with non-obvious responsibilities.
+- Add a short paragraph only when callers need context, invariants, or usage constraints.
+- Keep module docstrings free of change logs, feature lists, and ADR-style rationale.
 
 ## Class docstrings
-- **One line** stating what the class does
-- Add a second sentence only if it clarifies a non-obvious distinction
-- No feature lists or implementation details
+- Describe the class responsibility and key invariants/lifecycle expectations when they are not obvious.
+- Keep implementation details out unless consumers must know them.
+- Small private data holders may omit docstrings when names and types are already sufficient.
 
-## Method/function docstrings
-- **Brief description**: One sentence; omit period for single sentences
-- **Args**: `name: Brief description` (no "The" prefix, no full sentences)
-- **Returns**: Brief description of what's returned
-- **Raises**: Only document exceptions that callers should handle
+## Function and method docstrings
+- Document public callables and any private callable with non-obvious behavior, side effects, concurrency rules, or tricky contracts.
+- Start with a short summary sentence.
+- Document **Args**, **Returns**, **Raises**, **Yields**, or **Examples** only when they add real value for callers.
+- Call out side effects, blocking/async behavior, cancellation semantics, idempotency, and important invariants when relevant.
+- Document deprecation, backward-compatibility, retry, or partial-failure behavior when it affects callers.
+- Avoid duplicating type hints in prose unless clarification is needed.
+
+## Examples in documentation
+- Keep examples minimal, executable when practical, and synchronized with real behavior.
+- Prefer tested examples or snippets copied from working code over illustrative pseudo-code that can silently drift stale.
 
 ## Inline comments
-- Use sparingly for non-obvious logic only
-- Prefer self-documenting code (clear names, simple logic)
-- Never state the obvious
+- Use sparingly for non-obvious logic only.
+- Explain **why**, not **what**.
+- Prefer self-documenting code (clear names, simple logic) over explanatory noise.
+- Tag temporary workarounds with an issue/reference when possible.
 
 ## What NOT to document in code
 - ❌ Feature lists → belongs in README
 - ❌ Architecture patterns → belongs in ADRs
 - ❌ Performance claims → belongs in benchmarks/docs
 - ❌ Marketing language ("rich", "powerful", "advanced")
-- ❌ Redundant restatements of parameter names
+- ❌ Redundant restatements of type hints or parameter names

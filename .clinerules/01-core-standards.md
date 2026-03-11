@@ -1,6 +1,6 @@
 # Universal coding standards: naming, formatting, error handling, logging
 
-Use these rules for all Python code in this repo to keep behavior predictable and reviews lightweight.
+Use these rules for all Python code in the project to keep behavior predictable and reviews lightweight.
 
 ## Naming
 - **Modules/files**: `snake_case.py` (e.g., `prompt_loader.py`).
@@ -11,9 +11,26 @@ Use these rules for all Python code in this repo to keep behavior predictable an
 - **Tests**: `test_<behavior>()` focused on the behavior under test.
 
 ## Formatting
-- Use `ruff format .`; **do not** hand-format or fight the formatter.
-- Let `ruff check . --fix` handle import ordering.
+- Use `uv run ruff format .`; **do not** hand-format or fight the formatter.
+- Use `uv run ruff check . --fix` for import ordering and other safe auto-fixes.
 - Prefer explicit, readable code over clever one-liners.
+
+## Typing and API contracts
+- Public functions, public methods, ports, DTOs, and application/domain boundary types **must** have explicit type annotations, including return types.
+- Prefer domain/application types in core APIs; keep transport schemas, ORM models, and framework request/response types inside adapters.
+- Avoid `Any`; use it only at narrowly contained boundaries to untyped third-party code, and document the reason when it persists beyond a thin shim.
+- Prefer standard-library typing constructs supported by the project's minimum Python version (for example `Protocol`, `TypedDict`, `Literal`, `Self`, `TypeAlias`, and `collections.abc` generics).
+- Use `typing_extensions` only when the project's minimum Python version does not yet provide the required construct.
+
+## Python-specific defaults
+- Prefer modern type annotation syntax supported by the project's minimum Python version.
+- Use `None` only for a legitimate, documented absence value — never as a hidden error signal.
+- Prefer timezone-aware `datetime` values for persisted or cross-process timestamps.
+- Prefer explicit UTC sources such as `datetime.now(timezone.utc)` when recording interoperable timestamps.
+- Prefer `pathlib.Path` for filesystem paths unless a library API requires `str`.
+- Use context managers for files, connections, locks, and similar resources.
+- Prefer `Enum`/`StrEnum` or `Literal` over magic strings for closed sets of values.
+- Never use mutable default argument values; default to `None` and create the container inside the function.
 
 ## Boundary behavior (adapter input validation)
 - Validate and normalize external inputs at **adapter boundaries** before calling application ports.
@@ -28,6 +45,7 @@ Use these rules for all Python code in this repo to keep behavior predictable an
 - Preserve context with `raise CustomError(...) from err`.
 - Validate inputs at module boundaries (e.g., adapters) and fail fast with clear errors.
 - Avoid returning `None` for error states; raise unless the API explicitly allows it.
+- In async code, do not swallow cancellation-related exceptions during cleanup; re-raise them after releasing resources.
 - Translate exceptions at the **adapter boundary** into the caller's domain (CLI/HTTP response) without leaking internal types.
 
 ## Logging

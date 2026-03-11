@@ -8,8 +8,11 @@ import re
 from collections.abc import Mapping
 from dataclasses import asdict, is_dataclass
 from datetime import UTC, datetime
-from pathlib import Path
-from typing import Any, TypeAlias
+from os import PathLike, fspath
+from typing import TYPE_CHECKING, Any, TypeAlias
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 LOGGER = logging.getLogger(__name__)
 _LABEL_PATTERN = re.compile(r"[^a-zA-Z0-9_-]+")
@@ -56,52 +59,46 @@ class JsonFileWriterAdapter:
     @staticmethod
     def _serialize_payload(payload: Any) -> str:
         """Serialize payload into formatted JSON text."""
-        normalized_payload = _to_json_compatible(payload)
+        normalized_payload = _normalize_json_value(payload)
         return json.dumps(normalized_payload, ensure_ascii=False, indent=2, sort_keys=True)
 
 
-def _to_json_compatible(value: Any) -> JsonValue:
+def _normalize_json_value(value: Any) -> JsonValue:
     """Normalize common model objects into JSON-serializable values."""
     if value is None or isinstance(value, str | int | float | bool):
         return value
 
-    if is_dataclass(value) and not isinstance(value, type):
-        value = asdict(value)
-    else:
-        model_dump = getattr(value, "model_dump", None)
-        if callable(model_dump):
-            value = model_dump(by_alias=True)
+    normalized_model = _normalize_model_like(value)
+    if normalized_model is not value:
+        return _normalize_json_value(normalized_model)
 
     if isinstance(value, Mapping):
-        return _normalize_mapping(value)
+        return {str(key): _normalize_json_value(item) for key, item in value.items()}
 
     if isinstance(value, list | tuple):
-        return _normalize_sequence(value)
+        return [_normalize_json_value(item) for item in value]
 
     if isinstance(value, set | frozenset):
-        return _normalize_unordered_collection(value)
+        normalized_items = [_normalize_json_value(item) for item in value]
+        return sorted(normalized_items, key=_json_sort_key)
 
-    if isinstance(value, Path):
-        return str(value)
+    if isinstance(value, PathLike):
+        return fspath(value)
 
     msg = f"Unsupported JSON payload type: {type(value).__name__}"
     raise TypeError(msg)
 
 
-def _normalize_mapping(value: Mapping[Any, Any]) -> dict[str, JsonValue]:
-    """Normalize a mapping into JSON-compatible key/value pairs."""
-    return {str(key): _to_json_compatible(item) for key, item in value.items()}
+def _normalize_model_like(value: Any) -> Any:
+    """Convert model-like inputs into basic Python containers."""
+    if is_dataclass(value) and not isinstance(value, type):
+        return asdict(value)
 
+    model_dump = getattr(value, "model_dump", None)
+    if callable(model_dump):
+        return model_dump(by_alias=True)
 
-def _normalize_sequence(value: list[Any] | tuple[Any, ...]) -> list[JsonValue]:
-    """Normalize an ordered collection into JSON-compatible items."""
-    return [_to_json_compatible(item) for item in value]
-
-
-def _normalize_unordered_collection(value: set[Any] | frozenset[Any]) -> list[JsonValue]:
-    """Normalize an unordered collection into a stable JSON array."""
-    normalized_items = [_to_json_compatible(item) for item in value]
-    return sorted(normalized_items, key=_json_sort_key)
+    return value
 
 
 def _json_sort_key(value: JsonValue) -> str:

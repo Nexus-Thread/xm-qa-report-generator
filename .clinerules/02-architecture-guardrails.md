@@ -1,6 +1,6 @@
 # Hexagonal architecture doctrine (hard constraints)
 
-Use this doctrine as the default architecture standard for this repo. Any deviation must be explicitly documented.
+Use this doctrine as the default architecture standard for the codebase. Any deviation must be explicitly documented.
 
 ## Core principles (non-negotiable)
 - **Dependency direction**: All dependencies point **inward** toward the domain and application core.
@@ -31,9 +31,11 @@ Use this doctrine as the default architecture standard for this repo. Any deviat
 - Pure business rules and invariants.
 - No side effects, no I/O, no framework imports.
 - Exposes domain errors and value objects.
+- Value objects should be immutable, or treated as immutable by convention, when mutation would weaken invariants.
 
 ### Application (Use Cases)
 - Orchestrates flows, validates inputs (structural validation), invokes domain logic.
+- Keeps business invariants in the domain; application-level validation should focus on command shape, authorization, orchestration, and transaction boundaries.
 - Defines ports and DTOs that are **inward-facing** and stable.
 - Handles cross-cutting concerns like transactions or unit-of-work abstractions.
 
@@ -41,11 +43,25 @@ Use this doctrine as the default architecture standard for this repo. Any deviat
 - **Input ports**: Methods used by driving adapters (CLI/HTTP/Jobs).
 - **Output ports**: Interfaces for persistence, external services, or notifications.
 - Ports are defined in the application layer only.
+- Prefer small, explicit port contracts expressed via `Protocol` or ABCs.
+- Port signatures must use domain/application types rather than transport schemas, ORM models, or framework request/response objects.
 
 ### Adapters
 - Implement ports for external systems.
 - Translate external data structures ↔ DTOs/domain objects.
 - Handle I/O, serialization, transport, retry logic.
+
+## Composition root and framework isolation
+- **Must** keep dependency wiring, service construction, and framework bootstrapping in entry points or dedicated bootstrap/composition-root modules.
+- **Must** keep framework request/response objects, ORM models, serializer models, and transport schemas inside adapters.
+- **Must** keep environment/config lookups, secret loading, and framework settings access in adapters or bootstrap modules rather than scattering them through the core.
+- **Should** keep transport/event-loop concerns at I/O boundaries; use async in the core only when business semantics truly require asynchronous contracts.
+- **Must not** let dependency-injection containers or service locators leak into domain entities or application use cases.
+
+## Transactions and side effects
+- **Must** coordinate transactions, unit-of-work boundaries, and side-effect ordering in the application layer or adapter-owned infrastructure boundaries.
+- **Must not** hide persistence commits, network retries, or message publication inside domain entities.
+- Domain events may be modeled in the core, but publication and delivery mechanics belong behind output ports/adapters.
 
 ## Module/package structure guidance
 - `domain/`: entities, value objects, domain services, domain errors.
