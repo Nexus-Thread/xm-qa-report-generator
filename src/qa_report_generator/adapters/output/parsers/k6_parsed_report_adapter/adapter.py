@@ -58,7 +58,7 @@ class K6ParsedReportParser(K6ParsedReportParserPort):
         validated_report = _validate_report(sanitized_source)
         return build_scenarios(
             report=validated_report,
-            raw_payload=sanitized_source,
+            source_payload=sanitized_source,
             source_report_file=report_file.name,
         )
 

@@ -160,7 +160,7 @@ class K6ServiceExtractionService(ExtractK6ServiceMetricsUseCase):
         schema: dict[str, Any],
     ) -> _ExtractedRunModel:
         """Extract, validate, and verify one scenario payload."""
-        filtered_source_json = to_canonical_json(scenario.raw_payload)
+        filtered_source_json = to_canonical_json(scenario.source_payload)
         extracted_model = self._extract_payload(
             scenario=scenario,
             definition=definition,
@@ -176,7 +176,7 @@ class K6ServiceExtractionService(ExtractK6ServiceMetricsUseCase):
         )
         return _ExtractedRunModel(
             source_report_file=scenario.source_report_file,
-            source_payload=scenario.raw_payload,
+            source_payload=scenario.source_payload,
             extracted=extracted_model,
         )
 
@@ -243,7 +243,7 @@ class K6ServiceExtractionService(ExtractK6ServiceMetricsUseCase):
         )
         mismatches = parse_mismatches(
             verification_payload,
-            source_payload=scenario.raw_payload,
+            source_payload=scenario.source_payload,
             extracted_payload=extracted,
         )
         if mismatches:
@@ -348,13 +348,13 @@ def _apply_schema_authorized_metric_overrides(
         if metric_key not in normalized_payload:
             continue
         normalized_payload[metric_key] = pick_metric(
-            scenario.raw_payload,
+            scenario.source_payload,
             metric_key,
             scenario.name,
         ).get("values", normalized_payload[metric_key])
 
     normalized_payload["dropped_iterations"] = _pick_optional_metric_values(
-        source=scenario.raw_payload,
+        source=scenario.source_payload,
         metric_key="dropped_iterations",
         scenario_name=scenario.name,
         fallback=normalized_payload.get("dropped_iterations"),

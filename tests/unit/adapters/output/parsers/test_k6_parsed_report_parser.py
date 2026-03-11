@@ -61,17 +61,13 @@ def test_parse_builds_scenario_with_report_file_provenance(tmp_path: Path) -> No
     scenario = parsed_report.scenarios[0]
     assert scenario.source_report_file == "report.json"
     assert scenario.name == "orders-load"
-    assert scenario.env_name == "staging"
-    assert scenario.executor == "constant-arrival-rate"
-    assert scenario.rate == 42.0
-    assert scenario.duration == "1m"
-    assert scenario.pre_allocated_vus == 10
-    assert scenario.max_vus == 20
-    assert scenario.test_run_duration_ms == 60000.0
-    assert "checks" in scenario.metrics
-    assert "http_req_duration{test_name:orders-load}" in scenario.thresholds
-    assert "setup_data" not in scenario.raw_payload
-    assert "root_group" not in scenario.raw_payload
+    assert scenario.source_payload["execScenarios"]["orders-load"]["tags"]["env_name"] == "staging"
+    assert scenario.source_payload["execScenarios"]["orders-load"]["executor"] == "constant-arrival-rate"
+    assert scenario.source_payload["state"]["testRunDurationMs"] == 60000
+    assert "checks" in scenario.source_payload["metrics"]
+    assert "http_req_duration{test_name:orders-load}" in scenario.source_payload["execThresholds"]
+    assert "setup_data" not in scenario.source_payload
+    assert "root_group" not in scenario.source_payload
 
 
 def test_parse_keeps_top_level_keys_when_remove_keys_not_provided(tmp_path: Path) -> None:
@@ -97,8 +93,8 @@ def test_parse_keeps_top_level_keys_when_remove_keys_not_provided(tmp_path: Path
     parsed_report = parser.parse(service="megatron", report_files=[report_path])
 
     scenario = parsed_report.scenarios[0]
-    assert "setup_data" in scenario.raw_payload
-    assert "root_group" in scenario.raw_payload
+    assert "setup_data" in scenario.source_payload
+    assert "root_group" in scenario.source_payload
 
 
 def test_parse_raises_configuration_error_on_invalid_json(tmp_path: Path) -> None:
@@ -177,8 +173,8 @@ def test_parse_raises_configuration_error_on_invalid_exec_scenario_shape(tmp_pat
         parser.parse(service="megatron", report_files=[report_path])
 
 
-def test_parse_allows_missing_executor_specific_fields_with_defaults(tmp_path: Path) -> None:
-    """Parser maps absent scenario fields to deterministic defaults."""
+def test_parse_preserves_sparse_scenario_payload_without_normalizing_defaults(tmp_path: Path) -> None:
+    """Parser preserves sparse scenario payloads without adding normalized fields."""
     report_path = tmp_path / "executor-specific-shape.json"
     report_path.write_text(
         json.dumps(
@@ -198,14 +194,12 @@ def test_parse_allows_missing_executor_specific_fields_with_defaults(tmp_path: P
     parsed_report = parser.parse(service="megatron", report_files=[report_path])
     scenario = parsed_report.scenarios[0]
 
-    assert scenario.rate == 0.0
-    assert scenario.duration == ""
-    assert scenario.pre_allocated_vus == 0
-    assert scenario.max_vus == 0
+    assert scenario.name == "orders-load"
+    assert scenario.source_payload["execScenarios"]["orders-load"] == {"executor": "per-vu-iterations"}
 
 
-def test_parse_creates_independent_payload_structures_per_scenario(tmp_path: Path) -> None:
-    """Parser provides independent mutable structures for each parsed scenario."""
+def test_parse_creates_independent_source_payload_structures_per_scenario(tmp_path: Path) -> None:
+    """Parser provides independent mutable source payloads for each parsed scenario."""
     report_path = tmp_path / "two-scenarios.json"
     report_path.write_text(
         json.dumps(
@@ -237,17 +231,22 @@ def test_parse_creates_independent_payload_structures_per_scenario(tmp_path: Pat
     parsed_report = parser.parse(service="megatron", report_files=[report_path])
     first, second = parsed_report.scenarios
 
-    first.thresholds["new"] = ["p(99)<500"]
-    first.metrics["checks"]["contains"] = "first-only"
-    first.raw_payload["extra"] = {"flag": True}
+    assert first.name == "orders-load"
+    assert second.name == "positions-load"
+    assert first.source_payload["execScenarios"]["orders-load"]["rate"] == 10
+    assert second.source_payload["execScenarios"]["positions-load"]["rate"] == 20
 
-    assert "new" not in second.thresholds
-    assert second.metrics["checks"].get("contains") is None
-    assert "extra" not in second.raw_payload
+    first.source_payload["execThresholds"]["new"] = ["p(99)<500"]
+    first.source_payload["metrics"]["checks"]["contains"] = "first-only"
+    first.source_payload["extra"] = {"flag": True}
+
+    assert "new" not in second.source_payload["execThresholds"]
+    assert second.source_payload["metrics"]["checks"].get("contains") is None
+    assert "extra" not in second.source_payload
 
 
-def test_parse_drops_non_dict_metrics_payload_entries(tmp_path: Path) -> None:
-    """Parser keeps only metric entries that are object-shaped."""
+def test_parse_preserves_source_metrics_payload_in_source_payload(tmp_path: Path) -> None:
+    """Parser keeps the filtered source metrics payload on each scenario."""
     report_path = tmp_path / "mixed-metrics.json"
     report_path.write_text(
         json.dumps(
@@ -274,5 +273,5 @@ def test_parse_drops_non_dict_metrics_payload_entries(tmp_path: Path) -> None:
     parsed_report = parser.parse(service="megatron", report_files=[report_path])
 
     scenario = parsed_report.scenarios[0]
-    assert "checks" in scenario.metrics
-    assert "invalid_metric" not in scenario.metrics
+    assert "checks" in scenario.source_payload["metrics"]
+    assert scenario.source_payload["metrics"]["invalid_metric"] == 10

@@ -71,16 +71,7 @@ class StubK6ParsedReportParser:
             K6Scenario(
                 source_report_file=report_file.name,
                 name=template.name,
-                env_name=template.env_name,
-                executor=template.executor,
-                rate=template.rate,
-                duration=template.duration,
-                pre_allocated_vus=template.pre_allocated_vus,
-                max_vus=template.max_vus,
-                test_run_duration_ms=template.test_run_duration_ms,
-                thresholds=deepcopy(template.thresholds),
-                metrics=deepcopy(template.metrics),
-                raw_payload=deepcopy(template.raw_payload),
+                source_payload=deepcopy(template.source_payload),
             )
             for report_file in report_files
         ]
@@ -272,10 +263,9 @@ def _parsed_report_with_source_payload(
     source_report_file: str = "report.json",
 ) -> K6ParsedReport:
     """Build parsed report fixture from a provided source payload."""
-    scenario_payload = _source_payload()
-    scenario_payload = deepcopy(source_payload)
-    scenario_payload.pop("setup_data", None)
-    scenario_payload.pop("root_group", None)
+    filtered_source_payload = deepcopy(source_payload)
+    filtered_source_payload.pop("setup_data", None)
+    filtered_source_payload.pop("root_group", None)
     scenario_name = next(iter(source_payload["execScenarios"].keys()))
 
     return K6ParsedReport(
@@ -284,16 +274,7 @@ def _parsed_report_with_source_payload(
             K6Scenario(
                 source_report_file=source_report_file,
                 name=scenario_name,
-                env_name="staging",
-                executor="constant-arrival-rate",
-                rate=10.0,
-                duration="1m",
-                pre_allocated_vus=10,
-                max_vus=20,
-                test_run_duration_ms=60000.0,
-                thresholds={"http_req_duration": ["p(95)<1000"]},
-                metrics=scenario_payload["metrics"],
-                raw_payload=scenario_payload,
+                source_payload=filtered_source_payload,
             )
         ],
     )
@@ -718,16 +699,7 @@ def test_verification_prompt_describes_optional_missing_metric_as_null(tmp_path:
                 K6Scenario(
                     source_report_file="report.json",
                     name="getVpsEligible",
-                    env_name="staging",
-                    executor="constant-arrival-rate",
-                    rate=10.0,
-                    duration="1m",
-                    pre_allocated_vus=10,
-                    max_vus=20,
-                    test_run_duration_ms=60000.0,
-                    thresholds={"http_req_failed{test_name:getVpsEligible}": ["rate<0.01"]},
-                    metrics=source_payload["metrics"],
-                    raw_payload=source_payload,
+                    source_payload=source_payload,
                 )
             ],
         )
@@ -799,6 +771,35 @@ def test_extract_returns_generic_payload_when_service_definition_is_missing(tmp_
     assert "report_file" not in result.runs[0].extracted
     assert result.runs[0].extracted["scenario"]["name"] == "megatron-load"
     assert llm.calls == []
+
+
+def test_extract_normalizes_generic_metrics_and_thresholds_from_source_payload(tmp_path: Path) -> None:
+    """Generic extraction rebuilds normalized metrics and thresholds from source payload."""
+    report_path = tmp_path / "report.json"
+    source_payload = _source_payload()
+    source_payload["execThresholds"] = source_payload.pop("thresholds")
+    source_payload["metrics"]["invalid_metric"] = 10
+    report_path.write_text(json.dumps(source_payload), encoding="utf-8")
+
+    llm = StubStructuredLlm([])
+    parser = StubK6ParsedReportParser(
+        _parsed_report_with_source_payload(
+            source_payload=source_payload,
+            service="unknown-service",
+            source_report_file="report.json",
+        )
+    )
+    service = K6ServiceExtractionService(llm=llm, parser=parser)
+
+    result = service.extract(
+        service="unknown-service",
+        report_paths=[report_path],
+    )
+
+    extracted = result.runs[0].extracted
+    assert extracted["thresholds"] == {"http_req_duration": ["p(95)<1000"]}
+    assert "checks" in extracted["metrics"]
+    assert "invalid_metric" not in extracted["metrics"]
 
 
 def test_extract_ignores_false_positive_match_reports_from_verifier(tmp_path: Path) -> None:

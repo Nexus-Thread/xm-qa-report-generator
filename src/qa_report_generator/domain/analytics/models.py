@@ -10,20 +10,11 @@ K6Status: TypeAlias = Literal["pass", "fail", "unknown"]
 
 @dataclass(frozen=True)
 class K6Scenario:
-    """Parsed k6 scenario with normalized fields and raw payload."""
+    """Parsed k6 scenario with provenance and raw source payload."""
 
     source_report_file: str
     name: str
-    env_name: str | None
-    executor: str
-    rate: float
-    duration: str
-    pre_allocated_vus: int
-    max_vus: int
-    test_run_duration_ms: float
-    thresholds: dict[str, list[str]]
-    metrics: dict[str, dict[str, Any]]
-    raw_payload: dict[str, Any]
+    source_payload: dict[str, Any]
 
 
 @dataclass(frozen=True)

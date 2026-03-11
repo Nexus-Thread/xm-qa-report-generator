@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import FrozenInstanceError
+from dataclasses import FrozenInstanceError, fields
 from typing import Any, cast
 
 import pytest
@@ -10,29 +10,50 @@ import pytest
 from qa_report_generator.domain.analytics import K6ParsedReport, K6Scenario
 
 
-def test_k6_scenario_preserves_normalized_and_raw_fields() -> None:
-    """K6Scenario stores normalized values alongside raw payload."""
-    raw_payload = {"metrics": {"http_req_duration": {"values": {"avg": 123.4}}}}
+def test_k6_scenario_keeps_only_minimal_stored_fields() -> None:
+    """K6Scenario exposes only the minimal stored source-of-truth fields."""
+    source_payload = {
+        "testRunDurationMs": 60_000.0,
+        "execScenarios": {
+            "other-load": {
+                "tags": {"env_name": "dev"},
+                "executor": "shared-iterations",
+                "rate": 1,
+                "duration": "30s",
+                "preAllocatedVUs": 1,
+                "maxVUs": 2,
+            },
+            "megatron-load": {
+                "tags": {"env_name": "perf"},
+                "executor": "constant-arrival-rate",
+                "rate": 5,
+                "duration": "1m",
+                "preAllocatedVUs": 10,
+                "maxVUs": 20,
+            },
+        },
+        "execThresholds": {"http_req_duration{test_name:megatron-load}": ["p(95)<300"]},
+        "metrics": {
+            "http_req_duration": {"values": {"avg": 123.4}},
+            "invalid_metric": 10,
+        },
+    }
 
     scenario = K6Scenario(
         source_report_file="megatron-1.json",
         name="megatron-load",
-        env_name="perf",
-        executor="constant-arrival-rate",
-        rate=5.0,
-        duration="1m",
-        pre_allocated_vus=10,
-        max_vus=20,
-        test_run_duration_ms=60_000.0,
-        thresholds={"http_req_duration": ["p(95)<500"]},
-        metrics={"http_req_duration": {"values": {"avg": 123.4}}},
-        raw_payload=raw_payload,
+        source_payload=source_payload,
     )
 
+    assert [field.name for field in fields(K6Scenario)] == [
+        "source_report_file",
+        "name",
+        "source_payload",
+    ]
     assert scenario.source_report_file == "megatron-1.json"
     assert scenario.name == "megatron-load"
-    assert scenario.metrics["http_req_duration"]["values"]["avg"] == 123.4
-    assert scenario.raw_payload is raw_payload
+    assert scenario.source_payload["metrics"]["http_req_duration"]["values"]["avg"] == 123.4
+    assert scenario.source_payload is source_payload
 
 
 def test_k6_models_are_immutable_domain_records() -> None:
@@ -40,16 +61,18 @@ def test_k6_models_are_immutable_domain_records() -> None:
     scenario = K6Scenario(
         source_report_file="megatron-1.json",
         name="megatron-load",
-        env_name=None,
-        executor="constant-arrival-rate",
-        rate=5.0,
-        duration="1m",
-        pre_allocated_vus=10,
-        max_vus=20,
-        test_run_duration_ms=60_000.0,
-        thresholds={},
-        metrics={},
-        raw_payload={},
+        source_payload={
+            "testRunDurationMs": 60_000.0,
+            "execScenarios": {
+                "megatron-load": {
+                    "executor": "constant-arrival-rate",
+                    "rate": 5,
+                    "duration": "1m",
+                    "preAllocatedVUs": 10,
+                    "maxVUs": 20,
+                }
+            },
+        },
     )
     parsed_report = K6ParsedReport(service="megatron", scenarios=[scenario])
     mutable_report = cast("Any", parsed_report)
