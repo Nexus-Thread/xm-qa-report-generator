@@ -17,8 +17,8 @@ class StructuredLlmPort(Protocol):
         """Return a JSON object parsed from an LLM response."""
 
 
-class DebugJsonWriterPort(Protocol):
-    """Port for writing debug JSON payloads to files."""
+class JsonWriterPort(Protocol):
+    """Port for writing labeled JSON payloads to files."""
 
     def write_json(self, *, label: str, payload: Any) -> Path:
         """Persist one labeled JSON payload and return file path."""

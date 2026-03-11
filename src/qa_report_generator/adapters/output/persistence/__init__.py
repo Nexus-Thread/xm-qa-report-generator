@@ -1,5 +1,5 @@
 """Persistence output adapter exports."""
 
-from .json_file_debug import JsonFileDebugWriterAdapter
+from .json_file_writer_adapter import JsonFileWriterAdapter
 
-__all__ = ["JsonFileDebugWriterAdapter"]
+__all__ = ["JsonFileWriterAdapter"]

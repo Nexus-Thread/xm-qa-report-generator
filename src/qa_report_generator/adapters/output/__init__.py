@@ -2,10 +2,10 @@
 
 from .narrative import OpenAIStructuredLlmAdapter
 from .parsers import K6ParsedReportParser
-from .persistence import JsonFileDebugWriterAdapter
+from .persistence import JsonFileWriterAdapter
 
 __all__ = [
-    "JsonFileDebugWriterAdapter",
+    "JsonFileWriterAdapter",
     "K6ParsedReportParser",
     "OpenAIStructuredLlmAdapter",
 ]
