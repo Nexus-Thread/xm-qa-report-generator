@@ -4,12 +4,15 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from pydantic import Field, ValidationError, ValidationInfo, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from qa_report_generator.application.dtos import AppSettings
 from qa_report_generator.domain.exceptions import ConfigurationError
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 LOGGER = logging.getLogger(__name__)
 ALLOWED_LOG_LEVELS = frozenset({"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"})
@@ -38,6 +41,33 @@ def _normalize_path(value: object, *, field_name: str) -> object:
     return Path(normalized)
 
 
+def _field_name(info: ValidationInfo) -> str:
+    """Return the uppercase field name for validation messages."""
+    if info.field_name is None:
+        return "VALUE"
+    return info.field_name.upper()
+
+
+def _normalize_choice(
+    value: object,
+    *,
+    field_name: str,
+    invalid_label: str,
+    allowed_values: frozenset[str],
+    transform: Callable[[str], str],
+) -> object:
+    """Normalize a text setting and validate its allowed values."""
+    normalized = _normalize_non_empty_text(value, message=f"{field_name} must not be blank")
+    if not isinstance(normalized, str):
+        return normalized
+
+    transformed = transform(normalized)
+    if transformed not in allowed_values:
+        msg = f"Invalid {invalid_label}: {transformed}. Must be one of: {', '.join(sorted(allowed_values))}"
+        raise ValueError(msg)
+    return transformed
+
+
 class EnvSettings(BaseSettings):
     """Application configuration loaded from environment variables or a .env file."""
 
@@ -49,8 +79,16 @@ class EnvSettings(BaseSettings):
         extra="ignore",
     )
 
-    log_level: str | None = Field(default=None, description="Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)")
-    log_format: str | None = Field(default=None, description="Logging format: 'simple' for human-readable, 'json' for structured logging")
+    log_level: str | None = Field(
+        default=None,
+        alias="LOG_LEVEL",
+        description="Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)",
+    )
+    log_format: str | None = Field(
+        default=None,
+        alias="LOG_FORMAT",
+        description="Logging format: 'simple' for human-readable, 'json' for structured logging",
+    )
     llm_model: str | None = Field(default=None, alias="LLM_MODEL", description="LLM model name for OpenAI-compatible endpoint")
     llm_base_url: str | None = Field(default=None, alias="LLM_BASE_URL", description="Base URL for OpenAI-compatible endpoint")
     llm_api_key: str = Field(alias="LLM_API_KEY", description="API key for OpenAI-compatible endpoint")
@@ -90,11 +128,14 @@ class EnvSettings(BaseSettings):
 
     @field_validator("llm_model", "llm_base_url", "llm_api_key", mode="before")
     @classmethod
-    def validate_non_empty_text(cls, value: object) -> object:
+    def validate_non_empty_text(cls, value: object, info: ValidationInfo) -> object:
         """Normalize text settings and reject blank values."""
         if value is None:
             return value
-        return _normalize_non_empty_text(value, message="Value must not be blank")
+        return _normalize_non_empty_text(
+            value,
+            message=f"{_field_name(info)} must not be blank",
+        )
 
     @field_validator("llm_debug_json_dir", "model_debug_json_dir", mode="before")
     @classmethod
@@ -102,36 +143,35 @@ class EnvSettings(BaseSettings):
         """Normalize debug output directory and reject blank values."""
         if value is None:
             return value
-        field_name = info.field_name.upper() if info.field_name is not None else "PATH"
-        return _normalize_path(value, field_name=field_name)
+        return _normalize_path(value, field_name=_field_name(info))
 
-    @field_validator("log_level")
+    @field_validator("log_level", mode="before")
     @classmethod
-    def validate_log_level(cls, value: str | None) -> str | None:
+    def validate_log_level(cls, value: object, info: ValidationInfo) -> object:
         """Normalize and validate log level."""
         if value is None:
             return value
-        normalized = value.strip().upper()
-        if normalized not in ALLOWED_LOG_LEVELS:
-            msg = f"Invalid log level: {normalized}. Must be one of: {', '.join(sorted(ALLOWED_LOG_LEVELS))}"
-            raise ValueError(msg)
-        return normalized
+        return _normalize_choice(
+            value,
+            field_name=_field_name(info),
+            invalid_label="log level",
+            allowed_values=ALLOWED_LOG_LEVELS,
+            transform=str.upper,
+        )
 
-    @field_validator("log_format")
+    @field_validator("log_format", mode="before")
     @classmethod
-    def validate_log_format(cls, value: str | None) -> str | None:
+    def validate_log_format(cls, value: object, info: ValidationInfo) -> object:
         """Normalize and validate log format."""
         if value is None:
             return value
-        normalized = value.strip().lower()
-        if normalized not in ALLOWED_LOG_FORMATS:
-            msg = f"Invalid log format: {normalized}. Must be one of: {', '.join(sorted(ALLOWED_LOG_FORMATS))}"
-            raise ValueError(msg)
-        return normalized
-
-    def to_app_settings(self) -> AppSettings:
-        """Convert validated adapter settings to the application DTO."""
-        return AppSettings(**self.model_dump(exclude_none=True))
+        return _normalize_choice(
+            value,
+            field_name=_field_name(info),
+            invalid_label="log format",
+            allowed_values=ALLOWED_LOG_FORMATS,
+            transform=str.lower,
+        )
 
 
 def _build_validation_error_details(error: ValidationError) -> str:

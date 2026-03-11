@@ -26,6 +26,11 @@ ENV_SETTING_NAMES = (
 )
 
 
+def _set_minimal_valid_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Set the minimum environment required for successful loading."""
+    monkeypatch.setenv("LLM_API_KEY", "secret")
+
+
 @pytest.fixture(autouse=True)
 def isolate_env_settings(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """Reset environment-backed settings for each test."""
@@ -34,8 +39,8 @@ def isolate_env_settings(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Non
         monkeypatch.delenv(setting_name, raising=False)
 
 
-def test_env_settings_adapter_loads_defaults_when_environment_is_empty() -> None:
-    """Adapter uses default values when environment overrides are absent."""
+def test_env_settings_adapter_requires_llm_api_key_when_environment_is_empty() -> None:
+    """Empty environment raises a configuration error for the API key."""
     with pytest.raises(ConfigurationError, match=r"LLM_API_KEY: Field required"):
         EnvSettingsAdapter().load()
 
@@ -107,9 +112,10 @@ def test_env_settings_adapter_raises_configuration_error_for_invalid_values(
     value: str,
 ) -> None:
     """Invalid environment values raise ConfigurationError."""
+    _set_minimal_valid_env(monkeypatch)
     monkeypatch.setenv(setting_name, value)
 
-    with pytest.raises(ConfigurationError):
+    with pytest.raises(ConfigurationError, match=rf"{setting_name}:"):
         EnvSettingsAdapter().load()
 
 
@@ -140,6 +146,20 @@ def test_env_settings_adapter_raises_configuration_error_for_blank_debug_dir(
     setting_name: str,
 ) -> None:
     """Blank debug output directories raise ConfigurationError."""
+    _set_minimal_valid_env(monkeypatch)
+    monkeypatch.setenv(setting_name, "   ")
+
+    with pytest.raises(ConfigurationError, match=rf"{setting_name}: Value error, {setting_name} must not be blank"):
+        EnvSettingsAdapter().load()
+
+
+@pytest.mark.parametrize("setting_name", ["LOG_LEVEL", "LOG_FORMAT"])
+def test_env_settings_adapter_raises_configuration_error_for_blank_logging_setting(
+    monkeypatch: pytest.MonkeyPatch,
+    setting_name: str,
+) -> None:
+    """Blank logging settings raise ConfigurationError with field detail."""
+    _set_minimal_valid_env(monkeypatch)
     monkeypatch.setenv(setting_name, "   ")
 
     with pytest.raises(ConfigurationError, match=rf"{setting_name}: Value error, {setting_name} must not be blank"):
@@ -150,9 +170,10 @@ def test_env_settings_adapter_raises_configuration_error_for_blank_llm_model(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Blank LLM_MODEL raises ConfigurationError with field detail."""
+    _set_minimal_valid_env(monkeypatch)
     monkeypatch.setenv("LLM_MODEL", "   ")
 
-    with pytest.raises(ConfigurationError, match=r"LLM_MODEL: Value error, Value must not be blank"):
+    with pytest.raises(ConfigurationError, match=r"LLM_MODEL: Value error, LLM_MODEL must not be blank"):
         EnvSettingsAdapter().load()
 
 
@@ -162,5 +183,5 @@ def test_env_settings_adapter_raises_configuration_error_for_blank_llm_api_key(
     """Blank LLM_API_KEY raises ConfigurationError with field detail."""
     monkeypatch.setenv("LLM_API_KEY", "   ")
 
-    with pytest.raises(ConfigurationError, match=r"LLM_API_KEY: Value error, Value must not be blank"):
+    with pytest.raises(ConfigurationError, match=r"LLM_API_KEY: Value error, LLM_API_KEY must not be blank"):
         EnvSettingsAdapter().load()

@@ -1,15 +1,15 @@
 """Map environment settings to the AppSettings DTO."""
 
-from __future__ import annotations
+from qa_report_generator.application.dtos import AppSettings
 
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from qa_report_generator.application.dtos import AppSettings
-
-from .settings import load_settings_from_env
+from .settings import EnvSettings, load_settings_from_env
 
 __all__ = ["EnvSettingsAdapter"]
+
+
+def _to_app_settings(settings: EnvSettings) -> AppSettings:
+    """Map validated environment settings into the application DTO."""
+    return AppSettings(**settings.model_dump(exclude_none=True))
 
 
 class EnvSettingsAdapter:
@@ -17,4 +17,4 @@ class EnvSettingsAdapter:
 
     def load(self) -> AppSettings:
         """Load environment settings and map them to AppSettings DTO."""
-        return load_settings_from_env().to_app_settings()
+        return _to_app_settings(load_settings_from_env())
