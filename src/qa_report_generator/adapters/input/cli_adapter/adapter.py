@@ -11,10 +11,8 @@ from qa_report_generator.application.ports.input import (
 )
 from qa_report_generator.domain.exceptions import ReportingError
 
-from .errors import CliInputError, format_reporting_error
-from .output import print_json_output
-from .payloads import build_extraction_payload
-from .report_inputs import expand_report_inputs, normalize_service_input
+from .output import build_extraction_payload, format_reporting_error, print_json_output
+from .report_inputs import CliInputError, expand_report_inputs, normalize_service_input
 
 LOGGER = logging.getLogger(__name__)
 
@@ -42,6 +40,11 @@ class K6CliAdapter:
         self._app.callback()(_root_command)
         self._app.command(name="generate")(self.generate_command)
 
+    @property
+    def app(self) -> typer.Typer:
+        """Return the Typer application."""
+        return self._app
+
     def generate_command(
         self,
         *,
@@ -63,7 +66,7 @@ class K6CliAdapter:
             ),
         ],
     ) -> None:
-        """Generate and print service-specific deterministic metrics from one or more k6 JSON reports."""
+        """Generate and print service-specific metrics from k6 JSON reports."""
         try:
             normalized_service = normalize_service_input(service)
             report_files = expand_report_inputs(report)
@@ -98,17 +101,19 @@ class K6CliAdapter:
     def _exit_with_error(self, message: str, *, error: Exception | None = None) -> NoReturn:
         """Print formatted error and stop command execution."""
         LOGGER.error(
-            "CLI command failed",
+            "CLI command failed: %s",
+            message,
             extra={
                 "component": self.__class__.__name__,
                 "error_type": type(error).__name__ if error is not None else "CliUsageError",
+                "error_message": message,
             },
         )
-        typer.secho(f"❌ {message}", fg=typer.colors.RED)
+        typer.secho(f"❌ {message}", fg=typer.colors.RED, err=True)
         if error is None:
             raise typer.Exit(code=1)
         raise typer.Exit(code=1) from error
 
     def run(self) -> None:
         """Run the CLI application."""
-        self._app()
+        self.app()

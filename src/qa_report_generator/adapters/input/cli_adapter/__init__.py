@@ -1,6 +1,6 @@
-"""CLI adapter module for report generation."""
+"""CLI adapter package for report generation."""
 
-from qa_report_generator.adapters.input.cli_adapter.adapter import K6CliAdapter
+from .adapter import K6CliAdapter
 
 __all__ = [
     "K6CliAdapter",

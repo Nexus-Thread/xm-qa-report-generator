@@ -2,19 +2,19 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 
 import pytest
 import typer
 from typer.testing import CliRunner
 
 from qa_report_generator.adapters.input.cli_adapter import K6CliAdapter
-from qa_report_generator.adapters.input.cli_adapter.errors import (
-    CliInputError,
+from qa_report_generator.adapters.input.cli_adapter.output import (
+    build_extraction_payload,
     format_reporting_error,
 )
-from qa_report_generator.adapters.input.cli_adapter.payloads import build_extraction_payload
 from qa_report_generator.adapters.input.cli_adapter.report_inputs import (
+    CliInputError,
     expand_report_inputs,
     normalize_service_input,
 )
@@ -34,101 +34,6 @@ if TYPE_CHECKING:
 
 
 CLI_RUNNER = CliRunner()
-
-
-class SpyExtractionUseCase:
-    """Spy extraction use case for command assertions."""
-
-    def __init__(self) -> None:
-        """Initialize call storage."""
-        self.calls: list[tuple[str, list[Path]]] = []
-
-    def extract(self, *, service: str, report_paths: list[Path]) -> K6ServiceExtractionResult:
-        """Record call and return deterministic extraction result."""
-        self.calls.append((service, report_paths))
-        return K6ServiceExtractionResult(
-            service=service,
-            mode="service_specific",
-            runs=[
-                K6ServiceExtractionRun(
-                    source_report_files=[path.name for path in report_paths],
-                    extracted={
-                        "service": service,
-                        "scenario": {"name": "grouped-scenario"},
-                        "threshold_results": [
-                            {
-                                "metric_key": "checks",
-                                "expression": "rate>0.99",
-                                "status": "pass",
-                            }
-                        ],
-                    },
-                )
-            ],
-            overall_summary=K6OverallExecutiveSummary(
-                status="pass",
-                total_scenarios=1,
-                passed_scenarios=1,
-                failed_scenarios=0,
-                unknown_scenarios=0,
-                scenarios_requiring_attention=[],
-                executive_summary="All 1 scenarios passed their evaluated thresholds.",
-            ),
-            scenario_summaries=[
-                K6ScenarioExecutiveSummary(
-                    scenario_name="grouped-scenario",
-                    env_name=None,
-                    source_report_files=[path.name for path in report_paths],
-                    status="pass",
-                    executor=None,
-                    rate=None,
-                    duration=None,
-                    pre_allocated_vus=None,
-                    max_vus=None,
-                    threshold_results=[
-                        K6ThresholdSummary(
-                            metric_key="checks",
-                            expression="rate>0.99",
-                            status="pass",
-                        )
-                    ],
-                    executive_note="Scenario grouped-scenario met all evaluated thresholds.",
-                )
-            ],
-        )
-
-
-class FailingExtractionUseCase:
-    """Extraction use case stub that raises domain error."""
-
-    def __init__(self, *, suggestion: str | None = None) -> None:
-        """Store optional error suggestion."""
-        self._suggestion = suggestion
-
-    def extract(self, *, service: str, report_paths: list[Path]) -> K6ServiceExtractionResult:
-        """Raise reporting error."""
-        del service, report_paths
-        msg = "boom"
-        raise ReportingError(msg, suggestion=self._suggestion)
-
-
-class CrashingExtractionUseCase:
-    """Extraction use case stub that raises an unexpected error."""
-
-    def extract(self, *, service: str, report_paths: list[Path]) -> K6ServiceExtractionResult:
-        """Raise unexpected runtime error."""
-        del service, report_paths
-        msg = "unexpected boom"
-        raise RuntimeError(msg)
-
-
-def build_adapter(
-    service_metrics_extractor: SpyExtractionUseCase | FailingExtractionUseCase | CrashingExtractionUseCase,
-) -> K6CliAdapter:
-    """Build a CLI adapter with normalized configuration."""
-    return K6CliAdapter(
-        service_metrics_extractor=service_metrics_extractor,
-    )
 
 
 def build_result(*, service: str, report_paths: list[Path]) -> K6ServiceExtractionResult:
@@ -182,6 +87,52 @@ def build_result(*, service: str, report_paths: list[Path]) -> K6ServiceExtracti
                 executive_note="Scenario grouped-scenario met all evaluated thresholds.",
             )
         ],
+    )
+
+
+class SpyExtractionUseCase:
+    """Spy extraction use case for command assertions."""
+
+    def __init__(self) -> None:
+        """Initialize call storage."""
+        self.calls: list[tuple[str, list[Path]]] = []
+
+    def extract(self, *, service: str, report_paths: list[Path]) -> K6ServiceExtractionResult:
+        """Record call and return deterministic extraction result."""
+        self.calls.append((service, report_paths))
+        return build_result(service=service, report_paths=report_paths)
+
+
+class FailingExtractionUseCase:
+    """Extraction use case stub that raises domain error."""
+
+    def __init__(self, *, suggestion: str | None = None) -> None:
+        """Store optional error suggestion."""
+        self._suggestion = suggestion
+
+    def extract(self, *, service: str, report_paths: list[Path]) -> K6ServiceExtractionResult:
+        """Raise reporting error."""
+        del service, report_paths
+        msg = "boom"
+        raise ReportingError(msg, suggestion=self._suggestion)
+
+
+class CrashingExtractionUseCase:
+    """Extraction use case stub that raises an unexpected error."""
+
+    def extract(self, *, service: str, report_paths: list[Path]) -> K6ServiceExtractionResult:
+        """Raise unexpected runtime error."""
+        del service, report_paths
+        msg = "unexpected boom"
+        raise RuntimeError(msg)
+
+
+def build_adapter(
+    service_metrics_extractor: SpyExtractionUseCase | FailingExtractionUseCase | CrashingExtractionUseCase,
+) -> K6CliAdapter:
+    """Build a CLI adapter with normalized configuration."""
+    return K6CliAdapter(
+        service_metrics_extractor=service_metrics_extractor,
     )
 
 
@@ -268,7 +219,10 @@ def test_generate_command_prints_success_message_heading_and_json_payload(
     assert '"runs"' not in captured.out
 
 
-def test_generate_command_raises_typer_exit_on_empty_service(tmp_path: Path) -> None:
+def test_generate_command_raises_typer_exit_on_empty_service(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
     """Generate command rejects empty service identifier."""
     report_path = tmp_path / "report.json"
     report_path.write_text("{}", encoding="utf-8")
@@ -277,6 +231,10 @@ def test_generate_command_raises_typer_exit_on_empty_service(tmp_path: Path) -> 
 
     with pytest.raises(typer.Exit):
         adapter.generate_command(service="   ", report=[report_path])
+
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert "❌ --service cannot be empty" in captured.err
 
 
 def test_expand_report_inputs_returns_sorted_deduplicated_json_files(tmp_path: Path) -> None:
@@ -391,10 +349,9 @@ def test_cli_runner_invokes_generate_command_and_parses_options(tmp_path: Path) 
 
     extraction_use_case = SpyExtractionUseCase()
     adapter = build_adapter(extraction_use_case)
-    cli_app = cast("typer.Typer", vars(adapter)["_app"])
 
     result = CLI_RUNNER.invoke(
-        cli_app,
+        adapter.app,
         ["generate", "--service", "megatron", "--report", str(report_path)],
     )
 

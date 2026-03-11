@@ -7,7 +7,9 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from pathlib import Path
 
-from .errors import CliInputError
+
+class CliInputError(ValueError):
+    """Raised when CLI input validation fails."""
 
 
 def normalize_service_input(service: str) -> str:
