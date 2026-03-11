@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class K6RawState(BaseModel):
@@ -36,3 +36,15 @@ class K6RawSummary(BaseModel):
     state: K6RawState | None = Field(default=None)
     exec_scenarios: dict[str, K6RawExecScenario] = Field(alias="execScenarios", default_factory=dict)
     exec_thresholds: dict[str, list[str]] = Field(alias="execThresholds", default_factory=dict)
+    metrics: dict[str, dict[str, Any]] = Field(default_factory=dict)
+
+    @field_validator("metrics", mode="before")
+    @classmethod
+    def _normalize_metrics(cls, value: Any) -> dict[str, dict[str, Any]]:
+        """Normalize metrics payload to a dict of dict entries."""
+        if not isinstance(value, dict):
+            return {}
+
+        return {
+            metric_name: metric_payload for metric_name, metric_payload in value.items() if isinstance(metric_name, str) and isinstance(metric_payload, dict)
+        }

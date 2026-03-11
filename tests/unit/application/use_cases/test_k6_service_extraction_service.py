@@ -17,6 +17,7 @@ from qa_report_generator.domain.analytics import K6ParsedReport, K6Scenario
 from qa_report_generator.domain.exceptions import ExtractionVerificationError
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
     from pathlib import Path
 
 
@@ -60,8 +61,8 @@ class StubK6ParsedReportParser:
         self,
         *,
         service: str,
-        report_files: list[Path],
-        remove_keys: frozenset[str] | None = None,
+        report_files: Sequence[Path],
+        remove_keys: frozenset[str] = frozenset(),
     ) -> K6ParsedReport:
         """Return parsed report with one scenario entry per report file."""
         del remove_keys

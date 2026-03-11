@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Protocol
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
     from pathlib import Path
 
     from qa_report_generator.domain.analytics import K6ParsedReport
@@ -31,7 +32,7 @@ class K6ParsedReportParserPort(Protocol):
         self,
         *,
         service: str,
-        report_files: list[Path],
-        remove_keys: frozenset[str] | None = None,
+        report_files: Sequence[Path],
+        remove_keys: frozenset[str] = frozenset(),
     ) -> K6ParsedReport:
         """Parse report files into a normalized parsed report."""
