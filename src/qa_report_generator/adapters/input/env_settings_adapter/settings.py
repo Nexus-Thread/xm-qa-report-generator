@@ -100,6 +100,13 @@ class EnvSettings(BaseSettings):
         le=10,
         description="Maximum number of retry attempts for transient LLM failures",
     )
+    llm_max_concurrency: int | None = Field(
+        default=None,
+        alias="LLM_MAX_CONCURRENCY",
+        ge=1,
+        le=32,
+        description="Maximum number of scenarios processed in parallel for LLM-backed extraction",
+    )
     llm_retry_backoff_factor: float | None = Field(
         default=None,
         alias="LLM_RETRY_BACKOFF_FACTOR",

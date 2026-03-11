@@ -60,8 +60,13 @@ qa-report-generator-k6 generate \
 
 Environment variables:
 - `LLM_API_KEY` (required)
+- `LLM_MAX_CONCURRENCY` (default: `4`)
 - `LLM_DEBUG_JSON_ENABLED` (default: `false`)
 - `LLM_DEBUG_JSON_DIR` (default: `out/debug/llm`)
+
+When multiple parsed scenarios are present, service-specific extraction can process them in parallel
+using a synchronous worker pool. `LLM_MAX_CONCURRENCY` bounds how many scenarios may issue
+overlapping OpenAI-compatible requests at once while preserving deterministic output order.
 
 ## Adding a new service extraction module
 

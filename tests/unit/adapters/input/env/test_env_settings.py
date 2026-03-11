@@ -16,6 +16,7 @@ ENV_SETTING_NAMES = (
     "LLM_API_KEY",
     "LLM_TIMEOUT",
     "LLM_MAX_RETRIES",
+    "LLM_MAX_CONCURRENCY",
     "LLM_RETRY_BACKOFF_FACTOR",
     "LLM_DEBUG_JSON_ENABLED",
     "LLM_DEBUG_JSON_DIR",
@@ -52,6 +53,7 @@ def test_env_settings_adapter_loads_environment_overrides_into_app_settings(monk
     monkeypatch.setenv("LLM_API_KEY", "secret")
     monkeypatch.setenv("LLM_TIMEOUT", "30")
     monkeypatch.setenv("LLM_MAX_RETRIES", "2")
+    monkeypatch.setenv("LLM_MAX_CONCURRENCY", "6")
     monkeypatch.setenv("LLM_RETRY_BACKOFF_FACTOR", "1.5")
     monkeypatch.setenv("LLM_DEBUG_JSON_ENABLED", "true")
     monkeypatch.setenv("LLM_DEBUG_JSON_DIR", "out/debug/custom")
@@ -70,6 +72,7 @@ def test_env_settings_adapter_loads_environment_overrides_into_app_settings(monk
         llm_base_url="https://example.test/v1",
         llm_timeout=30.0,
         llm_max_retries=2,
+        llm_max_concurrency=6,
         llm_retry_backoff_factor=1.5,
         llm_debug_json_enabled=True,
         llm_debug_json_dir=Path("out/debug/custom"),
@@ -103,6 +106,7 @@ def test_env_settings_adapter_requires_llm_api_key_when_not_provided(monkeypatch
         ("LOG_FORMAT", "yaml"),
         ("LLM_TIMEOUT", "0"),
         ("LLM_MAX_RETRIES", "11"),
+        ("LLM_MAX_CONCURRENCY", "0"),
         ("LLM_RETRY_BACKOFF_FACTOR", "0.9"),
     ],
 )
@@ -185,3 +189,14 @@ def test_env_settings_adapter_raises_configuration_error_for_blank_llm_api_key(
 
     with pytest.raises(ConfigurationError, match=r"LLM_API_KEY: Value error, LLM_API_KEY must not be blank"):
         EnvSettingsAdapter().load()
+
+
+def test_env_settings_adapter_uses_default_llm_max_concurrency_when_unset(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Adapter preserves the DTO default concurrency when env override is absent."""
+    _set_minimal_valid_env(monkeypatch)
+
+    settings = EnvSettingsAdapter().load()
+
+    assert settings.llm_max_concurrency == 4

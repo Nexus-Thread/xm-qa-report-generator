@@ -40,6 +40,7 @@ def create_cli_adapter() -> K6CliAdapter:
     service_metrics_extractor = K6ServiceExtractionService(
         llm=structured_llm,
         parser=parsed_report_parser,
+        max_parallel_scenarios=config.llm_max_concurrency,
         debug_config=K6ServiceExtractionDebugConfig(
             model_debug_json_writer=model_debug_json_writer,
             model_debug_json_enabled=config.model_debug_json_enabled,

@@ -3,22 +3,32 @@
 from __future__ import annotations
 
 import json
+import time
 from copy import deepcopy
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 import pytest
+from pydantic import BaseModel
 
 from qa_report_generator.application.exceptions import ExtractionVerificationError
 from qa_report_generator.application.use_cases.k6_service_extraction import (
     K6ServiceExtractionDebugConfig,
     K6ServiceExtractionService,
 )
+from qa_report_generator.application.use_cases.k6_service_extraction.scenario_extraction import ExtractedRunModel
+from qa_report_generator.application.use_cases.k6_service_extraction.service_specific_extraction import (
+    _extract_run_models,
+)
 from qa_report_generator.application.use_cases.k6_service_extraction.verification import parse_mismatches
 from qa_report_generator.domain.analytics import K6ParsedReport, K6Scenario
+from qa_report_generator.domain.exceptions import ReportingError
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
     from pathlib import Path
+
+    from qa_report_generator.application.ports.output import StructuredLlmPort
+    from qa_report_generator.application.service_definitions.base import ServiceDefinition
 
 
 class SpyDebugJsonWriter:
@@ -278,6 +288,12 @@ def _parsed_report_with_source_payload(
             ),
         ),
     )
+
+
+class _FakeExtractedModel(BaseModel):
+    """Minimal extracted model for parallel orchestration tests."""
+
+    report_file: str
 
 
 def test_extract_filters_removed_keys_and_returns_validated_payload(tmp_path: Path) -> None:
@@ -1287,3 +1303,99 @@ def test_parse_mismatches_preserves_numeric_values() -> None:
     assert len(mismatches) == 1
     assert mismatches[0].expected == 100
     assert mismatches[0].actual == 101
+
+
+def test_extract_run_models_preserves_input_order_when_parallelized(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Parallel extraction preserves original scenario ordering in the final result."""
+    scenarios = (
+        K6Scenario(source_report_file="report-1.json", name="scenario-1", source_payload={}),
+        K6Scenario(source_report_file="report-2.json", name="scenario-2", source_payload={}),
+        K6Scenario(source_report_file="report-3.json", name="scenario-3", source_payload={}),
+    )
+    delay_by_report_file = {
+        "report-1.json": 0.05,
+        "report-2.json": 0.01,
+        "report-3.json": 0.03,
+    }
+
+    def fake_extract_verified_run_model(*, llm: object, scenario: K6Scenario, definition: object, schema: object) -> ExtractedRunModel:
+        del llm, definition, schema
+        time.sleep(delay_by_report_file[scenario.source_report_file])
+        return ExtractedRunModel(
+            source_report_file=scenario.source_report_file,
+            source_payload=scenario.source_payload,
+            extracted=_FakeExtractedModel(report_file=scenario.source_report_file),
+        )
+
+    monkeypatch.setattr(
+        "qa_report_generator.application.use_cases.k6_service_extraction.service_specific_extraction.extract_verified_run_model",
+        fake_extract_verified_run_model,
+    )
+
+    llm = cast("StructuredLlmPort", object())
+    definition = cast("ServiceDefinition", object())
+    extracted_run_models = _extract_run_models(
+        llm=llm,
+        scenarios=scenarios,
+        definition=definition,
+        schema={},
+        max_parallel_scenarios=3,
+    )
+
+    assert [run_model.source_report_file for run_model in extracted_run_models] == [
+        "report-1.json",
+        "report-2.json",
+        "report-3.json",
+    ]
+
+
+def test_extract_run_models_adds_scenario_context_when_parallel_worker_fails(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Parallel extraction re-raises reporting errors with scenario-specific context."""
+    scenarios = (
+        K6Scenario(source_report_file="report-1.json", name="scenario-1", source_payload={}),
+        K6Scenario(source_report_file="report-2.json", name="scenario-2", source_payload={}),
+    )
+
+    def fake_extract_verified_run_model(*, llm: object, scenario: K6Scenario, definition: object, schema: object) -> ExtractedRunModel:
+        del llm, definition, schema
+        if scenario.source_report_file == "report-2.json":
+            message = "boom"
+            raise ReportingError(message, suggestion="Inspect the scenario payload")
+        time.sleep(0.02)
+        return ExtractedRunModel(
+            source_report_file=scenario.source_report_file,
+            source_payload=scenario.source_payload,
+            extracted=_FakeExtractedModel(report_file=scenario.source_report_file),
+        )
+
+    monkeypatch.setattr(
+        "qa_report_generator.application.use_cases.k6_service_extraction.service_specific_extraction.extract_verified_run_model",
+        fake_extract_verified_run_model,
+    )
+
+    llm = cast("StructuredLlmPort", object())
+    definition = cast("ServiceDefinition", object())
+    with pytest.raises(ReportingError, match=r"Scenario processing failed for scenario-2 \(report-2.json\): boom") as exc_info:
+        _extract_run_models(
+            llm=llm,
+            scenarios=scenarios,
+            definition=definition,
+            schema={},
+            max_parallel_scenarios=2,
+        )
+
+    assert exc_info.value.suggestion == "Inspect the scenario payload"
+
+
+def test_service_rejects_non_positive_parallel_scenario_limit() -> None:
+    """Service rejects invalid max_parallel_scenarios values."""
+    with pytest.raises(ValueError, match="max_parallel_scenarios"):
+        K6ServiceExtractionService(
+            llm=StubStructuredLlm([]),
+            parser=StubK6ParsedReportParser(_parsed_report()),
+            max_parallel_scenarios=0,
+        )

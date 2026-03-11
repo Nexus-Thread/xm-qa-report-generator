@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
@@ -13,8 +15,9 @@ from qa_report_generator.domain.analytics import (
     build_overall_executive_summary,
     build_scenario_executive_summary,
 )
+from qa_report_generator.domain.exceptions import ReportingError
 
-from .scenario_extraction import extract_verified_run_model
+from .scenario_extraction import ExtractedRunModel, extract_verified_run_model
 from .thresholds import build_threshold_summaries_from_source_payload
 
 if TYPE_CHECKING:
@@ -22,7 +25,9 @@ if TYPE_CHECKING:
 
     from qa_report_generator.application.ports.output import StructuredLlmPort
     from qa_report_generator.application.service_definitions.base import ServiceDefinition
-    from qa_report_generator.domain.analytics import K6ParsedReport
+    from qa_report_generator.domain.analytics import K6ParsedReport, K6Scenario
+
+LOGGER = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True, slots=True)
@@ -34,23 +39,30 @@ class ServiceSpecificExtractionArtifacts:
     result: K6ServiceExtractionResult
 
 
+@dataclass(frozen=True, slots=True)
+class _IndexedExtractedRunModel:
+    """One extracted run model paired with its original scenario index."""
+
+    index: int
+    run_model: ExtractedRunModel
+
+
 def extract_service_specific_result(
     *,
     llm: StructuredLlmPort,
     parsed_report: K6ParsedReport,
     definition: ServiceDefinition,
+    max_parallel_scenarios: int = 1,
 ) -> ServiceSpecificExtractionArtifacts:
     """Run service-specific extraction flow for parsed scenarios."""
     schema = definition.dump_schema()
-    extracted_run_models = [
-        extract_verified_run_model(
-            llm=llm,
-            scenario=scenario,
-            definition=definition,
-            schema=schema,
-        )
-        for scenario in parsed_report.scenarios
-    ]
+    extracted_run_models = _extract_run_models(
+        llm=llm,
+        scenarios=parsed_report.scenarios,
+        definition=definition,
+        schema=schema,
+        max_parallel_scenarios=max_parallel_scenarios,
+    )
     extraction_runs = [
         K6ServiceExtractionRun.from_extracted_payload(
             source_report_files=(run_model.source_report_file,),
@@ -86,6 +98,93 @@ def extract_service_specific_result(
         final_runs=final_runs,
         result=result,
     )
+
+
+def _extract_run_models(
+    *,
+    llm: StructuredLlmPort,
+    scenarios: tuple[K6Scenario, ...],
+    definition: ServiceDefinition,
+    schema: dict[str, object],
+    max_parallel_scenarios: int,
+) -> list[ExtractedRunModel]:
+    """Extract scenario payloads sequentially or in parallel while preserving order."""
+    if max_parallel_scenarios <= 1 or len(scenarios) <= 1:
+        return [
+            extract_verified_run_model(
+                llm=llm,
+                scenario=scenario,
+                definition=definition,
+                schema=schema,
+            )
+            for scenario in scenarios
+        ]
+
+    indexed_results: list[ExtractedRunModel | None] = [None] * len(scenarios)
+    with ThreadPoolExecutor(max_workers=max_parallel_scenarios) as executor:
+        futures = {
+            executor.submit(
+                _extract_indexed_run_model,
+                llm=llm,
+                index=index,
+                scenario=scenario,
+                definition=definition,
+                schema=schema,
+            ): scenario
+            for index, scenario in enumerate(scenarios)
+        }
+
+        for future in as_completed(futures):
+            scenario = futures[future]
+            try:
+                indexed_run_model = future.result()
+            except ReportingError as err:
+                _cancel_pending_futures(futures=futures)
+                raise _build_scenario_processing_error(error=err, scenario=scenario) from err
+            indexed_results[indexed_run_model.index] = indexed_run_model.run_model
+
+    return [run_model for run_model in indexed_results if run_model is not None]
+
+
+def _extract_indexed_run_model(
+    *,
+    llm: StructuredLlmPort,
+    index: int,
+    scenario: K6Scenario,
+    definition: ServiceDefinition,
+    schema: dict[str, object],
+) -> _IndexedExtractedRunModel:
+    """Extract one scenario and retain its original position for stable ordering."""
+    return _IndexedExtractedRunModel(
+        index=index,
+        run_model=extract_verified_run_model(
+            llm=llm,
+            scenario=scenario,
+            definition=definition,
+            schema=schema,
+        ),
+    )
+
+
+def _cancel_pending_futures(*, futures: dict[Future[_IndexedExtractedRunModel], K6Scenario]) -> None:
+    """Cancel futures that have not started yet after the first failure."""
+    for future in futures:
+        future.cancel()
+
+
+def _build_scenario_processing_error(*, error: ReportingError, scenario: K6Scenario) -> ReportingError:
+    """Augment a reporting error with scenario context for clearer failures."""
+    message = f"Scenario processing failed for {scenario.name} ({scenario.source_report_file}): {error}"
+    LOGGER.error(
+        "Scenario processing failed",
+        extra={
+            "component": "service_specific_extraction",
+            "scenario_name": scenario.name,
+            "source_report_file": scenario.source_report_file,
+            "error_type": type(error).__name__,
+        },
+    )
+    return type(error)(message, suggestion=error.suggestion)
 
 
 def _post_process_runs(
