@@ -18,7 +18,11 @@ from qa_report_generator.domain.analytics import (
     build_threshold_summaries_from_source_payload,
     pick_metric,
 )
-from qa_report_generator.domain.exceptions import ConfigurationError, ExtractionVerificationError
+from qa_report_generator.domain.exceptions import (
+    ConfigurationError,
+    ExtractionVerificationError,
+    MissingK6MetricError,
+)
 
 from .config import K6ServiceExtractionDebugConfig
 from .json_utils import to_canonical_json
@@ -237,7 +241,11 @@ class K6ServiceExtractionService(ExtractK6ServiceMetricsUseCase):
             system_prompt=definition.verification_system_prompt,
             user_prompt=verification_prompt,
         )
-        mismatches = parse_mismatches(verification_payload)
+        mismatches = parse_mismatches(
+            verification_payload,
+            source_payload=scenario.raw_payload,
+            extracted_payload=extracted,
+        )
         if mismatches:
             raise self._build_verification_error(mismatches[0])
 
@@ -344,4 +352,28 @@ def _apply_schema_authorized_metric_overrides(
             metric_key,
             scenario.name,
         ).get("values", normalized_payload[metric_key])
+
+    normalized_payload["dropped_iterations"] = _pick_optional_metric_values(
+        source=scenario.raw_payload,
+        metric_key="dropped_iterations",
+        scenario_name=scenario.name,
+        fallback=normalized_payload.get("dropped_iterations"),
+    )
+
     return normalized_payload
+
+
+def _pick_optional_metric_values(
+    *,
+    source: dict[str, Any],
+    metric_key: str,
+    scenario_name: str,
+    fallback: Any,
+) -> Any:
+    """Return optional metric values from source when present, else fallback."""
+    try:
+        metric = pick_metric(source, metric_key, scenario_name)
+    except MissingK6MetricError:
+        return fallback
+
+    return metric.get("values", fallback)

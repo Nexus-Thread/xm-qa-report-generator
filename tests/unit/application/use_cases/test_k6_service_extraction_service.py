@@ -930,6 +930,61 @@ def test_extract_keeps_generic_http_req_failed_when_exact_scenario_tagged_metric
     }
 
 
+def test_extract_overrides_dropped_iterations_when_source_metric_is_present(tmp_path: Path) -> None:
+    """Extraction uses source dropped_iterations values even when model returns null."""
+    report_path = tmp_path / "report.json"
+    source_payload = _source_payload()
+    report_path.write_text(json.dumps(source_payload), encoding="utf-8")
+
+    extracted_payload = _extracted_payload()
+    extracted_payload["dropped_iterations"] = None
+
+    llm = StubStructuredLlm([extracted_payload, {"mismatches": []}])
+    parser = StubK6ParsedReportParser(_parsed_report_with_source_payload(source_payload=source_payload))
+    service = K6ServiceExtractionService(llm=llm, parser=parser)
+
+    result = service.extract(service="megatron", report_paths=[report_path])
+
+    assert result.runs[0].extracted["dropped_iterations"] == {"count": 0, "rate": 0.0}
+
+
+def test_extract_keeps_null_dropped_iterations_when_source_metric_is_absent(tmp_path: Path) -> None:
+    """Extraction keeps null dropped_iterations when source metric is absent."""
+    report_path = tmp_path / "report.json"
+    source_payload = _source_payload()
+    source_payload["metrics"].pop("dropped_iterations", None)
+    report_path.write_text(json.dumps(source_payload), encoding="utf-8")
+
+    extracted_payload = _extracted_payload()
+    extracted_payload["dropped_iterations"] = None
+
+    llm = StubStructuredLlm([extracted_payload, {"mismatches": []}])
+    parser = StubK6ParsedReportParser(_parsed_report_with_source_payload(source_payload=source_payload))
+    service = K6ServiceExtractionService(llm=llm, parser=parser)
+
+    result = service.extract(service="megatron", report_paths=[report_path])
+
+    assert result.runs[0].extracted["dropped_iterations"] is None
+
+
+def test_extract_populates_missing_dropped_iterations_from_source_metric(tmp_path: Path) -> None:
+    """Extraction restores dropped_iterations when the model omits the field."""
+    report_path = tmp_path / "report.json"
+    source_payload = _source_payload()
+    report_path.write_text(json.dumps(source_payload), encoding="utf-8")
+
+    extracted_payload = _extracted_payload()
+    extracted_payload.pop("dropped_iterations", None)
+
+    llm = StubStructuredLlm([extracted_payload, {"mismatches": []}])
+    parser = StubK6ParsedReportParser(_parsed_report_with_source_payload(source_payload=source_payload))
+    service = K6ServiceExtractionService(llm=llm, parser=parser)
+
+    result = service.extract(service="megatron", report_paths=[report_path])
+
+    assert result.runs[0].extracted["dropped_iterations"] == {"count": 0, "rate": 0.0}
+
+
 def test_verification_prompt_prefers_exact_test_name_tag_over_other_tagged_variants(tmp_path: Path) -> None:
     """Verification guidance ignores unrelated tagged metrics when scenario tag is absent."""
     report_path = tmp_path / "report.json"
@@ -994,6 +1049,63 @@ def test_parse_mismatches_ignores_unrelated_tagged_metric_false_positive() -> No
     )
 
     assert mismatches == []
+
+
+def test_parse_mismatches_ignores_verifier_mismatch_when_payload_values_match() -> None:
+    """Verifier mismatch is ignored when source and extracted payload values actually match."""
+    mismatches = parse_mismatches(
+        {
+            "mismatches": [
+                {
+                    "field": "http_req_failed.fails",
+                    "expected": 157479,
+                    "actual": 157579,
+                    "source_jsonpath": '$.source.metrics["http_req_failed{test_name:thdGetOrders}"].values.fails',
+                    "extracted_jsonpath": "$.extracted.http_req_failed.fails",
+                    "reason": "Schema requires exact scenario-tagged http_req_failed{test_name:<scenario>} when present; extracted used untagged fails value instead.",
+                }
+            ]
+        },
+        source_payload={
+            "metrics": {
+                "http_req_failed{test_name:thdGetOrders}": {"values": {"fails": 157479}},
+            }
+        },
+        extracted_payload={
+            "http_req_failed": {"fails": 157479},
+        },
+    )
+
+    assert mismatches == []
+
+
+def test_parse_mismatches_keeps_real_mismatch_when_payload_values_differ() -> None:
+    """Verifier mismatch is kept when source and extracted payload values differ."""
+    mismatches = parse_mismatches(
+        {
+            "mismatches": [
+                {
+                    "field": "http_req_failed.fails",
+                    "expected": 157479,
+                    "actual": 157579,
+                    "source_jsonpath": '$.source.metrics["http_req_failed{test_name:thdGetOrders}"].values.fails',
+                    "extracted_jsonpath": "$.extracted.http_req_failed.fails",
+                    "reason": "value mismatch",
+                }
+            ]
+        },
+        source_payload={
+            "metrics": {
+                "http_req_failed{test_name:thdGetOrders}": {"values": {"fails": 157479}},
+            }
+        },
+        extracted_payload={
+            "http_req_failed": {"fails": 157579},
+        },
+    )
+
+    assert len(mismatches) == 1
+    assert mismatches[0].field == "http_req_failed.fails"
 
 
 def test_extract_builds_symbolstreeservice_post_processed_group(tmp_path: Path) -> None:
