@@ -8,12 +8,33 @@ from typing import TYPE_CHECKING, Protocol, cast
 
 from openai import APIError
 
-from .constants import DEFAULT_BACKOFF_FACTOR, DEFAULT_MAX_RETRIES
-
 if TYPE_CHECKING:
     from collections.abc import Callable
 
 LOGGER = logging.getLogger(__name__)
+
+DEFAULT_MAX_RETRIES = 3
+DEFAULT_BACKOFF_FACTOR = 2.0
+
+
+class OpenAIClientProtocol(Protocol):
+    """Protocol for OpenAI chat completion transport."""
+
+    def create_json_completion(
+        self,
+        *,
+        model: str,
+        messages: list[dict[str, str]],
+    ) -> object:
+        """Create a chat completion response in JSON mode."""
+
+    def create_chat_completion(
+        self,
+        *,
+        model: str,
+        messages: list[dict[str, str]],
+    ) -> object:
+        """Create a plain chat completion without enforced response format."""
 
 
 class _ChatCompletionsProtocol(Protocol):
@@ -46,7 +67,7 @@ class _OpenAISDKClientProtocol(Protocol):
         """Return the chat API namespace."""
 
 
-class OpenAIClient:
+class OpenAIClient(OpenAIClientProtocol):
     """Thin transport wrapper around the OpenAI SDK client."""
 
     def __init__(

@@ -10,7 +10,7 @@ from .logging_utils import truncate_for_log
 from .response_parser import extract_structured_content, parse_json_object
 
 if TYPE_CHECKING:
-    from qa_report_generator.adapters.output.narrative.openai.protocols import OpenAIClientProtocol
+    from qa_report_generator.adapters.output.narrative.openai_adapter import OpenAIClientProtocol
     from qa_report_generator.application.ports.output import JsonWriterPort
 
 LOGGER = logging.getLogger(__name__)

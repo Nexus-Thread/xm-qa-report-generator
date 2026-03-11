@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from qa_report_generator.adapters.output.narrative.openai.response import OpenAIResponseError, extract_message_content
+from qa_report_generator.adapters.output.narrative.openai_adapter import OpenAIResponseError, extract_message_content
 from qa_report_generator.domain.exceptions import ExtractionVerificationError
 
 

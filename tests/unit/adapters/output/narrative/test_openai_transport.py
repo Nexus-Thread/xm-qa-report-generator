@@ -8,7 +8,7 @@ import httpx
 import pytest
 from openai import APIError
 
-from qa_report_generator.adapters.output.narrative.openai.transport import OpenAIClient
+from qa_report_generator.adapters.output.narrative.openai_adapter.transport import OpenAIClient
 
 
 @dataclass(frozen=True)
