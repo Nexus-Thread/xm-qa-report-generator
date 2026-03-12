@@ -31,12 +31,12 @@ LOGGER = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True, slots=True)
-class ServiceSpecificExtractionArtifacts:
-    """Structured outputs produced by the service-specific extraction flow."""
+class ServiceSpecificPipelineArtifacts:
+    """Structured outputs produced by the service-specific pipeline after parsing."""
 
-    extraction_runs: list[K6ServiceExtractionRun]
-    final_runs: list[K6ServiceExtractionRun]
-    result: K6ServiceExtractionResult
+    extracted_runs: list[K6ServiceExtractionRun]
+    post_processed_runs: list[K6ServiceExtractionRun]
+    summary_result: K6ServiceExtractionResult
 
 
 @dataclass(frozen=True, slots=True)
@@ -47,15 +47,17 @@ class _IndexedExtractedRunModel:
     run_model: ExtractedRunModel
 
 
-def extract_service_specific_result(
+def run_service_specific_pipeline(
     *,
     llm: StructuredLlmPort,
     parsed_report: K6ParsedReport,
     definition: ServiceDefinition,
     max_parallel_scenarios: int = 1,
-) -> ServiceSpecificExtractionArtifacts:
-    """Run service-specific extraction flow for parsed scenarios."""
+) -> ServiceSpecificPipelineArtifacts:
+    """Run extract -> post-process -> summary for an already parsed report."""
     schema = definition.dump_schema()
+
+    # Step 2: extract one validated run model per parsed scenario.
     extracted_run_models = _extract_run_models(
         llm=llm,
         scenarios=parsed_report.scenarios,
@@ -63,7 +65,7 @@ def extract_service_specific_result(
         schema=schema,
         max_parallel_scenarios=max_parallel_scenarios,
     )
-    extraction_runs = [
+    extracted_runs = [
         K6ServiceExtractionRun.from_extracted_payload(
             source_report_files=(run_model.source_report_file,),
             extracted=run_model.extracted.model_dump(by_alias=True),
@@ -73,30 +75,34 @@ def extract_service_specific_result(
         )
         for run_model in extracted_run_models
     ]
-    final_runs = _post_process_runs(
+
+    # Step 3: apply optional service-specific post-processing to extracted runs.
+    post_processed_runs = _post_process_runs(
         definition=definition,
-        fallback_runs=extraction_runs,
+        fallback_runs=extracted_runs,
         extracted_models=[run_model.extracted for run_model in extracted_run_models],
     )
+
+    # Step 4: build scenario summaries and the final service-specific result.
     scenario_summaries = [
         build_scenario_executive_summary(
             run_payload=run.extracted,
             source_report_files=run.source_report_files,
         )
-        for run in final_runs
+        for run in post_processed_runs
     ]
 
-    result = K6ServiceExtractionResult(
+    summary_result = K6ServiceExtractionResult(
         service=parsed_report.service,
         mode="service_specific",
-        runs=final_runs,
+        runs=post_processed_runs,
         overall_summary=build_overall_executive_summary(scenario_summaries=scenario_summaries),
         scenario_summaries=scenario_summaries,
     )
-    return ServiceSpecificExtractionArtifacts(
-        extraction_runs=extraction_runs,
-        final_runs=final_runs,
-        result=result,
+    return ServiceSpecificPipelineArtifacts(
+        extracted_runs=extracted_runs,
+        post_processed_runs=post_processed_runs,
+        summary_result=summary_result,
     )
 
 

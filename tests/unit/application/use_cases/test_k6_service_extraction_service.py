@@ -1086,7 +1086,7 @@ def test_extract_uses_max_duration_when_grouped_runs_differ(tmp_path: Path) -> N
 
 
 def test_extract_writes_model_snapshots_for_service_specific_flow(tmp_path: Path) -> None:
-    """Extraction writes extraction, post-processed, and summary snapshots."""
+    """Extraction writes extracted, post-processed, and summary snapshots."""
     report_path = tmp_path / "report.json"
     report_path.write_text(json.dumps(_source_payload()), encoding="utf-8")
     llm = StubStructuredLlm([_extracted_payload(), {"mismatches": []}])
@@ -1105,7 +1105,7 @@ def test_extract_writes_model_snapshots_for_service_specific_flow(tmp_path: Path
 
     assert result.service == "megatron"
     assert [label for label, _ in debug_writer.calls] == [
-        "extraction_runs",
+        "extracted_runs",
         "post_processed_runs",
         "summary_output",
     ]
@@ -1131,7 +1131,7 @@ def test_extract_writes_model_snapshots_for_generic_flow(tmp_path: Path) -> None
 
     assert result.mode == "generic"
     assert [label for label, _ in debug_writer.calls] == [
-        "extraction_runs",
+        "extracted_runs",
         "post_processed_runs",
         "summary_output",
     ]
