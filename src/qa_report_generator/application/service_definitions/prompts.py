@@ -19,13 +19,20 @@ VERIFICATION_SYSTEM_PROMPT = (
 )
 
 
-def build_extraction_user_prompt(filtered_source_json: str, schema: dict[str, Any], report_file: str) -> str:
+def build_extraction_user_prompt(
+    filtered_source_json: str,
+    schema: dict[str, Any],
+    report_file: str,
+    selected_scenario_name: str,
+) -> str:
     """Build extraction user prompt payload."""
     payload = {
         "task": "extract_k6_metrics",
         "report_file": report_file,
+        "selected_scenario_name": selected_scenario_name,
         "instructions": [
-            "Use scenario-specific metrics by selecting the scenario in execScenarios keys.",
+            "Use selected_scenario_name as the exact scenario key to read from execScenarios.",
+            "Use selected_scenario_name as the exact scenario name when schema guidance references test_name:<scenario>.",
             "When both generic and scenario-tagged metrics exist, prefer only the exact test_name:<scenario> tagged metric for the selected scenario.",
             "Ignore other tagged variants that do not use test_name:<scenario>; if no exact scenario-tagged metric exists, use the generic metric.",
             "If the schema names an exact tagged metric key, use that exact metric entry and do not use a generic sibling metric with the same base name.",
@@ -61,6 +68,7 @@ def build_verification_user_prompt(
             "Never emit explanatory notes such as 'no mismatch', 'matches', or other success wording inside mismatches.",
             "Use target_schema field descriptions as the source of truth for where each extracted field must be verified from.",
             "If target_schema describes a field as coming from verification_context, verify it against verification_context rather than source JSON.",
+            "Use verification_context.selected_scenario_name as the exact scenario name when interpreting schema placeholders such as test_name:<scenario>.",
             "Do not report a mismatch for context-backed fields solely because they are absent from source JSON.",
             "If target_schema allows null for a field and the schema-authorized source path is absent, treat null as correct rather than as a mismatch.",
             "Do not report a mismatch when an optional metric object is absent in source and the extracted value is null.",

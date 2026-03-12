@@ -18,15 +18,18 @@ def test_build_extraction_user_prompt_returns_expected_shared_payload() -> None:
         '{"metrics":{"checks":{"values":{"rate":1.0}}}}',
         {"type": "object"},
         "report.json",
+        "megatron-load",
     )
 
     payload = json.loads(prompt)
 
     assert payload["task"] == "extract_k6_metrics"
     assert payload["report_file"] == "report.json"
+    assert payload["selected_scenario_name"] == "megatron-load"
     assert payload["target_schema"] == {"type": "object"}
     assert payload["source"] == {"metrics": {"checks": {"values": {"rate": 1.0}}}}
     assert any("If the schema names an exact tagged metric key, use that exact metric entry" in instruction for instruction in payload["instructions"])
+    assert any("Use selected_scenario_name as the exact scenario name" in instruction for instruction in payload["instructions"])
     assert EXTRACTION_SYSTEM_PROMPT.startswith("You extract structured k6 metrics")
 
 
@@ -36,17 +39,21 @@ def test_build_verification_user_prompt_returns_expected_shared_payload() -> Non
         '{"metrics":{"checks":{"values":{"rate":1.0}}}}',
         '{"checks":{"rate":1.0}}',
         {"type": "object"},
-        {"report_file": "report.json"},
+        {"report_file": "report.json", "selected_scenario_name": "megatron-load"},
     )
 
     payload = json.loads(prompt)
 
     assert payload["task"] == "verify_k6_extraction"
-    assert payload["verification_context"] == {"report_file": "report.json"}
+    assert payload["verification_context"] == {
+        "report_file": "report.json",
+        "selected_scenario_name": "megatron-load",
+    }
     assert payload["source"] == {"metrics": {"checks": {"values": {"rate": 1.0}}}}
     assert payload["extracted"] == {"checks": {"rate": 1.0}}
     assert payload["response_schema"]["mismatches"][0]["reason"] == "string"
     assert any(
         "If the schema describes a tagged metric key, treat that exact tagged metric entry as the only authorized source" in rule for rule in payload["rules"]
     )
+    assert any("Use verification_context.selected_scenario_name as the exact scenario name" in rule for rule in payload["rules"])
     assert VERIFICATION_SYSTEM_PROMPT.startswith("You verify extracted k6 metrics")

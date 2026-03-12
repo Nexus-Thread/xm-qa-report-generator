@@ -31,7 +31,10 @@ def verify_extracted_payload(
         filtered_source_json,
         extracted_json,
         schema,
-        {"report_file": scenario.source_report_file},
+        {
+            "report_file": scenario.source_report_file,
+            "selected_scenario_name": scenario.name,
+        },
     )
     verification_payload = llm.complete_json(
         system_prompt=definition.verification_system_prompt,
