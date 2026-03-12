@@ -12,6 +12,8 @@ from qa_report_generator.application.dtos import (
     K6ServiceExtractionRun,
 )
 from qa_report_generator.domain.analytics import (
+    analyze_overall_scenarios,
+    analyze_scenario_run,
     build_overall_executive_summary,
     build_scenario_executive_summary,
 )
@@ -83,20 +85,22 @@ def run_service_specific_pipeline(
         extracted_models=[run_model.extracted for run_model in extracted_run_models],
     )
 
-    # Step 4: build scenario summaries and the final service-specific result.
-    scenario_summaries = [
-        build_scenario_executive_summary(
+    # Step 4: analyze prepared runs, then project summaries from those analyses.
+    scenario_analyses = [
+        analyze_scenario_run(
             run_payload=run.extracted,
             source_report_files=run.source_report_files,
         )
         for run in post_processed_runs
     ]
+    overall_analysis = analyze_overall_scenarios(scenario_analyses=scenario_analyses)
+    scenario_summaries = [build_scenario_executive_summary(analysis=analysis) for analysis in scenario_analyses]
 
     summary_result = K6ServiceExtractionResult(
         service=parsed_report.service,
         mode="service_specific",
         runs=post_processed_runs,
-        overall_summary=build_overall_executive_summary(scenario_summaries=scenario_summaries),
+        overall_summary=build_overall_executive_summary(analysis=overall_analysis),
         scenario_summaries=scenario_summaries,
     )
     return ServiceSpecificPipelineArtifacts(

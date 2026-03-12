@@ -6,6 +6,8 @@ from typing import TYPE_CHECKING, Any
 
 from qa_report_generator.application.dtos import K6ServiceExtractionResult, K6ServiceExtractionRun
 from qa_report_generator.domain.analytics import (
+    analyze_overall_scenarios,
+    analyze_scenario_run,
     build_overall_executive_summary,
     build_scenario_executive_summary,
 )
@@ -53,18 +55,20 @@ def build_generic_result(*, parsed_report: K6ParsedReport) -> K6ServiceExtractio
         )
         for scenario in parsed_report.scenarios
     ]
-    scenario_summaries = [
-        build_scenario_executive_summary(
+    scenario_analyses = [
+        analyze_scenario_run(
             run_payload=run.extracted,
             source_report_files=run.source_report_files,
         )
         for run in runs
     ]
+    overall_analysis = analyze_overall_scenarios(scenario_analyses=scenario_analyses)
+    scenario_summaries = [build_scenario_executive_summary(analysis=analysis) for analysis in scenario_analyses]
     return K6ServiceExtractionResult(
         service=parsed_report.service,
         mode="generic",
         runs=runs,
-        overall_summary=build_overall_executive_summary(scenario_summaries=scenario_summaries),
+        overall_summary=build_overall_executive_summary(analysis=overall_analysis),
         scenario_summaries=scenario_summaries,
     )
 
