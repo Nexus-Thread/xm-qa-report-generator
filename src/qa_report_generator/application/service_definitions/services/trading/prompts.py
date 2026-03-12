@@ -1,6 +1,6 @@
-"""Tradinghistoricaldata prompt exports."""
+"""Trading prompt exports."""
 
-from qa_report_generator.application.service_definitions.prompts import (
+from qa_report_generator.application.service_definitions.shared.prompts import (
     EXTRACTION_SYSTEM_PROMPT,
     VERIFICATION_SYSTEM_PROMPT,
     build_extraction_user_prompt,

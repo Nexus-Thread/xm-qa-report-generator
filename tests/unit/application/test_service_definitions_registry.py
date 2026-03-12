@@ -17,10 +17,10 @@ from qa_report_generator.application.service_definitions import (
     list_service_definitions,
     register_service_definition,
 )
-from qa_report_generator.application.service_definitions.schema import K6HttpExtractedMetrics
+from qa_report_generator.application.service_definitions.shared.schema import K6HttpExtractedMetrics
 
 if TYPE_CHECKING:
-    from qa_report_generator.application.service_definitions.base import ServiceDefinition
+    from qa_report_generator.application.service_definitions.shared.base import ServiceDefinition
 
 
 def test_list_service_definitions_contains_builtin_megatron() -> None:

@@ -1,8 +1,8 @@
-"""Vps service extraction definition."""
+"""Watchlists service extraction definition."""
 
 from __future__ import annotations
 
-from qa_report_generator.application.service_definitions.base import ServiceDefinition
+from qa_report_generator.application.service_definitions.shared.base import ServiceDefinition
 
 from .prompts import (
     EXTRACTION_SYSTEM_PROMPT,
@@ -10,11 +10,11 @@ from .prompts import (
     build_extraction_user_prompt,
     build_verification_user_prompt,
 )
-from .schema import VpsExtractedMetrics
+from .schema import WatchlistsExtractedMetrics
 
 SERVICE_DEFINITION = ServiceDefinition(
-    name="vps",
-    schema_model=VpsExtractedMetrics,
+    name="watchlists",
+    schema_model=WatchlistsExtractedMetrics,
     remove_keys=frozenset({"setup_data", "root_group"}),
     extraction_system_prompt=EXTRACTION_SYSTEM_PROMPT,
     verification_system_prompt=VERIFICATION_SYSTEM_PROMPT,

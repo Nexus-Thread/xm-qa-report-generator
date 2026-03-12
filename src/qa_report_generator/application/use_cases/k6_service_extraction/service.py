@@ -22,7 +22,7 @@ if TYPE_CHECKING:
         K6ServiceExtractionRun,
     )
     from qa_report_generator.application.ports.output import K6ParsedReportParserPort, StructuredLlmPort
-    from qa_report_generator.application.service_definitions.base import ServiceDefinition
+    from qa_report_generator.application.service_definitions.shared.base import ServiceDefinition
     from qa_report_generator.domain.analytics import K6ParsedReport
 
 

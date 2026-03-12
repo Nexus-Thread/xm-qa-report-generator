@@ -4,14 +4,15 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from .registry import ServiceDefinitionRegistry
+from . import services
+from .shared.registry import ServiceDefinitionRegistry
 
 if TYPE_CHECKING:
-    from .base import ServiceDefinition
+    from .shared.base import ServiceDefinition
 
 REGISTRY = ServiceDefinitionRegistry(
-    package_name=__name__,
-    package_paths=list(globals().get("__path__", [])),
+    package_name=services.__name__,
+    package_paths=list(getattr(services, "__path__", [])),
 )
 
 

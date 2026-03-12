@@ -12,7 +12,7 @@ from .verification import parse_mismatches
 if TYPE_CHECKING:
     from qa_report_generator.application.dtos import VerificationMismatch
     from qa_report_generator.application.ports.output import StructuredLlmPort
-    from qa_report_generator.application.service_definitions.base import ServiceDefinition
+    from qa_report_generator.application.service_definitions.shared.base import ServiceDefinition
     from qa_report_generator.domain.analytics import K6Scenario
 
 

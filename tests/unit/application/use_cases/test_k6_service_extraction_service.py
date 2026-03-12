@@ -28,7 +28,7 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     from qa_report_generator.application.ports.output import StructuredLlmPort
-    from qa_report_generator.application.service_definitions.base import ServiceDefinition
+    from qa_report_generator.application.service_definitions.shared.base import ServiceDefinition
 
 
 class SpyDebugJsonWriter:

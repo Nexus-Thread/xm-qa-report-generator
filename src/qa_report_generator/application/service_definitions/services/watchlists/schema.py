@@ -6,7 +6,7 @@ from typing import Literal
 
 from pydantic import ConfigDict
 
-from qa_report_generator.application.service_definitions import schema as k6_schema
+from qa_report_generator.application.service_definitions.shared import schema as k6_schema
 
 
 class WatchlistsExtractedMetrics(k6_schema.K6HttpExtractedMetrics):

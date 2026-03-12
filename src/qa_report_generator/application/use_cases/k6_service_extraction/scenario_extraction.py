@@ -13,7 +13,7 @@ if TYPE_CHECKING:
     from pydantic import BaseModel
 
     from qa_report_generator.application.ports.output import StructuredLlmPort
-    from qa_report_generator.application.service_definitions.base import ServiceDefinition
+    from qa_report_generator.application.service_definitions.shared.base import ServiceDefinition
     from qa_report_generator.domain.analytics import K6Scenario
 
 
