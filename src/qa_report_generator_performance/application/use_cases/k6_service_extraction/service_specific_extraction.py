@@ -41,14 +41,6 @@ class ServiceSpecificPipelineArtifacts:
 
 
 @dataclass(frozen=True, slots=True)
-class _IndexedExtractedRunModel:
-    """One extracted run model paired with its original scenario index."""
-
-    index: int
-    run_model: ExtractedRunModel
-
-
-@dataclass(frozen=True, slots=True)
 class _ExtractionExecutionConfig:
     """Execution settings shared by sequential and parallel extraction paths."""
 

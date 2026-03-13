@@ -224,7 +224,7 @@ def test_generate_command_prints_llm_cost_summary_when_present(
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    """Generate command prints one aggregated OpenAI cost line when usage is present."""
+    """Generate command prints one aggregated LLM cost line when usage is present."""
     report_path = tmp_path / "report.json"
     report_path.write_text("{}", encoding="utf-8")
 
@@ -254,7 +254,7 @@ def test_generate_command_prints_llm_cost_summary_when_present(
     adapter.generate_command(service="megatron", report=[report_path])
 
     captured = capsys.readouterr()
-    assert "OpenAI cost: $0.012345 (2 requests, 100 prompt, 50 completion, 150 total tokens)" in captured.out
+    assert "LLM cost: $0.012345 (2 requests, 100 prompt, 50 completion, 150 total tokens)" in captured.out
 
 
 def test_generate_command_raises_typer_exit_on_empty_service(
@@ -333,7 +333,7 @@ def test_format_llm_usage_summary_formats_unavailable_cost_with_tokens() -> None
         estimated_cost_usd=None,
     )
 
-    assert format_llm_usage_summary(summary) == "OpenAI cost: unavailable (3 requests, 100 prompt, 40 completion, 140 total tokens)"
+    assert format_llm_usage_summary(summary) == "LLM cost: unavailable (3 requests, 100 prompt, 40 completion, 140 total tokens)"
 
 
 def test_generate_command_expands_directory_reports_in_sorted_order(tmp_path: Path) -> None:
