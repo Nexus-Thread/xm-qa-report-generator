@@ -1,5 +1,7 @@
 # QA Report Generator
 
+This project uses `uv` for environment and command execution.
+
 ## Shared adapters
 
 Reusable LLM adapter infrastructure lives in `src/shared/adapters/output/llm/`.
@@ -19,13 +21,13 @@ Reusable JSON payload persistence also lives in `src/shared/adapters/output/pers
 ### Manual parser coverage check for fixture bundle
 
 ```bash
-python scripts/parse_k6_example_20260228.py
+uv run python scripts/parse_k6_example_20260228.py
 ```
 
 Optional custom input directory:
 
 ```bash
-python scripts/parse_k6_example_20260228.py --base-dir k6_example/20260228
+uv run python scripts/parse_k6_example_20260228.py --base-dir k6_example/20260228
 ```
 
 The script parses each `*.json` file per service folder and prints per-service status,
@@ -34,18 +36,20 @@ scenario counts/names, file-level failures, and final totals.
 ### Generate deterministic service metrics
 
 ```bash
-qa-report-generator-k6 generate \
+uv run qa-report-generator-performance generate \
   --service megatron \
-  --report k6_example/megatron
+  --report k6_example/20260228/megatron
 ```
 
 Another built-in example:
 
 ```bash
-qa-report-generator-k6 generate \
+uv run qa-report-generator-performance generate \
   --service trading \
   --report k6_example/20260228/trading
 ```
+
+`qa-report-generator-performance` is the packaged CLI entry point defined in `pyproject.toml`.
 
 Notes:
 - Reports are parsed first into a normalized scenario model.
@@ -67,9 +71,9 @@ You can persist low-level structured LLM payloads (request, response content, pa
 LLM_API_KEY=your-api-key \
 LLM_DEBUG_JSON_ENABLED=true \
 LLM_DEBUG_JSON_DIR=out/debug/llm \
-qa-report-generator-k6 generate \
+uv run qa-report-generator-performance generate \
   --service megatron \
-  --report k6_example/megatron
+  --report k6_example/20260228/megatron
 ```
 
 Environment variables:
@@ -85,7 +89,7 @@ overlapping OpenAI-compatible requests at once while preserving deterministic ou
 ## Adding a new service extraction module
 
 1. Create a new package under:
-   - `src/qa_report_generator_performance/application/service_definitions/<service_name>/`
+   - `src/qa_report_generator_performance/application/service_definitions/services/<service_name>/`
 2. Implement:
    - `schema.py`: Pydantic model(s)
    - `prompts.py`: extraction + verification prompt builders
@@ -93,7 +97,7 @@ overlapping OpenAI-compatible requests at once while preserving deterministic ou
    - `definition.py`: `ServiceDefinition` instance
    - `__init__.py`: export `SERVICE_DEFINITION`
 3. No central registry edit is required for in-repo definitions:
-   - built-in definitions are discovered automatically from `service_definitions/*` packages.
+   - built-in definitions are discovered automatically from `service_definitions/services/*` packages.
    - current built-in examples include `megatron`, `trading`, `symbolsservice`, `symbolstreeservice`, `tradinghistoricaldata`, `vps`, and `watchlists`.
 4. Keep extraction deterministic:
    - preserve exact numeric values,

@@ -8,7 +8,7 @@ packages = ["src/qa_report_generator_performance", "src/shared"]
 [project]
 name = "qa-report-generator"
 version = "0.1.0"
-description = "LLM-powered reporting from pytest results"
+description = "LLM-powered reporting"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
@@ -20,16 +20,7 @@ dependencies = [
 ]
 
 [project.scripts]
-qa-report-generator = "qa_report_generator_performance.cli:main"
-qa-report-generator-k6 = "qa_report_generator_performance.cli_k6:main"
-
-[project.entry-points."qa_report_generator_performance.parsers"]
-# custom-parser = "your_package.parsers:CustomParser"
-
-[project.entry-points."qa_report_generator_performance.writers"]
-# custom-writer = "your_package.writers:CustomWriter"
-
-[project.entry-points."qa_report_generator_performance.hooks"]
+qa-report-generator-performance = "qa_report_generator_performance.cli:main"
 
 [dependency-groups]
 dev = [
@@ -42,18 +33,17 @@ dev = [
     "ruff>=0.15.5",
     "types-PyYAML>=6.0.12.20250915",
 ]
-# custom-hook = "your_package.hooks:register"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = "test_*.py"
 python_classes = "Test*"
 python_functions = "test_*"
+console_output_style = "progress"
 
 [tool.ruff]
 target-version = "py311"
 line-length = 160
-extend-exclude = ["dummy_project"]
 
 [tool.ruff.lint]
 select = ["ALL"]
@@ -76,7 +66,6 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 "**/test_*.py" = ["S101"]
-"tests/unit/adapters/output/narrative/test_llm_adapter.py" = ["D103", "PLR2004", "SLF001"]
 "tests/**/__init__.py" = ["D104"]
 
 [tool.ruff.lint.isort]
@@ -100,4 +89,3 @@ show_error_codes = true
 ignore_missing_imports = true
 explicit_package_bases = true
 mypy_path = ["src"]
-exclude = ["dummy_project"]
