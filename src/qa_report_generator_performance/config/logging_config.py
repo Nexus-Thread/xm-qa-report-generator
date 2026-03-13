@@ -11,6 +11,10 @@ if TYPE_CHECKING:
 
 
 _RESERVED_LOG_RECORD_FIELDS = frozenset(logging.makeLogRecord({}).__dict__)
+_THIRD_PARTY_LOG_LEVELS: dict[str, int] = {
+    "httpx": logging.WARNING,
+    "httpcore": logging.WARNING,
+}
 
 
 class JsonLogFormatter(logging.Formatter):
@@ -46,6 +50,12 @@ def _build_handler(config: AppSettings) -> logging.Handler:
     return handler
 
 
+def _configure_third_party_loggers() -> None:
+    """Apply fixed log levels for noisy third-party loggers."""
+    for logger_name, level in _THIRD_PARTY_LOG_LEVELS.items():
+        logging.getLogger(logger_name).setLevel(level)
+
+
 def setup_logging(config: AppSettings) -> None:
     """Configure root logger from application settings."""
     level = getattr(logging, config.log_level.upper(), logging.INFO)
@@ -55,3 +65,4 @@ def setup_logging(config: AppSettings) -> None:
         handler.close()
     root_logger.setLevel(level)
     root_logger.addHandler(_build_handler(config))
+    _configure_third_party_loggers()

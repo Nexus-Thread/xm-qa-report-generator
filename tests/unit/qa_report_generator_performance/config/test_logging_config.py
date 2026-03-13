@@ -114,6 +114,8 @@ def test_setup_logging_reconfigures_existing_root_handlers() -> None:
 
         assert len(root_logger.handlers) == 1
         assert root_logger.level == logging.ERROR
+        assert logging.getLogger("httpx").level == logging.WARNING
+        assert logging.getLogger("httpcore").level == logging.WARNING
         assert first_stream.getvalue() == ""
 
         payload = json.loads(second_stream.getvalue())
@@ -124,3 +126,29 @@ def test_setup_logging_reconfigures_existing_root_handlers() -> None:
         root_logger.handlers.clear()
         root_logger.handlers.extend(original_handlers)
         root_logger.setLevel(original_level)
+
+
+def test_setup_logging_applies_third_party_logger_overrides() -> None:
+    """Logging setup applies fixed levels to noisy third-party loggers."""
+    root_logger = logging.getLogger()
+    original_handlers = list(root_logger.handlers)
+    original_level = root_logger.level
+    httpx_logger = logging.getLogger("httpx")
+    httpcore_logger = logging.getLogger("httpcore")
+    original_httpx_level = httpx_logger.level
+    original_httpcore_level = httpcore_logger.level
+
+    try:
+        httpx_logger.setLevel(logging.DEBUG)
+        httpcore_logger.setLevel(logging.INFO)
+
+        setup_logging(_build_settings(log_level="INFO", log_format="simple"))
+
+        assert httpx_logger.level == logging.WARNING
+        assert httpcore_logger.level == logging.WARNING
+    finally:
+        root_logger.handlers.clear()
+        root_logger.handlers.extend(original_handlers)
+        root_logger.setLevel(original_level)
+        httpx_logger.setLevel(original_httpx_level)
+        httpcore_logger.setLevel(original_httpcore_level)
