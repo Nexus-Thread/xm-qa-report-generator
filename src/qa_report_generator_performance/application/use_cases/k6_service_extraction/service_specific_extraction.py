@@ -48,22 +48,35 @@ class _IndexedExtractedRunModel:
     run_model: ExtractedRunModel
 
 
+@dataclass(frozen=True, slots=True)
+class _ExtractionExecutionConfig:
+    """Execution settings shared by sequential and parallel extraction paths."""
+
+    schema: dict[str, object]
+    max_verification_attempts: int
+
+
 def run_service_specific_pipeline(
     *,
     llm: StructuredLlmPort,
     parsed_report: K6ParsedReport,
     definition: ServiceDefinition,
     max_parallel_scenarios: int = 1,
+    max_verification_attempts: int = 3,
 ) -> ServiceSpecificPipelineArtifacts:
     """Run extract -> post-process -> summary for an already parsed report."""
     schema = definition.dump_schema()
+    extraction_config = _ExtractionExecutionConfig(
+        schema=schema,
+        max_verification_attempts=max_verification_attempts,
+    )
 
     # Step 2: extract one validated run model per parsed scenario.
     extracted_run_models = _extract_run_models(
         llm=llm,
         scenarios=parsed_report.scenarios,
         definition=definition,
-        schema=schema,
+        extraction_config=extraction_config,
         max_parallel_scenarios=max_parallel_scenarios,
     )
     prepared_runs = [_build_prepared_run(run_model=run_model, definition=definition) for run_model in extracted_run_models]
@@ -105,7 +118,7 @@ def _extract_run_models(
     llm: StructuredLlmPort,
     scenarios: tuple[K6Scenario, ...],
     definition: ServiceDefinition,
-    schema: dict[str, object],
+    extraction_config: _ExtractionExecutionConfig,
     max_parallel_scenarios: int,
 ) -> list[ExtractedRunModel]:
     """Extract scenario payloads sequentially or in parallel while preserving order."""
@@ -115,7 +128,8 @@ def _extract_run_models(
                 llm=llm,
                 scenario=scenario,
                 definition=definition,
-                schema=schema,
+                schema=extraction_config.schema,
+                max_verification_attempts=extraction_config.max_verification_attempts,
             )
             for scenario in scenarios
         ]
@@ -124,49 +138,29 @@ def _extract_run_models(
     with ThreadPoolExecutor(max_workers=max_parallel_scenarios) as executor:
         futures = {
             executor.submit(
-                _extract_indexed_run_model,
+                extract_verified_run_model,
                 llm=llm,
-                index=index,
                 scenario=scenario,
                 definition=definition,
-                schema=schema,
-            ): scenario
+                schema=extraction_config.schema,
+                max_verification_attempts=extraction_config.max_verification_attempts,
+            ): (index, scenario)
             for index, scenario in enumerate(scenarios)
         }
 
         for future in as_completed(futures):
-            scenario = futures[future]
+            index, scenario = futures[future]
             try:
                 indexed_run_model = future.result()
             except ReportingError as err:
                 _cancel_pending_futures(futures=futures)
                 raise _build_scenario_processing_error(error=err, scenario=scenario) from err
-            indexed_results[indexed_run_model.index] = indexed_run_model.run_model
+            indexed_results[index] = indexed_run_model
 
     return [run_model for run_model in indexed_results if run_model is not None]
 
 
-def _extract_indexed_run_model(
-    *,
-    llm: StructuredLlmPort,
-    index: int,
-    scenario: K6Scenario,
-    definition: ServiceDefinition,
-    schema: dict[str, object],
-) -> _IndexedExtractedRunModel:
-    """Extract one scenario and retain its original position for stable ordering."""
-    return _IndexedExtractedRunModel(
-        index=index,
-        run_model=extract_verified_run_model(
-            llm=llm,
-            scenario=scenario,
-            definition=definition,
-            schema=schema,
-        ),
-    )
-
-
-def _cancel_pending_futures(*, futures: dict[Future[_IndexedExtractedRunModel], K6Scenario]) -> None:
+def _cancel_pending_futures(*, futures: dict[Future[ExtractedRunModel], tuple[int, K6Scenario]]) -> None:
     """Cancel futures that have not started yet after the first failure."""
     for future in futures:
         future.cancel()

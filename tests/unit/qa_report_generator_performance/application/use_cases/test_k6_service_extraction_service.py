@@ -18,6 +18,7 @@ from qa_report_generator_performance.application.use_cases.k6_service_extraction
 from qa_report_generator_performance.application.use_cases.k6_service_extraction.scenario_extraction import ExtractedRunModel
 from qa_report_generator_performance.application.use_cases.k6_service_extraction.service_specific_extraction import (
     _extract_run_models,
+    _ExtractionExecutionConfig,
     _to_extraction_run,
 )
 from qa_report_generator_performance.application.use_cases.k6_service_extraction.verification import parse_mismatches
@@ -349,7 +350,7 @@ def test_extract_filters_removed_keys_and_returns_validated_payload(tmp_path: Pa
 
 
 def test_extract_fails_on_verification_mismatch(tmp_path: Path) -> None:
-    """Extraction fails strictly when verification returns mismatches."""
+    """Extraction fails after exhausting retries when verification keeps mismatching."""
     report_path = tmp_path / "report.json"
     report_path.write_text(json.dumps(_source_payload()), encoding="utf-8")
 
@@ -368,16 +369,102 @@ def test_extract_fails_on_verification_mismatch(tmp_path: Path) -> None:
                     }
                 ]
             },
+            _extracted_payload(),
+            {
+                "mismatches": [
+                    {
+                        "field": "http_reqs.count",
+                        "expected": "100",
+                        "actual": "101",
+                        "source_jsonpath": "$.metrics.http_reqs.values.count",
+                        "extracted_jsonpath": "$.http_reqs.count",
+                        "reason": "value mismatch",
+                    }
+                ]
+            },
+            _extracted_payload(),
+            {
+                "mismatches": [
+                    {
+                        "field": "http_reqs.count",
+                        "expected": "100",
+                        "actual": "101",
+                        "source_jsonpath": "$.metrics.http_reqs.values.count",
+                        "extracted_jsonpath": "$.http_reqs.count",
+                        "reason": "value mismatch",
+                    }
+                ]
+            },
         ]
     )
     parser = StubK6ParsedReportParser(_parsed_report())
     service = K6ServiceExtractionService(llm=llm, parser=parser)
 
-    with pytest.raises(ExtractionVerificationError):
+    with pytest.raises(ExtractionVerificationError, match="after 3 attempts"):
         service.extract(
             service="megatron",
             report_paths=[report_path],
         )
+
+    assert len(llm.calls) == 6
+
+
+def test_extract_retries_when_verification_fails_then_succeeds(tmp_path: Path) -> None:
+    """Extraction retries with a fresh extraction when verification fails once."""
+    report_path = tmp_path / "report.json"
+    report_path.write_text(json.dumps(_source_payload()), encoding="utf-8")
+
+    llm = StubStructuredLlm(
+        [
+            {**_extracted_payload(), "http_reqs": {"count": 101, "rate": 10.0}},
+            {
+                "mismatches": [
+                    {
+                        "field": "http_reqs.count",
+                        "expected": "100",
+                        "actual": "101",
+                        "source_jsonpath": "$.metrics.http_reqs.values.count",
+                        "extracted_jsonpath": "$.http_reqs.count",
+                        "reason": "value mismatch",
+                    }
+                ]
+            },
+            _extracted_payload(),
+            {"mismatches": []},
+        ]
+    )
+    parser = StubK6ParsedReportParser(_parsed_report())
+    service = K6ServiceExtractionService(llm=llm, parser=parser)
+
+    result = service.extract(
+        service="megatron",
+        report_paths=[report_path],
+    )
+
+    assert len(result.runs) == 1
+    assert result.runs[0].extracted["http_reqs"] == {"count": 100, "rate": 10.0}
+    assert len(llm.calls) == 4
+
+
+def test_extract_does_not_retry_when_schema_validation_fails(tmp_path: Path) -> None:
+    """Extraction does not retry when the extraction payload itself is invalid."""
+    report_path = tmp_path / "report.json"
+    report_path.write_text(json.dumps(_source_payload()), encoding="utf-8")
+
+    invalid_extraction_payload = _extracted_payload()
+    del invalid_extraction_payload["service"]
+
+    llm = StubStructuredLlm([invalid_extraction_payload])
+    parser = StubK6ParsedReportParser(_parsed_report())
+    service = K6ServiceExtractionService(llm=llm, parser=parser)
+
+    with pytest.raises(ExtractionVerificationError, match="schema validation"):
+        service.extract(
+            service="megatron",
+            report_paths=[report_path],
+        )
+
+    assert len(llm.calls) == 1
 
 
 def test_verification_prompt_includes_leaf_metric_mapping_rules(tmp_path: Path) -> None:
@@ -1133,8 +1220,15 @@ def test_extract_run_models_preserves_input_order_when_parallelized(
         "report-3.json": 0.03,
     }
 
-    def fake_extract_verified_run_model(*, llm: object, scenario: K6Scenario, definition: object, schema: object) -> ExtractedRunModel:
-        del llm, definition, schema
+    def fake_extract_verified_run_model(
+        *,
+        llm: object,
+        scenario: K6Scenario,
+        definition: object,
+        schema: object,
+        max_verification_attempts: int = 3,
+    ) -> ExtractedRunModel:
+        del llm, definition, schema, max_verification_attempts
         time.sleep(delay_by_report_file[scenario.source_report_file])
         return ExtractedRunModel(
             source_report_file=scenario.source_report_file,
@@ -1153,7 +1247,7 @@ def test_extract_run_models_preserves_input_order_when_parallelized(
         llm=llm,
         scenarios=scenarios,
         definition=definition,
-        schema={},
+        extraction_config=_ExtractionExecutionConfig(schema={}, max_verification_attempts=3),
         max_parallel_scenarios=3,
     )
 
@@ -1173,8 +1267,15 @@ def test_extract_run_models_adds_scenario_context_when_parallel_worker_fails(
         K6Scenario(source_report_file="report-2.json", name="scenario-2", source_payload={}),
     )
 
-    def fake_extract_verified_run_model(*, llm: object, scenario: K6Scenario, definition: object, schema: object) -> ExtractedRunModel:
-        del llm, definition, schema
+    def fake_extract_verified_run_model(
+        *,
+        llm: object,
+        scenario: K6Scenario,
+        definition: object,
+        schema: object,
+        max_verification_attempts: int = 3,
+    ) -> ExtractedRunModel:
+        del llm, definition, schema, max_verification_attempts
         if scenario.source_report_file == "report-2.json":
             message = "boom"
             raise ReportingError(message, suggestion="Inspect the scenario payload")
@@ -1197,7 +1298,7 @@ def test_extract_run_models_adds_scenario_context_when_parallel_worker_fails(
             llm=llm,
             scenarios=scenarios,
             definition=definition,
-            schema={},
+            extraction_config=_ExtractionExecutionConfig(schema={}, max_verification_attempts=3),
             max_parallel_scenarios=2,
         )
 
@@ -1211,6 +1312,16 @@ def test_service_rejects_non_positive_parallel_scenario_limit() -> None:
             llm=StubStructuredLlm([]),
             parser=StubK6ParsedReportParser(_parsed_report()),
             max_parallel_scenarios=0,
+        )
+
+
+def test_service_rejects_non_positive_verification_attempt_limit() -> None:
+    """Service rejects invalid max_verification_attempts values."""
+    with pytest.raises(ValueError, match="max_verification_attempts"):
+        K6ServiceExtractionService(
+            llm=StubStructuredLlm([]),
+            parser=StubK6ParsedReportParser(_parsed_report()),
+            max_verification_attempts=0,
         )
 
 

@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
+
+from qa_report_generator_performance.application.exceptions import ExtractionVerificationError
 
 from .json_utils import to_canonical_json
 from .scenario_verification import verify_extracted_payload
@@ -15,6 +18,8 @@ if TYPE_CHECKING:
     from qa_report_generator_performance.application.ports.output import StructuredLlmPort
     from qa_report_generator_performance.application.service_definitions.shared.base import ServiceDefinition
     from qa_report_generator_performance.domain.analytics import K6Scenario
+
+LOGGER = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True, slots=True)
@@ -32,27 +37,79 @@ def extract_verified_run_model(
     scenario: K6Scenario,
     definition: ServiceDefinition,
     schema: dict[str, Any],
+    max_verification_attempts: int = 3,
 ) -> ExtractedRunModel:
     """Extract, validate, and verify one scenario payload."""
+    if max_verification_attempts < 1:
+        msg = "max_verification_attempts must be greater than or equal to 1"
+        raise ValueError(msg)
+
     filtered_source_json = to_canonical_json(scenario.source_payload)
-    extracted_model = _extract_payload(
-        llm=llm,
+    last_error: ExtractionVerificationError | None = None
+
+    for attempt in range(1, max_verification_attempts + 1):
+        extracted_model = _extract_payload(
+            llm=llm,
+            scenario=scenario,
+            definition=definition,
+            schema=schema,
+            filtered_source_json=filtered_source_json,
+        )
+        try:
+            verify_extracted_payload(
+                llm=llm,
+                scenario=scenario,
+                definition=definition,
+                schema=schema,
+                extracted=extracted_model.model_dump(by_alias=True),
+            )
+        except ExtractionVerificationError as err:
+            last_error = err
+            if attempt == max_verification_attempts:
+                break
+            LOGGER.warning(
+                "Verification failed; retrying extraction",
+                extra={
+                    "component": "scenario_extraction",
+                    "scenario_name": scenario.name,
+                    "source_report_file": scenario.source_report_file,
+                    "attempt": attempt,
+                    "max_verification_attempts": max_verification_attempts,
+                },
+            )
+            continue
+
+        return ExtractedRunModel(
+            source_report_file=scenario.source_report_file,
+            source_payload=scenario.source_payload,
+            extracted=extracted_model,
+        )
+
+    if last_error is None:
+        msg = "Verification retry flow terminated without a verification error"
+        raise RuntimeError(msg)
+
+    raise _build_retry_exhausted_error(
+        error=last_error,
         scenario=scenario,
-        definition=definition,
-        schema=schema,
-        filtered_source_json=filtered_source_json,
-    )
-    verify_extracted_payload(
-        llm=llm,
-        scenario=scenario,
-        definition=definition,
-        schema=schema,
-        extracted=extracted_model.model_dump(by_alias=True),
-    )
-    return ExtractedRunModel(
-        source_report_file=scenario.source_report_file,
-        source_payload=scenario.source_payload,
-        extracted=extracted_model,
+        max_verification_attempts=max_verification_attempts,
+    ) from last_error
+
+
+def _build_retry_exhausted_error(
+    *,
+    error: ExtractionVerificationError,
+    scenario: K6Scenario,
+    max_verification_attempts: int,
+) -> ExtractionVerificationError:
+    """Return a verification error augmented with exhausted retry context."""
+    return ExtractionVerificationError(
+        (
+            "Verification failed after exhausting extraction retries for "
+            f"{scenario.name} ({scenario.source_report_file}) after {max_verification_attempts} attempts. "
+            f"Last error: {error}"
+        ),
+        suggestion=error.suggestion,
     )
 
 

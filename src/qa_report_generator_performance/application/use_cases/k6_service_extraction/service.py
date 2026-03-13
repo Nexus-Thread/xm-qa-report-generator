@@ -34,16 +34,21 @@ class K6ServiceExtractionService(ExtractK6ServiceMetricsUseCase):
         llm: StructuredLlmPort,
         parser: K6ParsedReportParserPort,
         max_parallel_scenarios: int = 1,
+        max_verification_attempts: int = 3,
         debug_config: K6ServiceExtractionDebugConfig | None = None,
     ) -> None:
         """Store adapter dependencies."""
         if max_parallel_scenarios < 1:
             msg = "max_parallel_scenarios must be greater than or equal to 1"
             raise ValueError(msg)
+        if max_verification_attempts < 1:
+            msg = "max_verification_attempts must be greater than or equal to 1"
+            raise ValueError(msg)
 
         self._llm = llm
         self._parser = parser
         self._max_parallel_scenarios = max_parallel_scenarios
+        self._max_verification_attempts = max_verification_attempts
         self._debug_config = debug_config or K6ServiceExtractionDebugConfig()
 
     def extract(self, *, service: str, report_paths: list[Path]) -> K6ServiceExtractionResult:
@@ -66,6 +71,7 @@ class K6ServiceExtractionService(ExtractK6ServiceMetricsUseCase):
             parsed_report=parsed_report,
             definition=definition,
             max_parallel_scenarios=self._max_parallel_scenarios,
+            max_verification_attempts=self._max_verification_attempts,
         )
         self._write_result_snapshots(
             extracted_runs=pipeline_artifacts.extracted_runs,
