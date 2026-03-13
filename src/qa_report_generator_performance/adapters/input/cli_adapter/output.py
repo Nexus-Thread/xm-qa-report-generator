@@ -47,4 +47,4 @@ def format_llm_usage_summary(summary: LlmUsageSummary) -> str:
     if len(token_segments) == 1:
         token_segments.append("token usage unavailable")
 
-    return f"OpenAI cost: {cost_text} ({', '.join(token_segments)})"
+    return f"LLM cost: {cost_text} ({', '.join(token_segments)})"
