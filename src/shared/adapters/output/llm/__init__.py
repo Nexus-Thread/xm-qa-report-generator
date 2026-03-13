@@ -14,6 +14,7 @@ from .structured_llm_adapter import (
     OpenAIStructuredLlmAdapter,
     StructuredLlmError,
     StructuredLlmInvalidJsonError,
+    StructuredLlmJsonCompletionResult,
     StructuredLlmResponseError,
 )
 
@@ -26,6 +27,7 @@ __all__ = [
     "OpenAIStructuredLlmAdapter",
     "StructuredLlmError",
     "StructuredLlmInvalidJsonError",
+    "StructuredLlmJsonCompletionResult",
     "StructuredLlmResponseError",
     "build_client",
     "extract_message_content",

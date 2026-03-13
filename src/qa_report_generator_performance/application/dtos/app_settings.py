@@ -19,6 +19,8 @@ class AppSettings:
     llm_max_retries: int = 3
     llm_max_concurrency: int = 4
     llm_retry_backoff_factor: float = 2.0
+    llm_input_cost_per_million_tokens: float | None = None
+    llm_output_cost_per_million_tokens: float | None = None
     llm_debug_json_enabled: bool = False
     llm_debug_json_dir: Path = field(default_factory=lambda: Path("out/debug/llm"))
     model_debug_json_enabled: bool = True

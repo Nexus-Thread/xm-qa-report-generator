@@ -6,8 +6,11 @@ import json
 import logging
 from typing import TYPE_CHECKING, Any
 
+from shared.adapters.output.llm.openai_adapter import extract_usage
+
 from .logging_utils import truncate_for_log
 from .response_parser import extract_structured_content, parse_json_object
+from .result import StructuredLlmJsonCompletionResult
 
 if TYPE_CHECKING:
     from shared.adapters.output.llm.openai_adapter import OpenAIClientProtocol
@@ -36,6 +39,14 @@ class OpenAIStructuredLlmAdapter:
 
     def complete_json(self, *, system_prompt: str, user_prompt: str) -> dict[str, Any]:
         """Return parsed JSON payload from model response."""
+        completion_result = self.complete_json_with_metadata(
+            system_prompt=system_prompt,
+            user_prompt=user_prompt,
+        )
+        return completion_result.payload
+
+    def complete_json_with_metadata(self, *, system_prompt: str, user_prompt: str) -> StructuredLlmJsonCompletionResult:
+        """Return parsed JSON payload together with token usage metadata."""
         messages = self._build_messages(system_prompt=system_prompt, user_prompt=user_prompt)
         request_payload = self._build_request_payload(messages=messages)
         self._log_json_stage(
@@ -46,6 +57,7 @@ class OpenAIStructuredLlmAdapter:
 
         response = self._client.create_json_completion(model=self._model, messages=messages)
         content = extract_structured_content(response)
+        usage = extract_usage(response)
         self._log_text_stage(
             label="response_content",
             content=content,
@@ -59,7 +71,7 @@ class OpenAIStructuredLlmAdapter:
             message="Structured LLM parsed JSON payload",
             extra={"payload_keys": list(payload.keys())},
         )
-        return payload
+        return StructuredLlmJsonCompletionResult(payload=payload, usage=usage)
 
     def _build_messages(self, *, system_prompt: str, user_prompt: str) -> list[dict[str, str]]:
         """Build chat messages for the structured completion request."""

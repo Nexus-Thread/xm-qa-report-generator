@@ -11,7 +11,7 @@ from qa_report_generator_performance.application.ports.input import (
 )
 from qa_report_generator_performance.domain.exceptions import ReportingError
 
-from .output import build_extraction_payload, format_reporting_error, print_json_output
+from .output import build_extraction_payload, format_llm_usage_summary, format_reporting_error, print_json_output
 from .report_inputs import CliInputError, expand_report_inputs, normalize_service_input
 
 LOGGER = logging.getLogger(__name__)
@@ -97,6 +97,8 @@ class K6CliAdapter:
             payload=payload,
             heading=f"Service: {result.service}",
         )
+        if result.llm_usage_summary is not None:
+            typer.echo(format_llm_usage_summary(result.llm_usage_summary))
 
     def _exit_with_error(self, message: str, *, error: Exception | None = None) -> NoReturn:
         """Print formatted error and stop command execution."""

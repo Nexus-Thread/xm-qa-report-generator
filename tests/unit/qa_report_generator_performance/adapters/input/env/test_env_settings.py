@@ -18,6 +18,8 @@ ENV_SETTING_NAMES = (
     "LLM_MAX_RETRIES",
     "LLM_MAX_CONCURRENCY",
     "LLM_RETRY_BACKOFF_FACTOR",
+    "LLM_INPUT_COST_PER_MILLION_TOKENS",
+    "LLM_OUTPUT_COST_PER_MILLION_TOKENS",
     "LLM_DEBUG_JSON_ENABLED",
     "LLM_DEBUG_JSON_DIR",
     "MODEL_DEBUG_JSON_ENABLED",
@@ -55,6 +57,8 @@ def test_env_settings_adapter_loads_environment_overrides_into_app_settings(monk
     monkeypatch.setenv("LLM_MAX_RETRIES", "2")
     monkeypatch.setenv("LLM_MAX_CONCURRENCY", "6")
     monkeypatch.setenv("LLM_RETRY_BACKOFF_FACTOR", "1.5")
+    monkeypatch.setenv("LLM_INPUT_COST_PER_MILLION_TOKENS", "2.5")
+    monkeypatch.setenv("LLM_OUTPUT_COST_PER_MILLION_TOKENS", "10")
     monkeypatch.setenv("LLM_DEBUG_JSON_ENABLED", "true")
     monkeypatch.setenv("LLM_DEBUG_JSON_DIR", "out/debug/custom")
     monkeypatch.setenv("MODEL_DEBUG_JSON_ENABLED", "false")
@@ -74,6 +78,8 @@ def test_env_settings_adapter_loads_environment_overrides_into_app_settings(monk
         llm_max_retries=2,
         llm_max_concurrency=6,
         llm_retry_backoff_factor=1.5,
+        llm_input_cost_per_million_tokens=2.5,
+        llm_output_cost_per_million_tokens=10.0,
         llm_debug_json_enabled=True,
         llm_debug_json_dir=Path("out/debug/custom"),
         model_debug_json_enabled=False,
@@ -108,6 +114,8 @@ def test_env_settings_adapter_requires_llm_api_key_when_not_provided(monkeypatch
         ("LLM_MAX_RETRIES", "11"),
         ("LLM_MAX_CONCURRENCY", "0"),
         ("LLM_RETRY_BACKOFF_FACTOR", "0.9"),
+        ("LLM_INPUT_COST_PER_MILLION_TOKENS", "-1"),
+        ("LLM_OUTPUT_COST_PER_MILLION_TOKENS", "-1"),
     ],
 )
 def test_env_settings_adapter_raises_configuration_error_for_invalid_values(

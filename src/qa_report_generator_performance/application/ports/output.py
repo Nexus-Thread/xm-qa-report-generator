@@ -8,6 +8,7 @@ if TYPE_CHECKING:
     from collections.abc import Sequence
     from pathlib import Path
 
+    from qa_report_generator_performance.application.dtos import LlmUsageSummary
     from qa_report_generator_performance.domain.analytics import K6ParsedReport
 
 
@@ -16,6 +17,16 @@ class StructuredLlmPort(Protocol):
 
     def complete_json(self, *, system_prompt: str, user_prompt: str) -> dict[str, Any]:
         """Return a JSON object parsed from an LLM response."""
+
+
+class LlmUsageSummaryProviderPort(Protocol):
+    """Port for resetting and reading aggregated LLM usage for one run."""
+
+    def reset(self) -> None:
+        """Clear any previously aggregated LLM usage state."""
+
+    def build_summary(self) -> LlmUsageSummary | None:
+        """Return aggregated LLM usage for the current run, if any."""
 
 
 class JsonWriterPort(Protocol):

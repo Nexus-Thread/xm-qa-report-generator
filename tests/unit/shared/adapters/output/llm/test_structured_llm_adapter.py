@@ -10,9 +10,11 @@ from typing import Any, cast
 
 import pytest
 
+from shared.adapters.output.llm.openai_adapter import OpenAIResponseUsage
 from shared.adapters.output.llm.structured_llm_adapter import (
     OpenAIStructuredLlmAdapter,
     StructuredLlmInvalidJsonError,
+    StructuredLlmJsonCompletionResult,
     StructuredLlmResponseError,
 )
 
@@ -32,6 +34,14 @@ class _Choice:
 @dataclass(frozen=True)
 class _Response:
     choices: list[_Choice] | None
+    usage: object | None = None
+
+
+@dataclass(frozen=True)
+class _Usage:
+    prompt_tokens: int | None = None
+    completion_tokens: int | None = None
+    total_tokens: int | None = None
 
 
 class _StubClient:
@@ -100,6 +110,26 @@ def test_complete_json_returns_payload_and_formats_messages() -> None:
             ],
         )
     ]
+
+
+def test_complete_json_with_metadata_returns_payload_and_usage() -> None:
+    """Structured adapter returns parsed payload plus response usage metadata."""
+    client = _StubClient(
+        [
+            _Response(
+                choices=[_Choice(message=_Message(content='{"ok": true}'))],
+                usage=_Usage(prompt_tokens=11, completion_tokens=7, total_tokens=18),
+            )
+        ]
+    )
+    adapter = OpenAIStructuredLlmAdapter(client=client, model="gpt-test")
+
+    result = adapter.complete_json_with_metadata(system_prompt="system", user_prompt="user")
+
+    assert result == StructuredLlmJsonCompletionResult(
+        payload={"ok": True},
+        usage=OpenAIResponseUsage(prompt_tokens=11, completion_tokens=7, total_tokens=18),
+    )
 
 
 def test_complete_json_raises_on_invalid_json() -> None:

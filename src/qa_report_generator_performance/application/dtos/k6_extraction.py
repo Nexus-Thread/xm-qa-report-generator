@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any, TypeAlias
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
+    from qa_report_generator_performance.application.dtos.llm_usage import LlmUsageSummary
     from qa_report_generator_performance.domain.analytics import (
         K6OverallExecutiveSummary,
         K6ScenarioExecutiveSummary,
@@ -39,6 +40,7 @@ class K6ServiceExtractionResult:
     runs: list[K6ServiceExtractionRun]
     overall_summary: K6OverallExecutiveSummary
     scenario_summaries: list[K6ScenarioExecutiveSummary]
+    llm_usage_summary: LlmUsageSummary | None = None
 
     def to_summary_payload(self) -> dict[str, object]:
         """Return the summary-stage payload used by adapters and debug snapshots."""

@@ -3,9 +3,10 @@
 from qa_report_generator_performance.adapters.input.cli_adapter import K6CliAdapter
 from qa_report_generator_performance.adapters.input.env_settings_adapter import EnvSettingsAdapter
 from qa_report_generator_performance.adapters.output.parsers import K6ParsedReportParser
-from qa_report_generator_performance.adapters.output.structured_llm_adapter import StructuredLlmPortAdapter
+from qa_report_generator_performance.adapters.output.structured_llm_adapter import OpenAILlmUsageTracker, StructuredLlmPortAdapter
 from qa_report_generator_performance.application.use_cases import (
     K6ServiceExtractionDebugConfig,
+    K6ServiceExtractionRuntimeConfig,
     K6ServiceExtractionService,
 )
 from qa_report_generator_performance.config import setup_logging
@@ -30,18 +31,25 @@ def create_cli_adapter() -> K6CliAdapter:
     )
     debug_json_writer = JsonFileWriterAdapter(base_dir=config.llm_debug_json_dir)
     model_debug_json_writer = JsonFileWriterAdapter(base_dir=config.model_debug_json_dir)
+    usage_tracker = OpenAILlmUsageTracker(
+        input_cost_per_million_tokens=config.llm_input_cost_per_million_tokens,
+        output_cost_per_million_tokens=config.llm_output_cost_per_million_tokens,
+    )
     structured_llm_adapter = OpenAIStructuredLlmAdapter(
         client=openai_client,
         model=config.llm_model,
         debug_json_writer=debug_json_writer,
         debug_json_enabled=config.llm_debug_json_enabled,
     )
-    structured_llm = StructuredLlmPortAdapter(adapter=structured_llm_adapter)
+    structured_llm = StructuredLlmPortAdapter(adapter=structured_llm_adapter, usage_tracker=usage_tracker)
     parsed_report_parser = K6ParsedReportParser()
     service_metrics_extractor = K6ServiceExtractionService(
         llm=structured_llm,
         parser=parsed_report_parser,
-        max_parallel_scenarios=config.llm_max_concurrency,
+        runtime_config=K6ServiceExtractionRuntimeConfig(
+            llm_usage_summary_provider=usage_tracker,
+            max_parallel_scenarios=config.llm_max_concurrency,
+        ),
         debug_config=K6ServiceExtractionDebugConfig(
             model_debug_json_writer=model_debug_json_writer,
             model_debug_json_enabled=config.model_debug_json_enabled,

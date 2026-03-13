@@ -114,6 +114,18 @@ class EnvSettings(BaseSettings):
         le=10.0,
         description="Exponential backoff multiplier for retries (wait time = factor^attempt)",
     )
+    llm_input_cost_per_million_tokens: float | None = Field(
+        default=None,
+        alias="LLM_INPUT_COST_PER_MILLION_TOKENS",
+        ge=0.0,
+        description="Estimated USD cost for one million input tokens",
+    )
+    llm_output_cost_per_million_tokens: float | None = Field(
+        default=None,
+        alias="LLM_OUTPUT_COST_PER_MILLION_TOKENS",
+        ge=0.0,
+        description="Estimated USD cost for one million output tokens",
+    )
     llm_debug_json_enabled: bool | None = Field(
         default=None, alias="LLM_DEBUG_JSON_ENABLED", description="Enable writing structured LLM request/response/parsed payloads to JSON files"
     )

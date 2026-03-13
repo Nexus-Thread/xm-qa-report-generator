@@ -11,6 +11,7 @@ from typer.testing import CliRunner
 from qa_report_generator_performance.adapters.input.cli_adapter import K6CliAdapter
 from qa_report_generator_performance.adapters.input.cli_adapter.output import (
     build_extraction_payload,
+    format_llm_usage_summary,
     format_reporting_error,
 )
 from qa_report_generator_performance.adapters.input.cli_adapter.report_inputs import (
@@ -21,6 +22,7 @@ from qa_report_generator_performance.adapters.input.cli_adapter.report_inputs im
 from qa_report_generator_performance.application.dtos import (
     K6ServiceExtractionResult,
     K6ServiceExtractionRun,
+    LlmUsageSummary,
 )
 from qa_report_generator_performance.domain.analytics import (
     K6OverallExecutiveSummary,
@@ -86,6 +88,7 @@ def build_result(*, service: str, report_paths: list[Path]) -> K6ServiceExtracti
                 executive_note="Scenario grouped-scenario met all evaluated thresholds.",
             )
         ],
+        llm_usage_summary=None,
     )
 
 
@@ -217,6 +220,43 @@ def test_generate_command_prints_success_message_heading_and_json_payload(
     assert '"runs"' not in captured.out
 
 
+def test_generate_command_prints_llm_cost_summary_when_present(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Generate command prints one aggregated OpenAI cost line when usage is present."""
+    report_path = tmp_path / "report.json"
+    report_path.write_text("{}", encoding="utf-8")
+
+    extraction_use_case = SpyExtractionUseCase()
+    adapter = build_adapter(extraction_use_case)
+
+    original_extract = extraction_use_case.extract
+
+    def _extract_with_usage(*, service: str, report_paths: list[Path]) -> K6ServiceExtractionResult:
+        result = original_extract(service=service, report_paths=report_paths)
+        return K6ServiceExtractionResult(
+            service=result.service,
+            runs=result.runs,
+            overall_summary=result.overall_summary,
+            scenario_summaries=result.scenario_summaries,
+            llm_usage_summary=LlmUsageSummary(
+                request_count=2,
+                prompt_tokens=100,
+                completion_tokens=50,
+                total_tokens=150,
+                estimated_cost_usd=0.012345,
+            ),
+        )
+
+    extraction_use_case.extract = _extract_with_usage  # type: ignore[method-assign]
+
+    adapter.generate_command(service="megatron", report=[report_path])
+
+    captured = capsys.readouterr()
+    assert "OpenAI cost: $0.012345 (2 requests, 100 prompt, 50 completion, 150 total tokens)" in captured.out
+
+
 def test_generate_command_raises_typer_exit_on_empty_service(
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
@@ -281,6 +321,19 @@ def test_build_extraction_payload_returns_summary_payload(tmp_path: Path) -> Non
     assert payload["service"] == "megatron"
     assert "scenario_summaries" in payload
     assert "runs" not in payload
+
+
+def test_format_llm_usage_summary_formats_unavailable_cost_with_tokens() -> None:
+    """CLI usage formatter reports unavailable cost when pricing is missing."""
+    summary = LlmUsageSummary(
+        request_count=3,
+        prompt_tokens=100,
+        completion_tokens=40,
+        total_tokens=140,
+        estimated_cost_usd=None,
+    )
+
+    assert format_llm_usage_summary(summary) == "OpenAI cost: unavailable (3 requests, 100 prompt, 40 completion, 140 total tokens)"
 
 
 def test_generate_command_expands_directory_reports_in_sorted_order(tmp_path: Path) -> None:

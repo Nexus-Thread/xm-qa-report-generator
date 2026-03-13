@@ -10,9 +10,11 @@ from typing import TYPE_CHECKING, Any, cast
 import pytest
 from pydantic import BaseModel, ConfigDict
 
+from qa_report_generator_performance.application.dtos import LlmUsageSummary
 from qa_report_generator_performance.application.exceptions import ExtractionVerificationError
 from qa_report_generator_performance.application.use_cases.k6_service_extraction import (
     K6ServiceExtractionDebugConfig,
+    K6ServiceExtractionRuntimeConfig,
     K6ServiceExtractionService,
 )
 from qa_report_generator_performance.application.use_cases.k6_service_extraction.scenario_extraction import ExtractedRunModel
@@ -88,6 +90,23 @@ class StubK6ParsedReportParser:
             for report_file in report_files
         ]
         return K6ParsedReport(service=service, scenarios=tuple(scenarios))
+
+
+class SpyLlmUsageSummaryProvider:
+    """Spy usage-summary provider for extraction service tests."""
+
+    def __init__(self, summary: LlmUsageSummary | None) -> None:
+        """Store the summary that should be returned."""
+        self._summary = summary
+        self.reset_call_count = 0
+
+    def reset(self) -> None:
+        """Record reset calls."""
+        self.reset_call_count += 1
+
+    def build_summary(self) -> LlmUsageSummary | None:
+        """Return the configured summary."""
+        return self._summary
 
 
 def _source_payload() -> dict[str, Any]:
@@ -1183,6 +1202,50 @@ def test_extract_writes_debug_snapshots_when_enabled(tmp_path: Path) -> None:
     ]
 
 
+def test_extract_attaches_llm_usage_summary_and_resets_provider(tmp_path: Path) -> None:
+    """Extraction service resets and attaches aggregated LLM usage when configured."""
+    report_path = tmp_path / "report.json"
+    report_path.write_text(json.dumps(_source_payload()), encoding="utf-8")
+
+    llm = StubStructuredLlm(
+        [
+            _extracted_payload(),
+            {"mismatches": []},
+        ]
+    )
+    parser = StubK6ParsedReportParser(_parsed_report())
+    usage_summary_provider = SpyLlmUsageSummaryProvider(
+        LlmUsageSummary(
+            request_count=2,
+            prompt_tokens=100,
+            completion_tokens=50,
+            total_tokens=150,
+            estimated_cost_usd=0.012345,
+        )
+    )
+    service = K6ServiceExtractionService(
+        llm=llm,
+        parser=parser,
+        runtime_config=K6ServiceExtractionRuntimeConfig(
+            llm_usage_summary_provider=usage_summary_provider,
+        ),
+    )
+
+    result = service.extract(
+        service="megatron",
+        report_paths=[report_path],
+    )
+
+    assert usage_summary_provider.reset_call_count == 1
+    assert result.llm_usage_summary == LlmUsageSummary(
+        request_count=2,
+        prompt_tokens=100,
+        completion_tokens=50,
+        total_tokens=150,
+        estimated_cost_usd=0.012345,
+    )
+
+
 def test_parse_mismatches_preserves_numeric_values() -> None:
     """Mismatch parsing preserves JSON-scalar numeric values."""
     mismatches = parse_mismatches(
@@ -1311,7 +1374,7 @@ def test_service_rejects_non_positive_parallel_scenario_limit() -> None:
         K6ServiceExtractionService(
             llm=StubStructuredLlm([]),
             parser=StubK6ParsedReportParser(_parsed_report()),
-            max_parallel_scenarios=0,
+            runtime_config=K6ServiceExtractionRuntimeConfig(max_parallel_scenarios=0),
         )
 
 
@@ -1321,7 +1384,7 @@ def test_service_rejects_non_positive_verification_attempt_limit() -> None:
         K6ServiceExtractionService(
             llm=StubStructuredLlm([]),
             parser=StubK6ParsedReportParser(_parsed_report()),
-            max_verification_attempts=0,
+            runtime_config=K6ServiceExtractionRuntimeConfig(max_verification_attempts=0),
         )
 
 

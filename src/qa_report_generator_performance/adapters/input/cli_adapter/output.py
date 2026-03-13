@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 import typer
 
 if TYPE_CHECKING:
-    from qa_report_generator_performance.application.dtos import K6ServiceExtractionResult
+    from qa_report_generator_performance.application.dtos import K6ServiceExtractionResult, LlmUsageSummary
     from qa_report_generator_performance.domain.exceptions import ReportingError
 
 
@@ -31,3 +31,20 @@ def print_json_output(*, success_message: str, payload: object, heading: str | N
     if heading:
         typer.echo(heading)
     typer.echo(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True))
+
+
+def format_llm_usage_summary(summary: LlmUsageSummary) -> str:
+    """Build CLI-facing text for aggregated OpenAI usage and estimated cost."""
+    cost_text = "unavailable" if summary.estimated_cost_usd is None else f"${summary.estimated_cost_usd:.6f}"
+
+    token_segments = [f"{summary.request_count} requests"]
+    if summary.prompt_tokens is not None:
+        token_segments.append(f"{summary.prompt_tokens} prompt")
+    if summary.completion_tokens is not None:
+        token_segments.append(f"{summary.completion_tokens} completion")
+    if summary.total_tokens is not None:
+        token_segments.append(f"{summary.total_tokens} total tokens")
+    if len(token_segments) == 1:
+        token_segments.append("token usage unavailable")
+
+    return f"OpenAI cost: {cost_text} ({', '.join(token_segments)})"

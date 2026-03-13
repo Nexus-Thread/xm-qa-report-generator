@@ -7,11 +7,13 @@ from .k6_extraction import (
     K6ServiceExtractionRun,
     VerificationMismatch,
 )
+from .llm_usage import LlmUsageSummary
 
 __all__ = [
     "AppSettings",
     "JsonScalar",
     "K6ServiceExtractionResult",
     "K6ServiceExtractionRun",
+    "LlmUsageSummary",
     "VerificationMismatch",
 ]

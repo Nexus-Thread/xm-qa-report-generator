@@ -7,11 +7,13 @@ from .exceptions import (
     StructuredLlmResponseError,
 )
 from .protocols import JsonDebugWriterProtocol
+from .result import StructuredLlmJsonCompletionResult
 
 __all__ = [
     "JsonDebugWriterProtocol",
     "OpenAIStructuredLlmAdapter",
     "StructuredLlmError",
     "StructuredLlmInvalidJsonError",
+    "StructuredLlmJsonCompletionResult",
     "StructuredLlmResponseError",
 ]

@@ -79,12 +79,18 @@ uv run qa-report-generator-performance generate \
 Environment variables:
 - `LLM_API_KEY` (required)
 - `LLM_MAX_CONCURRENCY` (default: `4`)
+- `LLM_INPUT_COST_PER_MILLION_TOKENS` (optional)
+- `LLM_OUTPUT_COST_PER_MILLION_TOKENS` (optional)
 - `LLM_DEBUG_JSON_ENABLED` (default: `false`)
 - `LLM_DEBUG_JSON_DIR` (default: `out/debug/llm`)
 
 When multiple parsed scenarios are present, service-specific extraction can process them in parallel
 using a synchronous worker pool. `LLM_MAX_CONCURRENCY` bounds how many scenarios may issue
 overlapping OpenAI-compatible requests at once while preserving deterministic output order.
+
+When pricing variables are configured, the CLI prints one aggregated OpenAI cost line per run.
+If token usage is returned but pricing is not configured, the CLI still prints the request/token summary
+with `OpenAI cost: unavailable`.
 
 ## Adding a new service extraction module
 
