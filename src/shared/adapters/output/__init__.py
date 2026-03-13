@@ -14,8 +14,10 @@ from .llm import (
     extract_message_content,
     extract_usage,
 )
+from .persistence import JsonFileWriterAdapter
 
 __all__ = [
+    "JsonFileWriterAdapter",
     "OpenAIClient",
     "OpenAIClientProtocol",
     "OpenAIClientSettings",

@@ -1,4 +1,4 @@
-"""Unit tests for the JSON file writer adapter."""
+"""Unit tests for the shared JSON file writer adapter."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING
 import pytest
 from pydantic import BaseModel, Field
 
-from qa_report_generator_performance.adapters.output.persistence import JsonFileWriterAdapter
+from shared.adapters.output.persistence import JsonFileWriterAdapter
 
 if TYPE_CHECKING:
     from pathlib import Path

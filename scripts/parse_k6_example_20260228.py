@@ -111,7 +111,7 @@ def _load_parser_class() -> type[ParsedReportParser] | None:
 
 def _load_debug_writer(*, dump_dir: Path) -> DebugJsonWriter | None:
     try:
-        from qa_report_generator_performance.adapters.output.persistence import JsonFileWriterAdapter
+        from shared.adapters.output.persistence import JsonFileWriterAdapter
     except ImportError as err:
         _write_error(f"ERROR: unable to import JSON debug writer adapter: {err}")
         _write_error("Hint: run from repository root or set PYTHONPATH=src")

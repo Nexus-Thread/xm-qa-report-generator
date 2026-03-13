@@ -3,7 +3,6 @@
 from qa_report_generator_performance.adapters.input.cli_adapter import K6CliAdapter
 from qa_report_generator_performance.adapters.input.env_settings_adapter import EnvSettingsAdapter
 from qa_report_generator_performance.adapters.output.parsers import K6ParsedReportParser
-from qa_report_generator_performance.adapters.output.persistence import JsonFileWriterAdapter
 from qa_report_generator_performance.adapters.output.structured_llm_adapter import StructuredLlmPortAdapter
 from qa_report_generator_performance.application.use_cases import (
     K6ServiceExtractionDebugConfig,
@@ -11,6 +10,7 @@ from qa_report_generator_performance.application.use_cases import (
 )
 from qa_report_generator_performance.config import setup_logging
 from shared.adapters.output.llm import OpenAIClientSettings, OpenAIStructuredLlmAdapter, build_client
+from shared.adapters.output.persistence import JsonFileWriterAdapter
 
 
 def create_cli_adapter() -> K6CliAdapter:

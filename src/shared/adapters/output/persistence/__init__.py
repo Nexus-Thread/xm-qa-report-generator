@@ -1,4 +1,4 @@
-"""Persistence output adapter exports."""
+"""Shared persistence adapter exports."""
 
 from .json_file_writer_adapter import JsonFileWriterAdapter
 

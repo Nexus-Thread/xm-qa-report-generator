@@ -9,6 +9,11 @@ Reusable LLM adapter infrastructure lives in `src/shared/adapters/output/llm/`.
 - Application packages keep only thin boundary adapters that translate shared failures into
   application-specific exceptions.
 
+Reusable JSON payload persistence also lives in `src/shared/adapters/output/persistence/`.
+
+- `JsonFileWriterAdapter` provides generic timestamped JSON file persistence for debug payloads and
+  other machine-readable snapshots.
+
 ## k6 CLI
 
 ### Manual parser coverage check for fixture bundle
