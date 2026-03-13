@@ -40,7 +40,6 @@ def build_result(*, service: str, report_paths: list[Path]) -> K6ServiceExtracti
     """Build a deterministic extraction result for tests."""
     return K6ServiceExtractionResult(
         service=service,
-        mode="service_specific",
         runs=[
             K6ServiceExtractionRun(
                 source_report_files=tuple(path.name for path in report_paths),
@@ -211,7 +210,6 @@ def test_generate_command_prints_success_message_heading_and_json_payload(
     captured = capsys.readouterr()
     assert "✅ Generated service metrics" in captured.out
     assert "Service: megatron" in captured.out
-    assert '"mode": "service_specific"' in captured.out
     assert '"service": "megatron"' in captured.out
     assert '"overall_summary"' in captured.out
     assert '"scenario_summaries"' in captured.out

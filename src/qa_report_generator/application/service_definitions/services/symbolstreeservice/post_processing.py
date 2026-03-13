@@ -4,117 +4,104 @@ from __future__ import annotations
 
 import re
 from collections import defaultdict
-from typing import TYPE_CHECKING, cast
+from copy import deepcopy
+from typing import Any, cast
 
-from qa_report_generator.application.dtos import K6ServiceExtractionRun
-
-if TYPE_CHECKING:
-    from pydantic import BaseModel
-
-    from .schema import SymbolstreeserviceExtractedMetrics
+from qa_report_generator.application.service_definitions.services.symbolstreeservice.schema import (
+    SymbolstreeserviceExtractedMetrics,
+)
+from qa_report_generator.application.service_definitions.shared import (
+    derive_merge_buckets,
+    merge_counter_metric_field,
+    merge_optional_counter_metric_field,
+    merge_rate_metric_field,
+    merge_trend_metric_field,
+)
+from qa_report_generator.application.service_definitions.shared.base import PreparedExtractionRun
 
 _GROUPED_SCENARIO_PATTERN = re.compile(r"^(?P<base>getSymbolsTreeInfo)\d+$")
 _GROUPED_SCENARIO_NAME_FRAGMENT_PATTERN = re.compile(r"getSymbolsTreeInfo\d+")
-_TREND_METRIC_FIELDS = (
-    "http_req_duration",
-    "http_req_blocked",
-    "http_req_connecting",
-    "http_req_receiving",
-    "http_req_sending",
-    "http_req_tls_handshaking",
-    "http_req_waiting",
-    "iteration_duration",
-)
-_RATE_METRIC_FIELDS = ("checks", "http_req_failed")
-_COUNTER_METRIC_FIELDS = (
-    "http_reqs",
-    "iterations",
-    "data_received",
-    "data_sent",
-)
+
+_MERGE_BUCKETS = derive_merge_buckets(SymbolstreeserviceExtractedMetrics)
 
 
 def build_post_processed_runs(
-    extracted_runs: list[BaseModel],
-) -> list[K6ServiceExtractionRun]:
-    """Build grouped derived runs for numbered getSymbolsTreeInfo scenarios."""
-    symbol_tree_runs = [_to_symbolstreeservice_metrics(run) for run in extracted_runs]
-    passthrough_runs: list[K6ServiceExtractionRun] = []
-    grouped_runs: dict[str, list[SymbolstreeserviceExtractedMetrics]] = defaultdict(list)
+    extracted_runs: list[PreparedExtractionRun],
+) -> list[PreparedExtractionRun]:
+    """Build grouped prepared runs for numbered getSymbolsTreeInfo scenarios."""
+    passthrough_runs: list[PreparedExtractionRun] = []
+    grouped_runs: dict[str, list[PreparedExtractionRun]] = defaultdict(list)
 
-    for extracted_run in symbol_tree_runs:
-        match = _GROUPED_SCENARIO_PATTERN.match(extracted_run.scenario.name)
+    for extracted_run in extracted_runs:
+        match = _GROUPED_SCENARIO_PATTERN.match(_scenario_name(_to_symbolstreeservice_metrics(extracted_run.extracted)))
         if match is None:
-            passthrough_runs.append(
-                K6ServiceExtractionRun.from_extracted_payload(
-                    source_report_files=(extracted_run.report_file,),
-                    extracted=extracted_run.model_dump(by_alias=True),
-                )
-            )
+            passthrough_runs.append(extracted_run)
             continue
         grouped_runs[match.group("base")].append(extracted_run)
 
     merged_runs = [_build_grouped_run(name=group_name, extracted_runs=group_runs) for group_name, group_runs in sorted(grouped_runs.items())]
     return sorted(
         [*passthrough_runs, *merged_runs],
-        key=lambda run: str(run.extracted.get("scenario", {}).get("name", "")),
+        key=_prepared_run_scenario_name,
     )
 
 
 def _build_grouped_run(
     *,
     name: str,
-    extracted_runs: list[SymbolstreeserviceExtractedMetrics],
-) -> K6ServiceExtractionRun:
-    """Build one grouped derived run from multiple extracted runs."""
-    representative_run = extracted_runs[0]
-    source_report_files = sorted(run.report_file for run in extracted_runs)
-    total_iterations = sum(run.iterations.count for run in extracted_runs)
-    duration_values = {run.test_run_duration_ms for run in extracted_runs}
+    extracted_runs: list[PreparedExtractionRun],
+) -> PreparedExtractionRun:
+    """Build one grouped prepared run from multiple extracted runs."""
+    typed_runs = [_to_symbolstreeservice_metrics(run.extracted) for run in extracted_runs]
+    representative_run = typed_runs[0]
+    source_report_files = tuple(sorted(source_report_file for prepared_run in extracted_runs for source_report_file in prepared_run.source_report_files))
+    duration_values = {float(run.test_run_duration_ms) for run in typed_runs}
 
-    grouped_payload = representative_run.model_dump(by_alias=True)
+    grouped_payload = deepcopy(representative_run.model_dump(by_alias=True))
     grouped_payload["scenario"] = {
-        **grouped_payload["scenario"],
+        **_required_dict(grouped_payload, "scenario"),
         "name": name,
-        "rate": sum(run.scenario.rate for run in extracted_runs),
-        "preAllocatedVUs": max(run.scenario.pre_allocated_vus for run in extracted_runs),
-        "maxVUs": max(run.scenario.max_vus for run in extracted_runs),
+        "rate": sum(_scenario_float(run, "rate") for run in typed_runs),
+        "preAllocatedVUs": max(_scenario_int(run, "preAllocatedVUs", "pre_allocated_vus") for run in typed_runs),
+        "maxVUs": max(_scenario_int(run, "maxVUs", "max_vus") for run in typed_runs),
     }
-    grouped_payload["test_run_duration_ms"] = duration_values.pop() if len(duration_values) == 1 else max(run.test_run_duration_ms for run in extracted_runs)
-    grouped_payload["thresholds"] = _merge_thresholds(name=name, extracted_runs=extracted_runs)
-    grouped_payload["threshold_results"] = _merge_threshold_results(name=name, extracted_runs=extracted_runs)
-    for field_name in _TREND_METRIC_FIELDS:
-        grouped_payload[field_name] = _merge_trend_metric_values(
-            extracted_runs=extracted_runs,
-            field_name=field_name,
-            total_iterations=total_iterations,
-        )
-    for field_name in _RATE_METRIC_FIELDS:
-        grouped_payload[field_name] = _merge_rate_metric_values(
-            extracted_runs=extracted_runs,
-            field_name=field_name,
-        )
-    for field_name in _COUNTER_METRIC_FIELDS:
-        grouped_payload[field_name] = _merge_counter_metric_values(
-            extracted_runs=extracted_runs,
-            field_name=field_name,
-        )
-    grouped_payload["dropped_iterations"] = _merge_optional_counter_metric_values(
-        extracted_runs=extracted_runs,
-        field_name="dropped_iterations",
+    grouped_payload["test_run_duration_ms"] = duration_values.pop() if len(duration_values) == 1 else max(float(run.test_run_duration_ms) for run in typed_runs)
+    grouped_payload["thresholds"] = _merge_thresholds(name=name, extracted_runs=typed_runs)
+    grouped_payload["threshold_statuses"] = _merge_threshold_statuses(
+        name=name,
+        extracted_runs=typed_runs,
     )
-    grouped_payload["source_scenarios"] = [run.scenario.name for run in extracted_runs]
+    for field_name in _MERGE_BUCKETS.trend_fields:
+        grouped_payload[field_name] = merge_trend_metric_field(
+            extracted_runs=typed_runs,
+            field_name=field_name,
+        )
+    for field_name in _MERGE_BUCKETS.rate_fields:
+        grouped_payload[field_name] = merge_rate_metric_field(
+            extracted_runs=typed_runs,
+            field_name=field_name,
+        )
+    for field_name in _MERGE_BUCKETS.counter_fields:
+        grouped_payload[field_name] = merge_counter_metric_field(
+            extracted_runs=typed_runs,
+            field_name=field_name,
+        )
+    for field_name in _MERGE_BUCKETS.optional_counter_fields:
+        grouped_payload[field_name] = merge_optional_counter_metric_field(
+            extracted_runs=typed_runs,
+            field_name=field_name,
+        )
+    grouped_payload["source_scenarios"] = [_scenario_name(run) for run in typed_runs]
     grouped_payload["group_size"] = len(extracted_runs)
-    grouped_payload["source_report_files"] = source_report_files
-    grouped_payload.pop("report_file", None)
+    grouped_payload["report_file"] = source_report_files[0]
 
-    return K6ServiceExtractionRun.from_extracted_payload(
+    return PreparedExtractionRun(
         source_report_files=source_report_files,
-        extracted=grouped_payload,
+        extracted=SymbolstreeserviceExtractedMetrics.model_validate(grouped_payload),
     )
 
 
-def _to_symbolstreeservice_metrics(run: BaseModel) -> SymbolstreeserviceExtractedMetrics:
+def _to_symbolstreeservice_metrics(run: object) -> SymbolstreeserviceExtractedMetrics:
     """Convert a generic extracted model into symbolstreeservice metrics."""
     if not hasattr(run, "scenario") or not hasattr(run, "report_file"):
         msg = "Post-processing requires symbolstreeservice extracted metrics"
@@ -122,78 +109,9 @@ def _to_symbolstreeservice_metrics(run: BaseModel) -> SymbolstreeserviceExtracte
     return cast("SymbolstreeserviceExtractedMetrics", run)
 
 
-def _merge_trend_metric_values(
-    *,
-    extracted_runs: list[SymbolstreeserviceExtractedMetrics],
-    field_name: str,
-    total_iterations: int,
-) -> dict[str, float]:
-    """Merge trend metric values using weighted averages and guardrail percentiles."""
-    weights = [run.iterations.count for run in extracted_runs]
-    values = [getattr(run, field_name) for run in extracted_runs]
-    return {
-        "min": min(value.min for value in values),
-        "avg": _weighted_average(
-            values=[value.avg for value in values],
-            weights=weights,
-            fallback_divisor=total_iterations,
-        ),
-        "med": _weighted_average(
-            values=[value.med for value in values],
-            weights=weights,
-            fallback_divisor=total_iterations,
-        ),
-        "max": max(value.max for value in values),
-        "p(95)": max(value.p95 for value in values),
-        "p(99)": max(value.p99 for value in values),
-    }
-
-
-def _merge_rate_metric_values(
-    *,
-    extracted_runs: list[SymbolstreeserviceExtractedMetrics],
-    field_name: str,
-) -> dict[str, float | int]:
-    """Merge rate metric values from summed pass/fail counts."""
-    values = [getattr(run, field_name) for run in extracted_runs]
-    passes = sum(value.passes for value in values)
-    fails = sum(value.fails for value in values)
-    total = passes + fails
-    rate = fails / total if total else 0.0
-    return {
-        "rate": rate,
-        "passes": passes,
-        "fails": fails,
-    }
-
-
-def _merge_counter_metric_values(
-    *,
-    extracted_runs: list[SymbolstreeserviceExtractedMetrics],
-    field_name: str,
-) -> dict[str, float | int]:
-    """Merge counter metric values by summing counts and rates."""
-    values = [getattr(run, field_name) for run in extracted_runs]
-    return {
-        "count": sum(value.count for value in values),
-        "rate": sum(value.rate for value in values),
-    }
-
-
-def _merge_optional_counter_metric_values(
-    *,
-    extracted_runs: list[SymbolstreeserviceExtractedMetrics],
-    field_name: str,
-) -> dict[str, float | int] | None:
-    """Merge optional counter metric values when present in any source run."""
-    values = [getattr(run, field_name) for run in extracted_runs]
-    present_values = [value for value in values if value is not None]
-    if not present_values:
-        return None
-    return {
-        "count": sum(value.count for value in present_values),
-        "rate": sum(value.rate for value in present_values),
-    }
+def _prepared_run_scenario_name(run: PreparedExtractionRun) -> str:
+    """Return scenario name for sorting prepared runs."""
+    return _scenario_name(_to_symbolstreeservice_metrics(run.extracted))
 
 
 def _merge_thresholds(
@@ -205,58 +123,95 @@ def _merge_thresholds(
     merged_thresholds: dict[str, list[str]] = {}
     for run in extracted_runs:
         for key, values in run.thresholds.items():
+            if not isinstance(key, str) or not isinstance(values, list):
+                continue
             normalized_key = _GROUPED_SCENARIO_NAME_FRAGMENT_PATTERN.sub(name, key)
             merged_thresholds.setdefault(normalized_key, [])
             for value in values:
+                if not isinstance(value, str):
+                    continue
                 if value not in merged_thresholds[normalized_key]:
                     merged_thresholds[normalized_key].append(value)
     return merged_thresholds
 
 
-def _merge_threshold_results(
+def _merge_threshold_statuses(
     *,
     name: str,
     extracted_runs: list[SymbolstreeserviceExtractedMetrics],
-) -> list[dict[str, str]]:
-    """Merge threshold status rows under the grouped scenario name."""
-    merged_results: dict[tuple[str, str], str] = {}
+) -> dict[str, dict[str, bool]]:
+    """Merge threshold ok-status values under the grouped scenario name."""
+    merged_results: dict[tuple[str, str], bool] = {}
     for run in extracted_runs:
-        raw_results = getattr(run, "threshold_results", [])
-        if not isinstance(raw_results, list):
-            continue
-        for item in raw_results:
-            if not isinstance(item, dict):
+        for metric_key, threshold_map in run.threshold_statuses.items():
+            if not isinstance(metric_key, str) or not isinstance(threshold_map, dict):
                 continue
-            metric_key = item.get("metric_key")
-            expression = item.get("expression")
-            status = item.get("status")
-            if not isinstance(metric_key, str) or not isinstance(expression, str) or status not in {"pass", "fail", "unknown"}:
-                continue
-            normalized_metric_key = _GROUPED_SCENARIO_NAME_FRAGMENT_PATTERN.sub(name, metric_key)
-            existing_status = merged_results.get((normalized_metric_key, expression))
-            merged_results[(normalized_metric_key, expression)] = _merge_threshold_status(existing_status, status)
-    return [
-        {
-            "metric_key": metric_key,
-            "expression": expression,
-            "status": status,
-        }
-        for (metric_key, expression), status in sorted(merged_results.items())
-    ]
+            for expression, ok in threshold_map.items():
+                if not isinstance(expression, str) or not isinstance(ok, bool):
+                    continue
+                normalized_metric_key = _GROUPED_SCENARIO_NAME_FRAGMENT_PATTERN.sub(name, metric_key)
+                existing_status = merged_results.get((normalized_metric_key, expression))
+                merged_results[(normalized_metric_key, expression)] = _merge_threshold_ok(existing_status, ok)
+    normalized_results: dict[str, dict[str, bool]] = {}
+    for (metric_key, expression), ok in sorted(merged_results.items()):
+        normalized_results.setdefault(metric_key, {})[expression] = ok
+    return normalized_results
 
 
-def _merge_threshold_status(existing_status: str | None, new_status: str) -> str:
-    """Merge threshold status values with fail taking precedence."""
-    if existing_status == "fail" or new_status == "fail":
-        return "fail"
-    if existing_status == "unknown" or new_status == "unknown":
-        return "unknown"
-    return "pass"
+def _merge_threshold_ok(existing_status: bool | None, new_status: bool) -> bool:
+    """Merge threshold ok-status values with failures taking precedence."""
+    return not (existing_status is False or new_status is False)
 
 
-def _weighted_average(*, values: list[float], weights: list[int], fallback_divisor: int) -> float:
-    """Calculate a weighted average with a deterministic zero fallback."""
-    weighted_sum = sum(value * weight for value, weight in zip(values, weights, strict=True))
-    if fallback_divisor <= 0:
-        return 0.0
-    return weighted_sum / fallback_divisor
+def _scenario_name(run: SymbolstreeserviceExtractedMetrics) -> str:
+    """Return the extracted scenario name from one prepared run."""
+    return run.scenario.name
+
+
+def _scenario_int(run: SymbolstreeserviceExtractedMetrics, *field_names: str) -> int:
+    """Return one required integer scenario field from a prepared run."""
+    scenario = run.scenario.model_dump(by_alias=True)
+    for field_name in field_names:
+        value = scenario.get(field_name)
+        if isinstance(value, int) and not isinstance(value, bool):
+            return value
+    msg = f"Prepared symbolstreeservice run is missing scenario fields: {', '.join(field_names)}"
+    raise TypeError(msg)
+
+
+def _scenario_float(run: SymbolstreeserviceExtractedMetrics, *field_names: str) -> float:
+    """Return one required numeric scenario field from a prepared run."""
+    scenario = run.scenario.model_dump(by_alias=True)
+    for field_name in field_names:
+        value = scenario.get(field_name)
+        if isinstance(value, int | float) and not isinstance(value, bool):
+            return float(value)
+    msg = f"Prepared symbolstreeservice run is missing scenario fields: {', '.join(field_names)}"
+    raise TypeError(msg)
+
+
+def _required_dict(payload: dict[str, Any], field_name: str) -> dict[str, Any]:
+    """Return one required object field from a payload."""
+    value = payload.get(field_name)
+    if isinstance(value, dict):
+        return value
+    msg = f"Prepared symbolstreeservice payload is missing object field: {field_name}"
+    raise TypeError(msg)
+
+
+def _required_int(payload: dict[str, Any], field_name: str) -> int:
+    """Return one required integer field from a payload."""
+    value = payload.get(field_name)
+    if isinstance(value, int) and not isinstance(value, bool):
+        return value
+    msg = f"Prepared symbolstreeservice payload is missing integer field: {field_name}"
+    raise TypeError(msg)
+
+
+def _required_float(payload: dict[str, Any], field_name: str) -> float:
+    """Return one required numeric field from a payload."""
+    value = payload.get(field_name)
+    if isinstance(value, int | float) and not isinstance(value, bool):
+        return float(value)
+    msg = f"Prepared symbolstreeservice payload is missing numeric field: {field_name}"
+    raise TypeError(msg)

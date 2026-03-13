@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -63,12 +63,8 @@ def analyze_overall_scenarios(*, scenario_analyses: Sequence[K6ScenarioAnalysis]
 
 def _build_threshold_summaries(*, run_payload: dict[str, Any]) -> list[K6ThresholdSummary]:
     """Build normalized threshold summaries from extracted payload fields."""
-    prebuilt_threshold_results = run_payload.get("threshold_results")
-    if isinstance(prebuilt_threshold_results, list):
-        return _prebuilt_threshold_summaries(prebuilt_threshold_results)
-
     threshold_definitions = _normalize_threshold_definitions(run_payload.get("thresholds"))
-    threshold_statuses = _collect_threshold_statuses(metric_payloads=run_payload)
+    threshold_statuses = _collect_threshold_statuses_from_payload(run_payload=run_payload)
 
     summaries: list[K6ThresholdSummary] = []
     for metric_key, expressions in sorted(threshold_definitions.items()):
@@ -96,8 +92,34 @@ def _normalize_threshold_definitions(value: Any) -> dict[str, tuple[str, ...]]:
     return normalized
 
 
-def _collect_threshold_statuses(*, metric_payloads: dict[str, Any]) -> dict[tuple[str, str], K6Status]:
-    """Collect threshold statuses from metric payloads when present."""
+def _collect_threshold_statuses_from_payload(*, run_payload: dict[str, Any]) -> dict[tuple[str, str], K6Status]:
+    """Collect threshold statuses from extracted threshold source fields."""
+    threshold_statuses = run_payload.get("threshold_statuses")
+    if isinstance(threshold_statuses, dict):
+        return _collect_threshold_statuses_from_status_map(threshold_statuses)
+    return _collect_threshold_statuses_from_metric_payloads(metric_payloads=run_payload)
+
+
+def _collect_threshold_statuses_from_status_map(
+    threshold_statuses: dict[str, Any],
+) -> dict[tuple[str, str], K6Status]:
+    """Collect threshold statuses from a normalized status map."""
+    statuses: dict[tuple[str, str], K6Status] = {}
+    for metric_key, threshold_map in threshold_statuses.items():
+        if not isinstance(metric_key, str) or not isinstance(threshold_map, dict):
+            continue
+        for expression, ok in threshold_map.items():
+            if not isinstance(expression, str) or not isinstance(ok, bool):
+                continue
+            statuses[(metric_key, expression)] = "pass" if ok else "fail"
+    return statuses
+
+
+def _collect_threshold_statuses_from_metric_payloads(
+    *,
+    metric_payloads: dict[str, Any],
+) -> dict[tuple[str, str], K6Status]:
+    """Collect threshold statuses from metric payload threshold objects."""
     statuses: dict[tuple[str, str], K6Status] = {}
     for metric_key, metric_payload in metric_payloads.items():
         if not isinstance(metric_payload, dict):
@@ -113,27 +135,6 @@ def _collect_threshold_statuses(*, metric_payloads: dict[str, Any]) -> dict[tupl
     return statuses
 
 
-def _prebuilt_threshold_summaries(value: list[Any]) -> list[K6ThresholdSummary]:
-    """Convert prebuilt threshold summary payloads into domain records."""
-    summaries: list[K6ThresholdSummary] = []
-    for item in value:
-        if not isinstance(item, dict):
-            continue
-        metric_key = _as_string(item.get("metric_key"))
-        expression = _as_string(item.get("expression"))
-        status = item.get("status")
-        if metric_key is None or expression is None or status not in {"pass", "fail", "unknown"}:
-            continue
-        summaries.append(
-            K6ThresholdSummary(
-                metric_key=metric_key,
-                expression=expression,
-                status=cast("K6Status", status),
-            )
-        )
-    return summaries
-
-
 def _derive_scenario_status(*, threshold_results: Sequence[K6ThresholdSummary]) -> K6Status:
     """Derive scenario pass/fail status from threshold results."""
     if not threshold_results:
@@ -147,7 +148,7 @@ def _derive_scenario_status(*, threshold_results: Sequence[K6ThresholdSummary]) 
 
 def _as_dict(value: Any) -> dict[str, Any]:
     """Return a dict value or an empty dict fallback."""
-    return cast("dict[str, Any]", value) if isinstance(value, dict) else {}
+    return value if isinstance(value, dict) else {}
 
 
 def _as_string(value: Any) -> str | None:

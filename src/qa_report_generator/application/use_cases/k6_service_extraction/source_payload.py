@@ -100,3 +100,20 @@ def collect_threshold_statuses(*, metric_payloads: dict[str, Any]) -> dict[tuple
             if isinstance(evaluation, dict) and isinstance(evaluation.get("ok"), bool):
                 statuses[(metric_key, expression)] = "pass" if evaluation["ok"] else "fail"
     return statuses
+
+
+def collect_threshold_status_map(*, metric_payloads: dict[str, Any]) -> dict[str, dict[str, bool]]:
+    """Collect raw threshold ok-status values by metric and expression."""
+    statuses: dict[str, dict[str, bool]] = {}
+    for metric_key, metric_payload in metric_payloads.items():
+        if not isinstance(metric_key, str) or not isinstance(metric_payload, dict):
+            continue
+        thresholds = metric_payload.get("thresholds")
+        if not isinstance(thresholds, dict):
+            continue
+        for expression, evaluation in thresholds.items():
+            if not isinstance(expression, str):
+                continue
+            if isinstance(evaluation, dict) and isinstance(evaluation.get("ok"), bool):
+                statuses.setdefault(metric_key, {})[expression] = evaluation["ok"]
+    return statuses

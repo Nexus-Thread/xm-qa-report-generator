@@ -11,7 +11,7 @@ from qa_report_generator.domain.analytics import (
 
 
 def test_analyze_scenario_run_uses_prebuilt_threshold_results() -> None:
-    """Scenario analysis uses attached threshold results for status and failures."""
+    """Scenario analysis derives threshold results from definitions and statuses."""
     run_payload = {
         "scenario": {
             "name": "megatron-load",
@@ -22,18 +22,14 @@ def test_analyze_scenario_run_uses_prebuilt_threshold_results() -> None:
             "preAllocatedVUs": 10,
             "maxVUs": 20,
         },
-        "threshold_results": [
-            {
-                "metric_key": "http_req_duration",
-                "expression": "p(95)<1000",
-                "status": "pass",
-            },
-            {
-                "metric_key": "checks",
-                "expression": "rate>0.99",
-                "status": "fail",
-            },
-        ],
+        "thresholds": {
+            "http_req_duration": ["p(95)<1000"],
+            "checks": ["rate>0.99"],
+        },
+        "threshold_statuses": {
+            "http_req_duration": {"p(95)<1000": True},
+            "checks": {"rate>0.99": False},
+        },
     }
 
     result = analyze_scenario_run(
@@ -53,7 +49,8 @@ def test_build_scenario_executive_summary_projects_analysis_into_note() -> None:
     analysis = analyze_scenario_run(
         run_payload={
             "scenario": {"name": "scenario-b"},
-            "threshold_results": [{"metric_key": "checks", "expression": "rate>0.99", "status": "fail"}],
+            "thresholds": {"checks": ["rate>0.99"]},
+            "threshold_statuses": {"checks": {"rate>0.99": False}},
         },
         source_report_files=["b.json"],
     )
@@ -70,14 +67,16 @@ def test_analyze_overall_scenarios_rolls_up_attention_scenarios() -> None:
     pass_analysis = analyze_scenario_run(
         run_payload={
             "scenario": {"name": "scenario-a"},
-            "threshold_results": [{"metric_key": "checks", "expression": "rate>0.99", "status": "pass"}],
+            "thresholds": {"checks": ["rate>0.99"]},
+            "threshold_statuses": {"checks": {"rate>0.99": True}},
         },
         source_report_files=["a.json"],
     )
     fail_analysis = analyze_scenario_run(
         run_payload={
             "scenario": {"name": "scenario-b"},
-            "threshold_results": [{"metric_key": "checks", "expression": "rate>0.99", "status": "fail"}],
+            "thresholds": {"checks": ["rate>0.99"]},
+            "threshold_statuses": {"checks": {"rate>0.99": False}},
         },
         source_report_files=["b.json"],
     )
@@ -100,14 +99,16 @@ def test_build_overall_executive_summary_projects_analysis_into_text() -> None:
             analyze_scenario_run(
                 run_payload={
                     "scenario": {"name": "scenario-a"},
-                    "threshold_results": [{"metric_key": "checks", "expression": "rate>0.99", "status": "pass"}],
+                    "thresholds": {"checks": ["rate>0.99"]},
+                    "threshold_statuses": {"checks": {"rate>0.99": True}},
                 },
                 source_report_files=["a.json"],
             ),
             analyze_scenario_run(
                 run_payload={
                     "scenario": {"name": "scenario-b"},
-                    "threshold_results": [{"metric_key": "checks", "expression": "rate>0.99", "status": "fail"}],
+                    "thresholds": {"checks": ["rate>0.99"]},
+                    "threshold_statuses": {"checks": {"rate>0.99": False}},
                 },
                 source_report_files=["b.json"],
             ),

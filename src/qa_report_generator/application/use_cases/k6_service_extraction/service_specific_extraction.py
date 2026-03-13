@@ -11,6 +11,7 @@ from qa_report_generator.application.dtos import (
     K6ServiceExtractionResult,
     K6ServiceExtractionRun,
 )
+from qa_report_generator.application.service_definitions.shared.base import PreparedExtractionRun
 from qa_report_generator.domain.analytics import (
     analyze_overall_scenarios,
     analyze_scenario_run,
@@ -20,11 +21,9 @@ from qa_report_generator.domain.analytics import (
 from qa_report_generator.domain.exceptions import ReportingError
 
 from .scenario_extraction import ExtractedRunModel, extract_verified_run_model
-from .thresholds import build_threshold_summaries_from_source_payload
+from .source_payload import collect_threshold_status_map
 
 if TYPE_CHECKING:
-    from pydantic import BaseModel
-
     from qa_report_generator.application.ports.output import StructuredLlmPort
     from qa_report_generator.application.service_definitions.shared.base import ServiceDefinition
     from qa_report_generator.domain.analytics import K6ParsedReport, K6Scenario
@@ -67,25 +66,17 @@ def run_service_specific_pipeline(
         schema=schema,
         max_parallel_scenarios=max_parallel_scenarios,
     )
-    extracted_runs = [
-        K6ServiceExtractionRun.from_extracted_payload(
-            source_report_files=(run_model.source_report_file,),
-            extracted=run_model.extracted.model_dump(by_alias=True),
-            threshold_results=build_threshold_summaries_from_source_payload(
-                source_payload=run_model.source_payload,
-            ),
-        )
-        for run_model in extracted_run_models
-    ]
+    prepared_runs = [_build_prepared_run(run_model=run_model, definition=definition) for run_model in extracted_run_models]
+    extracted_runs = [_to_extraction_run(prepared_run=prepared_run) for prepared_run in prepared_runs]
 
-    # Step 3: apply optional service-specific post-processing to extracted runs.
-    post_processed_runs = _post_process_runs(
+    # Step 2b: apply optional service-specific post-processing before DTO conversion.
+    post_processed_prepared_runs = _post_process_runs(
         definition=definition,
-        fallback_runs=extracted_runs,
-        extracted_models=[run_model.extracted for run_model in extracted_run_models],
+        fallback_runs=prepared_runs,
     )
+    post_processed_runs = [_to_extraction_run(prepared_run=prepared_run) for prepared_run in post_processed_prepared_runs]
 
-    # Step 4: analyze prepared runs, then project summaries from those analyses.
+    # Step 3: analyze prepared runs, then project summaries from those analyses.
     scenario_analyses = [
         analyze_scenario_run(
             run_payload=run.extracted,
@@ -98,7 +89,6 @@ def run_service_specific_pipeline(
 
     summary_result = K6ServiceExtractionResult(
         service=parsed_report.service,
-        mode="service_specific",
         runs=post_processed_runs,
         overall_summary=build_overall_executive_summary(analysis=overall_analysis),
         scenario_summaries=scenario_summaries,
@@ -200,10 +190,46 @@ def _build_scenario_processing_error(*, error: ReportingError, scenario: K6Scena
 def _post_process_runs(
     *,
     definition: ServiceDefinition,
-    fallback_runs: list[K6ServiceExtractionRun],
-    extracted_models: list[BaseModel],
-) -> list[K6ServiceExtractionRun]:
-    """Build final runs after optional post-processing."""
+    fallback_runs: list[PreparedExtractionRun],
+) -> list[PreparedExtractionRun]:
+    """Build final prepared runs after optional post-processing."""
     if definition.post_process_extracted is None:
         return fallback_runs
-    return definition.post_process_extracted(extracted_models)
+    return definition.post_process_extracted(fallback_runs)
+
+
+def _build_prepared_run(
+    *,
+    run_model: ExtractedRunModel,
+    definition: ServiceDefinition,
+) -> PreparedExtractionRun:
+    """Build one prepared typed extraction result before output conversion."""
+    enriched_payload = run_model.extracted.model_dump(by_alias=True)
+    enriched_payload["threshold_statuses"] = collect_threshold_status_map(
+        metric_payloads=_as_metrics_payload(run_model.source_payload),
+    )
+    return PreparedExtractionRun(
+        source_report_files=(run_model.source_report_file,),
+        extracted=definition.schema_model.model_validate(enriched_payload),
+    )
+
+
+def _to_extraction_run(*, prepared_run: PreparedExtractionRun) -> K6ServiceExtractionRun:
+    """Convert one prepared typed run into the output extraction DTO."""
+    extracted_payload = prepared_run.extracted.model_dump(
+        by_alias=True,
+        exclude={"report_file"},
+    )
+    if "threshold_results" in extracted_payload:
+        msg = "Prepared extraction payload unexpectedly contains threshold_results before analysis"
+        raise TypeError(msg)
+    return K6ServiceExtractionRun(
+        source_report_files=prepared_run.source_report_files,
+        extracted=extracted_payload,
+    )
+
+
+def _as_metrics_payload(source_payload: dict[str, object]) -> dict[str, object]:
+    """Return raw metric payload mapping or an empty fallback."""
+    metrics = source_payload.get("metrics")
+    return metrics if isinstance(metrics, dict) else {}

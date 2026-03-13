@@ -8,10 +8,9 @@ from qa_report_generator.application.exceptions import (
     ConfigurationError,
 )
 from qa_report_generator.application.ports.input import ExtractK6ServiceMetricsUseCase
-from qa_report_generator.application.service_definitions import get_optional_service_definition
+from qa_report_generator.application.service_definitions import get_service_definition
 
 from .config import K6ServiceExtractionDebugConfig
-from .result_builders import build_generic_result
 from .service_specific_extraction import run_service_specific_pipeline
 
 if TYPE_CHECKING:
@@ -53,7 +52,7 @@ class K6ServiceExtractionService(ExtractK6ServiceMetricsUseCase):
             msg = "No report files provided for extraction"
             raise ConfigurationError(msg, suggestion="Pass one or more k6 JSON reports")
 
-        definition = get_optional_service_definition(service)
+        definition = get_service_definition(service)
 
         # Step 1: parse the input JSON files into a normalized report model.
         parsed_report = self._parse_report(
@@ -61,15 +60,6 @@ class K6ServiceExtractionService(ExtractK6ServiceMetricsUseCase):
             report_paths=report_paths,
             definition=definition,
         )
-
-        if definition is None:
-            result = build_generic_result(parsed_report=parsed_report)
-            self._write_result_snapshots(
-                extracted_runs=result.runs,
-                post_processed_runs=result.runs,
-                summary_result=result,
-            )
-            return result
 
         pipeline_artifacts = run_service_specific_pipeline(
             llm=self._llm,
@@ -89,14 +79,13 @@ class K6ServiceExtractionService(ExtractK6ServiceMetricsUseCase):
         *,
         service: str,
         report_paths: list[Path],
-        definition: ServiceDefinition | None,
+        definition: ServiceDefinition,
     ) -> K6ParsedReport:
         """Parse source reports with service-specific key filtering."""
-        remove_keys = definition.remove_keys if definition is not None else frozenset()
         return self._parser.parse(
             service=service,
             report_files=report_paths,
-            remove_keys=remove_keys,
+            remove_keys=definition.remove_keys,
         )
 
     def _write_result_snapshots(

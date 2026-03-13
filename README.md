@@ -39,7 +39,7 @@ Notes:
 - If a service definition does not exist, CLI returns generic parsed scenario output.
 - `LLM_API_KEY` must be provided in the environment.
 - Verification is strict-fail: any numeric mismatch fails the run.
-- Output is printed as one consolidated envelope with `mode` and `runs`.
+- Output is printed as one consolidated summary envelope for the extracted service.
 - `runs` always contains the final consumer-facing result after the pipeline finishes.
 - For services without custom post-processing, `runs` contains the extracted scenarios as-is.
 - For services with custom post-processing, `runs` contains the post-processed result in the same interface.

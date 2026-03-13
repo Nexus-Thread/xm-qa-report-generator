@@ -8,7 +8,7 @@ from copy import deepcopy
 from typing import TYPE_CHECKING, Any, cast
 
 import pytest
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from qa_report_generator.application.exceptions import ExtractionVerificationError
 from qa_report_generator.application.use_cases.k6_service_extraction import (
@@ -18,6 +18,7 @@ from qa_report_generator.application.use_cases.k6_service_extraction import (
 from qa_report_generator.application.use_cases.k6_service_extraction.scenario_extraction import ExtractedRunModel
 from qa_report_generator.application.use_cases.k6_service_extraction.service_specific_extraction import (
     _extract_run_models,
+    _to_extraction_run,
 )
 from qa_report_generator.application.use_cases.k6_service_extraction.verification import parse_mismatches
 from qa_report_generator.domain.analytics import K6ParsedReport, K6Scenario
@@ -296,6 +297,15 @@ class _FakeExtractedModel(BaseModel):
     report_file: str
 
 
+class _UnexpectedThresholdResultsModel(BaseModel):
+    """Prepared-model fixture carrying an invalid pre-analysis threshold summary field."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    service: str
+    threshold_results: list[dict[str, str]]
+
+
 def test_extract_filters_removed_keys_and_returns_validated_payload(tmp_path: Path) -> None:
     """Extraction filters heavy keys and returns validated payload."""
     report_path_1 = tmp_path / "report-1.json"
@@ -320,19 +330,14 @@ def test_extract_filters_removed_keys_and_returns_validated_payload(tmp_path: Pa
     )
 
     assert result.service == "megatron"
-    assert result.mode == "service_specific"
     assert len(result.runs) == 2
     assert result.overall_summary.total_scenarios == 2
     assert len(result.scenario_summaries) == 2
     assert "report_file" not in result.runs[0].extracted
     assert "report_file" not in result.runs[1].extracted
-    assert result.runs[0].extracted["threshold_results"] == [
-        {
-            "metric_key": "http_req_duration",
-            "expression": "p(95)<1000",
-            "status": "unknown",
-        }
-    ]
+    assert "threshold_results" not in result.runs[0].extracted
+    assert result.runs[0].extracted["threshold_statuses"] == {}
+    assert result.scenario_summaries[0].threshold_results[0].metric_key == "http_req_duration"
     assert result.runs[0].extracted["service"] == "megatron"
     assert result.runs[1].extracted["service"] == "megatron"
     assert llm.calls[0][0].startswith("You extract structured k6 metrics from a filtered k6 JSON report.")
@@ -769,8 +774,8 @@ def test_verification_prompt_includes_report_file_context(tmp_path: Path) -> Non
     )
 
 
-def test_extract_returns_generic_payload_when_service_definition_is_missing(tmp_path: Path) -> None:
-    """Extraction returns generic parsed payload when no service definition exists."""
+def test_extract_fails_when_service_definition_is_missing(tmp_path: Path) -> None:
+    """Extraction fails when the requested service definition is missing."""
     report_path = tmp_path / "report.json"
     report_path.write_text(json.dumps(_source_payload()), encoding="utf-8")
 
@@ -778,48 +783,13 @@ def test_extract_returns_generic_payload_when_service_definition_is_missing(tmp_
     parser = StubK6ParsedReportParser(_parsed_report(service="unknown-service", source_report_file="report.json"))
     service = K6ServiceExtractionService(llm=llm, parser=parser)
 
-    result = service.extract(
-        service="unknown-service",
-        report_paths=[report_path],
-    )
-
-    assert result.service == "unknown-service"
-    assert result.mode == "generic"
-    assert len(result.runs) == 1
-    assert result.overall_summary.status == "unknown"
-    assert result.scenario_summaries[0].threshold_results[0].metric_key == "http_req_duration"
-    assert "report_file" not in result.runs[0].extracted
-    assert result.runs[0].extracted["scenario"]["name"] == "megatron-load"
-    assert llm.calls == []
-
-
-def test_extract_normalizes_generic_metrics_and_thresholds_from_source_payload(tmp_path: Path) -> None:
-    """Generic extraction rebuilds normalized metrics and thresholds from source payload."""
-    report_path = tmp_path / "report.json"
-    source_payload = _source_payload()
-    source_payload["execThresholds"] = source_payload.pop("thresholds")
-    source_payload["metrics"]["invalid_metric"] = 10
-    report_path.write_text(json.dumps(source_payload), encoding="utf-8")
-
-    llm = StubStructuredLlm([])
-    parser = StubK6ParsedReportParser(
-        _parsed_report_with_source_payload(
-            source_payload=source_payload,
+    with pytest.raises(Exception, match="Unsupported service"):
+        service.extract(
             service="unknown-service",
-            source_report_file="report.json",
+            report_paths=[report_path],
         )
-    )
-    service = K6ServiceExtractionService(llm=llm, parser=parser)
 
-    result = service.extract(
-        service="unknown-service",
-        report_paths=[report_path],
-    )
-
-    extracted = result.runs[0].extracted
-    assert extracted["thresholds"] == {"http_req_duration": ["p(95)<1000"]}
-    assert "checks" in extracted["metrics"]
-    assert "invalid_metric" not in extracted["metrics"]
+    assert llm.calls == []
 
 
 def test_extract_ignores_false_positive_match_reports_from_verifier(tmp_path: Path) -> None:
@@ -1045,7 +1015,9 @@ def test_extract_builds_symbolstreeservice_post_processed_group(tmp_path: Path) 
         "p(99)": 700.0,
     }
     assert grouped_run.extracted["thresholds"] == {"http_req_duration{test_name:getSymbolsTreeInfo}": ["p(95)<1000"]}
-    assert grouped_run.extracted["threshold_results"] == []
+    assert grouped_run.extracted["threshold_statuses"] == {}
+    assert grouped_run.extracted.get("threshold_results") is None
+    assert result.scenario_summaries[1].threshold_results[0].metric_key == "http_req_duration{test_name:getSymbolsTreeInfo}"
 
 
 def test_extract_uses_max_duration_when_grouped_runs_differ(tmp_path: Path) -> None:
@@ -1082,55 +1054,42 @@ def test_extract_uses_max_duration_when_grouped_runs_differ(tmp_path: Path) -> N
     )
 
     assert len(result.runs) == 1
+    assert result.runs[0].source_report_files == (
+        "symbolstreeservice-1.json",
+        "symbolstreeservice-2.json",
+    )
+    assert result.runs[0].extracted["scenario"]["name"] == "getSymbolsTreeInfo"
     assert result.runs[0].extracted["test_run_duration_ms"] == 62000
 
 
-def test_extract_writes_model_snapshots_for_service_specific_flow(tmp_path: Path) -> None:
-    """Extraction writes extracted, post-processed, and summary snapshots."""
+def test_extract_writes_debug_snapshots_when_enabled(tmp_path: Path) -> None:
+    """Extraction writes debug snapshots for extracted, post-processed, and summary outputs."""
     report_path = tmp_path / "report.json"
     report_path.write_text(json.dumps(_source_payload()), encoding="utf-8")
-    llm = StubStructuredLlm([_extracted_payload(), {"mismatches": []}])
+
+    llm = StubStructuredLlm(
+        [
+            _extracted_payload(),
+            {"mismatches": []},
+        ]
+    )
     parser = StubK6ParsedReportParser(_parsed_report())
-    debug_writer = SpyDebugJsonWriter()
+    writer = SpyDebugJsonWriter()
     service = K6ServiceExtractionService(
         llm=llm,
         parser=parser,
         debug_config=K6ServiceExtractionDebugConfig(
-            model_debug_json_writer=debug_writer,
+            model_debug_json_writer=writer,
             model_debug_json_enabled=True,
         ),
     )
 
-    result = service.extract(service="megatron", report_paths=[report_path])
-
-    assert result.service == "megatron"
-    assert [label for label, _ in debug_writer.calls] == [
-        "extracted_runs",
-        "post_processed_runs",
-        "summary_output",
-    ]
-
-
-def test_extract_writes_model_snapshots_for_generic_flow(tmp_path: Path) -> None:
-    """Generic extraction writes consistent model snapshots."""
-    report_path = tmp_path / "report.json"
-    report_path.write_text(json.dumps(_source_payload()), encoding="utf-8")
-    llm = StubStructuredLlm([])
-    parser = StubK6ParsedReportParser(_parsed_report(service="unknown-service"))
-    debug_writer = SpyDebugJsonWriter()
-    service = K6ServiceExtractionService(
-        llm=llm,
-        parser=parser,
-        debug_config=K6ServiceExtractionDebugConfig(
-            model_debug_json_writer=debug_writer,
-            model_debug_json_enabled=True,
-        ),
+    service.extract(
+        service="megatron",
+        report_paths=[report_path],
     )
 
-    result = service.extract(service="unknown-service", report_paths=[report_path])
-
-    assert result.mode == "generic"
-    assert [label for label, _ in debug_writer.calls] == [
+    assert [label for label, _ in writer.calls] == [
         "extracted_runs",
         "post_processed_runs",
         "summary_output",
@@ -1253,3 +1212,25 @@ def test_service_rejects_non_positive_parallel_scenario_limit() -> None:
             parser=StubK6ParsedReportParser(_parsed_report()),
             max_parallel_scenarios=0,
         )
+
+
+def test_to_extraction_run_rejects_pre_analysis_threshold_results() -> None:
+    """Extraction run serialization rejects threshold summaries before analysis."""
+    from qa_report_generator.application.service_definitions.shared.base import PreparedExtractionRun
+
+    prepared_run = PreparedExtractionRun(
+        source_report_files=("report.json",),
+        extracted=_UnexpectedThresholdResultsModel(
+            service="megatron",
+            threshold_results=[
+                {
+                    "metric_key": "checks",
+                    "expression": "rate>0.99",
+                    "status": "pass",
+                }
+            ],
+        ),
+    )
+
+    with pytest.raises(TypeError, match="threshold_results"):
+        _to_extraction_run(prepared_run=prepared_run)

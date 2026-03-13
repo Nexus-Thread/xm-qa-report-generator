@@ -1,10 +1,12 @@
 """Unit tests for generic extracted k6 schema models."""
 
 from qa_report_generator.application.service_definitions.shared.schema import (
+    K6HttpExtractedMetrics,
     Scenario,
     TrendValuesMs,
     counter_metric_field,
     metric_values_field,
+    threshold_statuses_field,
     trend_metric_field,
 )
 
@@ -67,3 +69,17 @@ def test_full_metric_fields_describe_whole_metric_objects() -> None:
 
     assert counter_field.description == "Use $.metrics.custom_counter"
     assert trend_field.description == "Use $.metrics.custom_trend"
+
+
+def test_threshold_statuses_field_is_marked_internal() -> None:
+    """Threshold status lookup is an internal schema field, not an LLM extraction input."""
+    field = threshold_statuses_field()
+
+    assert field.json_schema_extra == {"internal": True}
+
+
+def test_k6_http_extracted_metrics_supports_threshold_status_lookup() -> None:
+    """Shared HTTP extraction schema includes normalized threshold status lookup."""
+    annotation = K6HttpExtractedMetrics.model_fields["threshold_statuses"].annotation
+
+    assert annotation == dict[str, dict[str, bool]]

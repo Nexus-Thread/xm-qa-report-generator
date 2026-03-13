@@ -55,6 +55,15 @@ def thresholds_field() -> Any:
     return Field(description="Use $.execThresholds")
 
 
+def threshold_statuses_field() -> Any:
+    """Build an internal threshold-status field derived from raw payloads."""
+    return Field(
+        default_factory=dict,
+        description="Internal derived threshold evaluation lookup",
+        json_schema_extra={"internal": True},
+    )
+
+
 def counter_metric_field(metric_key: str) -> Any:
     """Build a typed counter metric field for a full custom metric."""
     return Field(description=f"Use $.metrics.{metric_key}")
@@ -221,6 +230,7 @@ class K6HttpExtractedMetrics(BaseModel):
     test_run_duration_ms: float = test_run_duration_ms_field()
     scenario: Scenario = scenario_field()
     thresholds: dict[str, list[str]] = thresholds_field()
+    threshold_statuses: dict[str, dict[str, bool]] = threshold_statuses_field()
 
     http_req_duration: TrendValuesMs = metric_values_field("http_req_duration", prefer_scenario_tagged=True)
     http_req_blocked: TrendValuesMs = metric_values_field("http_req_blocked")
@@ -265,6 +275,7 @@ __all__ = [
     "scenario_field",
     "service_name_field",
     "test_run_duration_ms_field",
+    "threshold_statuses_field",
     "thresholds_field",
     "trend_metric_field",
 ]
