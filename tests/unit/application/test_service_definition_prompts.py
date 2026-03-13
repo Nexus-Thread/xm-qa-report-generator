@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 
-from qa_report_generator.application.service_definitions.shared.prompts import (
+from qa_report_generator_performance.application.service_definitions.shared.prompts import (
     EXTRACTION_SYSTEM_PROMPT,
     VERIFICATION_SYSTEM_PROMPT,
     build_extraction_user_prompt,

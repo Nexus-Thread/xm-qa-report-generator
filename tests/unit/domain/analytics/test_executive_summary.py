@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from qa_report_generator.domain.analytics import (
+from qa_report_generator_performance.domain.analytics import (
     analyze_overall_scenarios,
     analyze_scenario_run,
     build_overall_executive_summary,

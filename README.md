@@ -71,7 +71,7 @@ overlapping OpenAI-compatible requests at once while preserving deterministic ou
 ## Adding a new service extraction module
 
 1. Create a new package under:
-   - `src/qa_report_generator/application/service_definitions/<service_name>/`
+   - `src/qa_report_generator_performance/application/service_definitions/<service_name>/`
 2. Implement:
    - `schema.py`: Pydantic model(s)
    - `prompts.py`: extraction + verification prompt builders

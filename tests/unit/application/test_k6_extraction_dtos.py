@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-from qa_report_generator.application.dtos import (
+from qa_report_generator_performance.application.dtos import (
     K6ServiceExtractionResult,
     K6ServiceExtractionRun,
 )
-from qa_report_generator.domain.analytics import (
+from qa_report_generator_performance.domain.analytics import (
     K6OverallExecutiveSummary,
     K6ScenarioExecutiveSummary,
     K6ThresholdSummary,

@@ -8,8 +8,8 @@ import logging
 from pathlib import Path
 from typing import cast
 
-from qa_report_generator.application.dtos import AppSettings
-from qa_report_generator.config.logging_config import setup_logging
+from qa_report_generator_performance.application.dtos import AppSettings
+from qa_report_generator_performance.config.logging_config import setup_logging
 
 
 def _build_settings(*, log_level: str = "INFO", log_format: str = "simple") -> AppSettings:
@@ -49,14 +49,14 @@ def test_setup_logging_configures_simple_format() -> None:
         handler = _get_stream_handler()
         handler.setStream(stream)
 
-        logger = logging.getLogger("qa_report_generator.tests.simple")
+        logger = logging.getLogger("qa_report_generator_performance.tests.simple")
         logger.warning("simple message")
 
         output = stream.getvalue()
         assert root_logger.level == logging.WARNING
         assert "WARNING" in output
         assert "simple message" in output
-        assert "qa_report_generator.tests.simple" in output
+        assert "qa_report_generator_performance.tests.simple" in output
     finally:
         root_logger.handlers.clear()
         root_logger.handlers.extend(original_handlers)
@@ -76,12 +76,12 @@ def test_setup_logging_configures_json_format_with_extra_fields() -> None:
         handler = _get_stream_handler()
         handler.setStream(stream)
 
-        logger = logging.getLogger("qa_report_generator.tests.json")
+        logger = logging.getLogger("qa_report_generator_performance.tests.json")
         logger.info("json message", extra={"component": "test", "service": "demo"})
 
         payload = json.loads(stream.getvalue())
         assert payload["level"] == "INFO"
-        assert payload["logger"] == "qa_report_generator.tests.json"
+        assert payload["logger"] == "qa_report_generator_performance.tests.json"
         assert payload["message"] == "json message"
         assert payload["component"] == "test"
         assert payload["service"] == "demo"
@@ -108,7 +108,7 @@ def test_setup_logging_reconfigures_existing_root_handlers() -> None:
         second_handler = _get_stream_handler()
         second_handler.setStream(second_stream)
 
-        logger = logging.getLogger("qa_report_generator.tests.reconfigure")
+        logger = logging.getLogger("qa_report_generator_performance.tests.reconfigure")
         logger.warning("ignored warning")
         logger.error("error message", extra={"component": "reconfigure"})
 

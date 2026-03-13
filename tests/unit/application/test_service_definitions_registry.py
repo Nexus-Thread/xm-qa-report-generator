@@ -7,20 +7,20 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from qa_report_generator.application.exceptions import (
+from qa_report_generator_performance.application.exceptions import (
     DuplicateServiceDefinitionError,
     UnknownServiceDefinitionError,
 )
-from qa_report_generator.application.service_definitions import (
+from qa_report_generator_performance.application.service_definitions import (
     get_optional_service_definition,
     get_service_definition,
     list_service_definitions,
     register_service_definition,
 )
-from qa_report_generator.application.service_definitions.shared.schema import K6HttpExtractedMetrics
+from qa_report_generator_performance.application.service_definitions.shared.schema import K6HttpExtractedMetrics
 
 if TYPE_CHECKING:
-    from qa_report_generator.application.service_definitions.shared.base import ServiceDefinition
+    from qa_report_generator_performance.application.service_definitions.shared.base import ServiceDefinition
 
 
 def test_list_service_definitions_contains_builtin_megatron() -> None:

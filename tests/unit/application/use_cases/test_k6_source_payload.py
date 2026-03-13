@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from qa_report_generator.application.use_cases.k6_service_extraction.thresholds import (
+from qa_report_generator_performance.application.use_cases.k6_service_extraction.thresholds import (
     build_threshold_summaries_from_source_payload,
 )
 

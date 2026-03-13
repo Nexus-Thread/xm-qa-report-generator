@@ -7,8 +7,8 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from qa_report_generator.adapters.output.parsers import K6ParsedReportParser
-from qa_report_generator.application.exceptions import ConfigurationError
+from qa_report_generator_performance.adapters.output.parsers import K6ParsedReportParser
+from qa_report_generator_performance.application.exceptions import ConfigurationError
 
 if TYPE_CHECKING:
     from pathlib import Path

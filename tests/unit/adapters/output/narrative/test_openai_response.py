@@ -7,7 +7,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from qa_report_generator.adapters.output.narrative.openai_adapter.response import (
+from qa_report_generator_performance.adapters.output.narrative.openai_adapter.response import (
     OpenAIResponseError,
     OpenAIResponseUsage,
     extract_message_content,

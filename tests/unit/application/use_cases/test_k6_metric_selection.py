@@ -6,12 +6,12 @@ from typing import Any
 
 import pytest
 
-from qa_report_generator.application.use_cases.k6_service_extraction.metric_selection import (
+from qa_report_generator_performance.application.use_cases.k6_service_extraction.metric_selection import (
     pick_metric,
     pick_primary_scenario_name,
     scenario_metric_key,
 )
-from qa_report_generator.domain.exceptions import (
+from qa_report_generator_performance.domain.exceptions import (
     InvalidK6MetricPayloadError,
     MissingK6MetricError,
     MissingK6ScenarioError,

@@ -7,7 +7,7 @@ from typing import Protocol, cast
 
 import pytest
 
-from qa_report_generator.adapters.output.narrative.openai_adapter import OpenAIClient, OpenAIClientSettings, build_client
+from qa_report_generator_performance.adapters.output.narrative.openai_adapter import OpenAIClient, OpenAIClientSettings, build_client
 
 
 class _TimeoutLike(Protocol):
@@ -71,11 +71,11 @@ def test_build_client_creates_transport_with_explicit_settings(monkeypatch: pyte
     http_client_factory = _HttpClientFactoryStub()
     openai_factory = _OpenAiFactoryStub()
     monkeypatch.setattr(
-        "qa_report_generator.adapters.output.narrative.openai_adapter.client.httpx.Client",
+        "qa_report_generator_performance.adapters.output.narrative.openai_adapter.client.httpx.Client",
         http_client_factory,
     )
     monkeypatch.setattr(
-        "qa_report_generator.adapters.output.narrative.openai_adapter.client.OpenAI",
+        "qa_report_generator_performance.adapters.output.narrative.openai_adapter.client.OpenAI",
         openai_factory,
     )
 
@@ -108,11 +108,11 @@ def test_build_client_uses_default_settings(monkeypatch: pytest.MonkeyPatch) -> 
     http_client_factory = _HttpClientFactoryStub()
     openai_factory = _OpenAiFactoryStub()
     monkeypatch.setattr(
-        "qa_report_generator.adapters.output.narrative.openai_adapter.client.httpx.Client",
+        "qa_report_generator_performance.adapters.output.narrative.openai_adapter.client.httpx.Client",
         http_client_factory,
     )
     monkeypatch.setattr(
-        "qa_report_generator.adapters.output.narrative.openai_adapter.client.OpenAI",
+        "qa_report_generator_performance.adapters.output.narrative.openai_adapter.client.OpenAI",
         openai_factory,
     )
 

@@ -1,6 +1,6 @@
 """Unit tests for generic extracted k6 schema models."""
 
-from qa_report_generator.application.service_definitions.shared.schema import (
+from qa_report_generator_performance.application.service_definitions.shared.schema import (
     K6HttpExtractedMetrics,
     Scenario,
     TrendValuesMs,

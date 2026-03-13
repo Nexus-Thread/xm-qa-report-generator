@@ -7,7 +7,7 @@ from typing import Any, cast
 
 import pytest
 
-from qa_report_generator.domain.analytics import K6ParsedReport, K6Scenario
+from qa_report_generator_performance.domain.analytics import K6ParsedReport, K6Scenario
 
 
 def test_k6_scenario_keeps_only_minimal_stored_fields() -> None:

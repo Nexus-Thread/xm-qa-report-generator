@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Protocol
 
 if TYPE_CHECKING:
-    from qa_report_generator.domain.analytics import K6ParsedReport
+    from qa_report_generator_performance.domain.analytics import K6ParsedReport
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 SRC_DIR = PROJECT_ROOT / "src"
@@ -100,7 +100,7 @@ def _load_parser_class() -> type[ParsedReportParser] | None:
         sys.path.insert(0, str(SRC_DIR))
 
     try:
-        from qa_report_generator.adapters.output.parsers import K6ParsedReportParser
+        from qa_report_generator_performance.adapters.output.parsers import K6ParsedReportParser
     except ImportError as err:
         _write_error(f"ERROR: unable to import parser adapter: {err}")
         _write_error("Hint: run from repository root or set PYTHONPATH=src")
@@ -111,7 +111,7 @@ def _load_parser_class() -> type[ParsedReportParser] | None:
 
 def _load_debug_writer(*, dump_dir: Path) -> DebugJsonWriter | None:
     try:
-        from qa_report_generator.adapters.output.persistence import JsonFileWriterAdapter
+        from qa_report_generator_performance.adapters.output.persistence import JsonFileWriterAdapter
     except ImportError as err:
         _write_error(f"ERROR: unable to import JSON debug writer adapter: {err}")
         _write_error("Hint: run from repository root or set PYTHONPATH=src")
@@ -240,7 +240,7 @@ def _parse_services(
 
 
 def _parse_one_file(*, parser: ParsedReportParser, service: str, report_file: Path) -> ParseResultWithDumpEntry:
-    from qa_report_generator.application.exceptions import ConfigurationError
+    from qa_report_generator_performance.application.exceptions import ConfigurationError
 
     try:
         source = _load_json(report_file)
@@ -349,7 +349,7 @@ def _load_json(path: Path) -> dict[str, object] | None:
 
 
 def _compare_parsed_to_source(*, source: dict[str, object], parsed: K6ParsedReport, report_file: Path) -> tuple[list[str], int, int]:
-    from qa_report_generator.domain.analytics.source_payload import extract_env_name, pick_test_run_duration_ms
+    from qa_report_generator_performance.domain.analytics.source_payload import extract_env_name, pick_test_run_duration_ms
 
     checks: list[tuple[str, bool]] = []
 

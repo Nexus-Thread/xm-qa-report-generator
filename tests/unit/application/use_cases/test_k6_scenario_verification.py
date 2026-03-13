@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from qa_report_generator.application.dtos import VerificationMismatch
-from qa_report_generator.application.exceptions import ExtractionVerificationError
-from qa_report_generator.application.use_cases.k6_service_extraction.scenario_verification import (
+from qa_report_generator_performance.application.dtos import VerificationMismatch
+from qa_report_generator_performance.application.exceptions import ExtractionVerificationError
+from qa_report_generator_performance.application.use_cases.k6_service_extraction.scenario_verification import (
     build_verification_error,
 )
 

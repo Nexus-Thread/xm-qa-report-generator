@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from qa_report_generator.domain import ReportingError
+from qa_report_generator_performance.domain import ReportingError
 
 
 def test_reporting_error_str_returns_message() -> None:

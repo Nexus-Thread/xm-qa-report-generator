@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/qa_report_generator"]
+packages = ["src/qa_report_generator_performance"]
 
 [project]
 name = "qa-report-generator"
@@ -20,16 +20,16 @@ dependencies = [
 ]
 
 [project.scripts]
-qa-report-generator = "qa_report_generator.cli:main"
-qa-report-generator-k6 = "qa_report_generator.cli_k6:main"
+qa-report-generator = "qa_report_generator_performance.cli:main"
+qa-report-generator-k6 = "qa_report_generator_performance.cli_k6:main"
 
-[project.entry-points."qa_report_generator.parsers"]
+[project.entry-points."qa_report_generator_performance.parsers"]
 # custom-parser = "your_package.parsers:CustomParser"
 
-[project.entry-points."qa_report_generator.writers"]
+[project.entry-points."qa_report_generator_performance.writers"]
 # custom-writer = "your_package.writers:CustomWriter"
 
-[project.entry-points."qa_report_generator.hooks"]
+[project.entry-points."qa_report_generator_performance.hooks"]
 
 [dependency-groups]
 dev = [
@@ -80,7 +80,7 @@ ignore = [
 "tests/**/__init__.py" = ["D104"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["qa_report_generator"]
+known-first-party = ["qa_report_generator_performance"]
 
 [tool.ruff.format]
 quote-style = "double"

@@ -10,26 +10,26 @@ from typing import TYPE_CHECKING, Any, cast
 import pytest
 from pydantic import BaseModel, ConfigDict
 
-from qa_report_generator.application.exceptions import ExtractionVerificationError
-from qa_report_generator.application.use_cases.k6_service_extraction import (
+from qa_report_generator_performance.application.exceptions import ExtractionVerificationError
+from qa_report_generator_performance.application.use_cases.k6_service_extraction import (
     K6ServiceExtractionDebugConfig,
     K6ServiceExtractionService,
 )
-from qa_report_generator.application.use_cases.k6_service_extraction.scenario_extraction import ExtractedRunModel
-from qa_report_generator.application.use_cases.k6_service_extraction.service_specific_extraction import (
+from qa_report_generator_performance.application.use_cases.k6_service_extraction.scenario_extraction import ExtractedRunModel
+from qa_report_generator_performance.application.use_cases.k6_service_extraction.service_specific_extraction import (
     _extract_run_models,
     _to_extraction_run,
 )
-from qa_report_generator.application.use_cases.k6_service_extraction.verification import parse_mismatches
-from qa_report_generator.domain.analytics import K6ParsedReport, K6Scenario
-from qa_report_generator.domain.exceptions import ReportingError
+from qa_report_generator_performance.application.use_cases.k6_service_extraction.verification import parse_mismatches
+from qa_report_generator_performance.domain.analytics import K6ParsedReport, K6Scenario
+from qa_report_generator_performance.domain.exceptions import ReportingError
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
     from pathlib import Path
 
-    from qa_report_generator.application.ports.output import StructuredLlmPort
-    from qa_report_generator.application.service_definitions.shared.base import ServiceDefinition
+    from qa_report_generator_performance.application.ports.output import StructuredLlmPort
+    from qa_report_generator_performance.application.service_definitions.shared.base import ServiceDefinition
 
 
 class SpyDebugJsonWriter:
@@ -1143,7 +1143,7 @@ def test_extract_run_models_preserves_input_order_when_parallelized(
         )
 
     monkeypatch.setattr(
-        "qa_report_generator.application.use_cases.k6_service_extraction.service_specific_extraction.extract_verified_run_model",
+        "qa_report_generator_performance.application.use_cases.k6_service_extraction.service_specific_extraction.extract_verified_run_model",
         fake_extract_verified_run_model,
     )
 
@@ -1186,7 +1186,7 @@ def test_extract_run_models_adds_scenario_context_when_parallel_worker_fails(
         )
 
     monkeypatch.setattr(
-        "qa_report_generator.application.use_cases.k6_service_extraction.service_specific_extraction.extract_verified_run_model",
+        "qa_report_generator_performance.application.use_cases.k6_service_extraction.service_specific_extraction.extract_verified_run_model",
         fake_extract_verified_run_model,
     )
 
@@ -1216,7 +1216,7 @@ def test_service_rejects_non_positive_parallel_scenario_limit() -> None:
 
 def test_to_extraction_run_rejects_pre_analysis_threshold_results() -> None:
     """Extraction run serialization rejects threshold summaries before analysis."""
-    from qa_report_generator.application.service_definitions.shared.base import PreparedExtractionRun
+    from qa_report_generator_performance.application.service_definitions.shared.base import PreparedExtractionRun
 
     prepared_run = PreparedExtractionRun(
         source_report_files=("report.json",),

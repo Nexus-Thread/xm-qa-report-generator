@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING
 import pytest
 from pydantic import BaseModel, Field
 
-from qa_report_generator.adapters.output.persistence import JsonFileWriterAdapter
+from qa_report_generator_performance.adapters.output.persistence import JsonFileWriterAdapter
 
 if TYPE_CHECKING:
     from pathlib import Path

@@ -8,26 +8,26 @@ import pytest
 import typer
 from typer.testing import CliRunner
 
-from qa_report_generator.adapters.input.cli_adapter import K6CliAdapter
-from qa_report_generator.adapters.input.cli_adapter.output import (
+from qa_report_generator_performance.adapters.input.cli_adapter import K6CliAdapter
+from qa_report_generator_performance.adapters.input.cli_adapter.output import (
     build_extraction_payload,
     format_reporting_error,
 )
-from qa_report_generator.adapters.input.cli_adapter.report_inputs import (
+from qa_report_generator_performance.adapters.input.cli_adapter.report_inputs import (
     CliInputError,
     expand_report_inputs,
     normalize_service_input,
 )
-from qa_report_generator.application.dtos import (
+from qa_report_generator_performance.application.dtos import (
     K6ServiceExtractionResult,
     K6ServiceExtractionRun,
 )
-from qa_report_generator.domain.analytics import (
+from qa_report_generator_performance.domain.analytics import (
     K6OverallExecutiveSummary,
     K6ScenarioExecutiveSummary,
     K6ThresholdSummary,
 )
-from qa_report_generator.domain.exceptions import ReportingError
+from qa_report_generator_performance.domain.exceptions import ReportingError
 
 if TYPE_CHECKING:
     from pathlib import Path

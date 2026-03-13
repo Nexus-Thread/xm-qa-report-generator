@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from qa_report_generator.application.service_definitions.services.symbolstreeservice.schema import (
+from qa_report_generator_performance.application.service_definitions.services.symbolstreeservice.schema import (
     SymbolstreeserviceExtractedMetrics,
 )
-from qa_report_generator.application.service_definitions.shared import derive_merge_buckets
+from qa_report_generator_performance.application.service_definitions.shared import derive_merge_buckets
 
 
 def test_derive_merge_buckets_from_symbolstreeservice_schema() -> None:
