@@ -1,4 +1,4 @@
-"""Unit tests for OpenAI transport retry behavior."""
+"""Unit tests for shared OpenAI transport retry behavior."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ import httpx
 import pytest
 from openai import APIError
 
-from qa_report_generator_performance.adapters.output.narrative.openai_adapter.transport import OpenAIClient
+from shared.adapters.output.llm.openai_adapter.transport import OpenAIClient
 
 
 @dataclass(frozen=True)

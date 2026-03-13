@@ -2,15 +2,15 @@
 
 from qa_report_generator_performance.adapters.input.cli_adapter import K6CliAdapter
 from qa_report_generator_performance.adapters.input.env_settings_adapter import EnvSettingsAdapter
-from qa_report_generator_performance.adapters.output.narrative.openai_adapter import OpenAIClientSettings, build_client
-from qa_report_generator_performance.adapters.output.narrative.structured_llm_adapter import OpenAIStructuredLlmAdapter
 from qa_report_generator_performance.adapters.output.parsers import K6ParsedReportParser
 from qa_report_generator_performance.adapters.output.persistence import JsonFileWriterAdapter
+from qa_report_generator_performance.adapters.output.structured_llm_adapter import StructuredLlmPortAdapter
 from qa_report_generator_performance.application.use_cases import (
     K6ServiceExtractionDebugConfig,
     K6ServiceExtractionService,
 )
 from qa_report_generator_performance.config import setup_logging
+from shared.adapters.output.llm import OpenAIClientSettings, OpenAIStructuredLlmAdapter, build_client
 
 
 def create_cli_adapter() -> K6CliAdapter:
@@ -30,12 +30,13 @@ def create_cli_adapter() -> K6CliAdapter:
     )
     debug_json_writer = JsonFileWriterAdapter(base_dir=config.llm_debug_json_dir)
     model_debug_json_writer = JsonFileWriterAdapter(base_dir=config.model_debug_json_dir)
-    structured_llm = OpenAIStructuredLlmAdapter(
+    structured_llm_adapter = OpenAIStructuredLlmAdapter(
         client=openai_client,
         model=config.llm_model,
         debug_json_writer=debug_json_writer,
         debug_json_enabled=config.llm_debug_json_enabled,
     )
+    structured_llm = StructuredLlmPortAdapter(adapter=structured_llm_adapter)
     parsed_report_parser = K6ParsedReportParser()
     service_metrics_extractor = K6ServiceExtractionService(
         llm=structured_llm,

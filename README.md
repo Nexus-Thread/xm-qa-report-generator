@@ -1,5 +1,14 @@
 # QA Report Generator
 
+## Shared adapters
+
+Reusable LLM adapter infrastructure lives in `src/shared/adapters/output/llm/`.
+
+- OpenAI transport and response helpers are shared there.
+- Structured JSON LLM completion logic is shared there.
+- Application packages keep only thin boundary adapters that translate shared failures into
+  application-specific exceptions.
+
 ## k6 CLI
 
 ### Manual parser coverage check for fixture bundle

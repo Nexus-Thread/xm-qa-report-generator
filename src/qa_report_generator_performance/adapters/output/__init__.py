@@ -1,11 +1,11 @@
 """Output adapter exports."""
 
-from .narrative import OpenAIStructuredLlmAdapter
 from .parsers import K6ParsedReportParser
 from .persistence import JsonFileWriterAdapter
+from .structured_llm_adapter import StructuredLlmPortAdapter
 
 __all__ = [
     "JsonFileWriterAdapter",
     "K6ParsedReportParser",
-    "OpenAIStructuredLlmAdapter",
+    "StructuredLlmPortAdapter",
 ]

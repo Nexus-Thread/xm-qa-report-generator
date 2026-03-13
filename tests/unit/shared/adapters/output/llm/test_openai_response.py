@@ -1,4 +1,4 @@
-"""Unit tests for OpenAI response parsing helpers."""
+"""Unit tests for shared OpenAI response parsing helpers."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from qa_report_generator_performance.adapters.output.narrative.openai_adapter.response import (
+from shared.adapters.output.llm.openai_adapter.response import (
     OpenAIResponseError,
     OpenAIResponseUsage,
     extract_message_content,

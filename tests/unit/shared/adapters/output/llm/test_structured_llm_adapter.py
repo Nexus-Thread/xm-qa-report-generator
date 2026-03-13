@@ -1,4 +1,4 @@
-"""Unit tests for the structured LLM output adapter."""
+"""Unit tests for the shared structured LLM adapter."""
 
 from __future__ import annotations
 
@@ -10,10 +10,13 @@ from typing import Any, cast
 
 import pytest
 
-from qa_report_generator_performance.adapters.output.narrative.structured_llm_adapter import OpenAIStructuredLlmAdapter
-from qa_report_generator_performance.application.exceptions import ExtractionVerificationError
+from shared.adapters.output.llm.structured_llm_adapter import (
+    OpenAIStructuredLlmAdapter,
+    StructuredLlmInvalidJsonError,
+    StructuredLlmResponseError,
+)
 
-LOGGER_NAME = "qa_report_generator_performance.adapters.output.narrative.structured_llm_adapter.adapter"
+LOGGER_NAME = "shared.adapters.output.llm.structured_llm_adapter.adapter"
 
 
 @dataclass(frozen=True)
@@ -100,11 +103,11 @@ def test_complete_json_returns_payload_and_formats_messages() -> None:
 
 
 def test_complete_json_raises_on_invalid_json() -> None:
-    """Structured adapter wraps JSON decode failures as verification errors."""
+    """Structured adapter raises a shared invalid-JSON error."""
     client = _StubClient([_Response(choices=[_Choice(message=_Message(content="{not-json"))])])
     adapter = OpenAIStructuredLlmAdapter(client=client, model="gpt-test")
 
-    with pytest.raises(ExtractionVerificationError, match="invalid JSON payload"):
+    with pytest.raises(StructuredLlmInvalidJsonError, match="invalid JSON payload"):
         adapter.complete_json(system_prompt="system", user_prompt="user")
 
 
@@ -113,16 +116,16 @@ def test_complete_json_raises_when_payload_is_not_object() -> None:
     client = _StubClient([_Response(choices=[_Choice(message=_Message(content="[]"))])])
     adapter = OpenAIStructuredLlmAdapter(client=client, model="gpt-test")
 
-    with pytest.raises(ExtractionVerificationError, match="JSON object"):
+    with pytest.raises(StructuredLlmInvalidJsonError, match="JSON object"):
         adapter.complete_json(system_prompt="system", user_prompt="user")
 
 
 def test_complete_json_raises_when_message_content_missing() -> None:
-    """Structured adapter maps missing response content into verification error."""
+    """Structured adapter raises a shared response-shape error."""
     client = _StubClient([_Response(choices=[_Choice(message=None)])])
     adapter = OpenAIStructuredLlmAdapter(client=client, model="gpt-test")
 
-    with pytest.raises(ExtractionVerificationError, match="missing content"):
+    with pytest.raises(StructuredLlmResponseError, match="missing content"):
         adapter.complete_json(system_prompt="system", user_prompt="user")
 
 

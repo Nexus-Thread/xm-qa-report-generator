@@ -10,8 +10,9 @@ from .logging_utils import truncate_for_log
 from .response_parser import extract_structured_content, parse_json_object
 
 if TYPE_CHECKING:
-    from qa_report_generator_performance.adapters.output.narrative.openai_adapter import OpenAIClientProtocol
-    from qa_report_generator_performance.application.ports.output import JsonWriterPort
+    from shared.adapters.output.llm.openai_adapter import OpenAIClientProtocol
+
+    from .protocols import JsonDebugWriterProtocol
 
 LOGGER = logging.getLogger(__name__)
 
@@ -24,7 +25,7 @@ class OpenAIStructuredLlmAdapter:
         *,
         client: OpenAIClientProtocol,
         model: str,
-        debug_json_writer: JsonWriterPort | None = None,
+        debug_json_writer: JsonDebugWriterProtocol | None = None,
         debug_json_enabled: bool = False,
     ) -> None:
         """Store transport client and runtime configuration."""

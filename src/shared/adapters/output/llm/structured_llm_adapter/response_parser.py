@@ -5,8 +5,12 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from qa_report_generator_performance.adapters.output.narrative.openai_adapter import OpenAIResponseError, extract_message_content
-from qa_report_generator_performance.application.exceptions import ExtractionVerificationError
+from shared.adapters.output.llm.openai_adapter import (
+    OpenAIResponseError,
+    extract_message_content,
+)
+
+from .exceptions import StructuredLlmInvalidJsonError, StructuredLlmResponseError
 
 
 def extract_structured_content(response: object) -> str:
@@ -15,7 +19,7 @@ def extract_structured_content(response: object) -> str:
         return extract_message_content(response)
     except OpenAIResponseError as err:
         msg = "LLM response has missing content or invalid content shape"
-        raise ExtractionVerificationError(msg, suggestion=str(err)) from err
+        raise StructuredLlmResponseError(msg, suggestion=str(err)) from err
 
 
 def parse_json_object(content: str) -> dict[str, Any]:
@@ -24,8 +28,8 @@ def parse_json_object(content: str) -> dict[str, Any]:
         payload = json.loads(content)
     except json.JSONDecodeError as err:
         msg = "LLM returned invalid JSON payload"
-        raise ExtractionVerificationError(msg, suggestion="Inspect model output and prompts") from err
+        raise StructuredLlmInvalidJsonError(msg, suggestion="Inspect model output and prompts") from err
     if not isinstance(payload, dict):
         msg = "LLM payload must be a JSON object"
-        raise ExtractionVerificationError(msg, suggestion="Ensure prompt requests top-level JSON object")
+        raise StructuredLlmInvalidJsonError(msg, suggestion="Ensure prompt requests top-level JSON object")
     return payload
