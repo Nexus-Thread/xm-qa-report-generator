@@ -85,7 +85,7 @@ Notes:
 - If a service definition does not exist, CLI returns generic parsed scenario output.
 - `LLM_API_KEY` must be provided in the environment.
 - Verification is strict-fail: any numeric mismatch fails the run.
-- Output is printed as one consolidated summary envelope for the extracted service.
+- Successful CLI runs do not emit a summary payload to stdout; operational details are emitted through logs.
 - `runs` always contains the final consumer-facing result after the pipeline finishes.
 - For services without custom post-processing, `runs` contains the extracted scenarios as-is.
 - For services with custom post-processing, `runs` contains the post-processed result in the same interface.
@@ -116,12 +116,12 @@ When multiple parsed scenarios are present, service-specific extraction can proc
 using a synchronous worker pool. `LLM_MAX_CONCURRENCY` bounds how many scenarios may issue
 overlapping OpenAI-compatible requests at once while preserving deterministic output order.
 
-Normal logs include metadata about structured LLM stages and retry behavior, while the optional
-debug JSON files contain the raw request/response/parsed payload artifacts for deeper inspection.
+Normal logs include metadata about structured LLM stages, retry behavior, and LLM usage/cost summaries,
+while the optional debug JSON files contain the raw request/response/parsed payload artifacts for deeper inspection.
 
-When pricing variables are configured, the CLI prints one aggregated LLM cost line per run.
-If token usage is returned but pricing is not configured, the CLI still prints the request/token summary
-with `LLM cost: unavailable`.
+When pricing variables are configured, the CLI emits one aggregated LLM cost log event per run.
+If token usage is returned but pricing is not configured, the log still includes token counts with
+`estimated_cost_usd=null`.
 
 ## Adding a new service extraction module
 

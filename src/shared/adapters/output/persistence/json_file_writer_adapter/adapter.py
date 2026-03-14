@@ -34,11 +34,11 @@ class JsonFileWriterAdapter:
         normalized_payload = _normalize_json_value(payload)
         self._write_payload(file_path=file_path, payload=normalized_payload)
         LOGGER.debug(
-            "Wrote JSON payload to file: %s",
-            file_path,
+            "JSON payload artifact written",
             extra={
                 "component": self.__class__.__name__,
                 "payload_label": safe_label,
+                "file_path": str(file_path),
             },
         )
         return file_path

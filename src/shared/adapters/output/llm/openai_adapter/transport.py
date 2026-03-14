@@ -132,7 +132,7 @@ class OpenAIClient(OpenAIClientProtocol):
             except APIError:
                 if attempt >= total_attempts:
                     LOGGER.exception(
-                        "OpenAI completion failed after retries",
+                        "OpenAI completion failed after exhausting retries",
                         extra={
                             "component": self.__class__.__name__,
                             "model": model,
@@ -144,7 +144,7 @@ class OpenAIClient(OpenAIClientProtocol):
                     raise
                 delay = self._backoff_factor**attempt
                 LOGGER.warning(
-                    "OpenAI completion failed, retrying",
+                    "OpenAI completion attempt failed; retrying",
                     extra={
                         "component": self.__class__.__name__,
                         "model": model,

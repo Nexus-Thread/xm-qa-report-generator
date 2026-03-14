@@ -68,7 +68,7 @@ def extract_verified_run_model(
             if attempt == max_verification_attempts:
                 break
             LOGGER.warning(
-                "Verification failed; retrying extraction",
+                "Scenario extraction verification failed; retrying",
                 extra={
                     "component": "scenario_extraction",
                     "scenario_name": scenario.name,

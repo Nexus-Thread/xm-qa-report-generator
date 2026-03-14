@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import logging
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -14,7 +13,6 @@ from qa_report_generator_performance.application.exceptions import Configuration
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-LOGGER = logging.getLogger(__name__)
 ALLOWED_LOG_LEVELS = frozenset({"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"})
 ALLOWED_LOG_FORMATS = frozenset({"simple", "json"})
 
@@ -206,5 +204,4 @@ def load_settings_from_env() -> EnvSettings:
         message = f"Invalid configuration: {_build_validation_error_details(exc)}"
         raise ConfigurationError(message) from exc
 
-    LOGGER.debug("Configuration loaded from environment")
     return settings

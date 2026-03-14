@@ -162,9 +162,10 @@ def _build_scenario_processing_error(*, error: ReportingError, scenario: K6Scena
     """Augment a reporting error with scenario context for clearer failures."""
     message = f"Scenario processing failed for {scenario.name} ({scenario.source_report_file}): {error}"
     LOGGER.error(
-        "Scenario processing failed",
+        "Parallel scenario extraction failed",
         extra={
             "component": "service_specific_extraction",
+            "stage": "parallel_extraction",
             "scenario_name": scenario.name,
             "source_report_file": scenario.source_report_file,
             "error_type": type(error).__name__,

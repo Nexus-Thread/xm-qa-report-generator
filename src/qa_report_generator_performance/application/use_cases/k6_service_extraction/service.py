@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING
 
 from qa_report_generator_performance.application.dtos import K6ServiceExtractionResult
@@ -24,6 +25,9 @@ if TYPE_CHECKING:
     from qa_report_generator_performance.application.ports.output import K6ParsedReportParserPort, StructuredLlmPort
     from qa_report_generator_performance.application.service_definitions.shared.base import ServiceDefinition
     from qa_report_generator_performance.domain.analytics import K6ParsedReport
+
+
+LOGGER = logging.getLogger(__name__)
 
 
 class K6ServiceExtractionService(ExtractK6ServiceMetricsUseCase):
@@ -63,6 +67,17 @@ class K6ServiceExtractionService(ExtractK6ServiceMetricsUseCase):
             msg = "No report files provided for extraction"
             raise ConfigurationError(msg, suggestion="Pass one or more k6 JSON reports")
 
+        LOGGER.info(
+            "Service extraction started",
+            extra={
+                "component": self.__class__.__name__,
+                "service": service,
+                "report_count": len(report_paths),
+                "max_parallel_scenarios": self._max_parallel_scenarios,
+                "max_verification_attempts": self._max_verification_attempts,
+            },
+        )
+
         definition = get_service_definition(service)
 
         # Step 1: parse the input JSON files into a normalized report model.
@@ -70,6 +85,14 @@ class K6ServiceExtractionService(ExtractK6ServiceMetricsUseCase):
             service=service,
             report_paths=report_paths,
             definition=definition,
+        )
+        LOGGER.debug(
+            "Service extraction input parsed",
+            extra={
+                "component": self.__class__.__name__,
+                "service": service,
+                "parsed_scenario_count": len(parsed_report.scenarios),
+            },
         )
 
         pipeline_artifacts = run_service_specific_pipeline(
@@ -84,12 +107,23 @@ class K6ServiceExtractionService(ExtractK6ServiceMetricsUseCase):
             post_processed_runs=pipeline_artifacts.post_processed_runs,
             summary_result=pipeline_artifacts.summary_result,
         )
+        llm_usage_summary = self._build_llm_usage_summary()
+        LOGGER.info(
+            "Service extraction completed",
+            extra={
+                "component": self.__class__.__name__,
+                "service": pipeline_artifacts.summary_result.service,
+                "parsed_scenario_count": len(parsed_report.scenarios),
+                "output_run_count": len(pipeline_artifacts.summary_result.runs),
+                "llm_usage_summary_present": llm_usage_summary is not None,
+            },
+        )
         return K6ServiceExtractionResult(
             service=pipeline_artifacts.summary_result.service,
             runs=pipeline_artifacts.summary_result.runs,
             overall_summary=pipeline_artifacts.summary_result.overall_summary,
             scenario_summaries=pipeline_artifacts.summary_result.scenario_summaries,
-            llm_usage_summary=self._build_llm_usage_summary(),
+            llm_usage_summary=llm_usage_summary,
         )
 
     def _build_llm_usage_summary(self) -> LlmUsageSummary | None:

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import time
 from copy import deepcopy
 from typing import TYPE_CHECKING, Any, cast
@@ -33,6 +34,14 @@ if TYPE_CHECKING:
 
     from qa_report_generator_performance.application.ports.output import StructuredLlmPort
     from qa_report_generator_performance.application.service_definitions.shared.base import ServiceDefinition
+
+
+LOGGER_NAME = "qa_report_generator_performance.application.use_cases.k6_service_extraction.service"
+
+
+def _record_attr(record: logging.LogRecord, name: str) -> object:
+    """Return a typed access shim for custom log-record attributes in tests."""
+    return getattr(record, name)
 
 
 class SpyDebugJsonWriter:
@@ -366,6 +375,36 @@ def test_extract_filters_removed_keys_and_returns_validated_payload(tmp_path: Pa
     assert extraction_prompt["task"] == "extract_k6_metrics"
     assert "setup_data" not in extraction_prompt["source"]
     assert "root_group" not in extraction_prompt["source"]
+
+
+def test_extract_logs_start_and_completion_events(
+    tmp_path: Path,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Extraction service logs stable start and completion events."""
+    report_path = tmp_path / "report.json"
+    report_path.write_text(json.dumps(_source_payload()), encoding="utf-8")
+
+    llm = StubStructuredLlm(
+        [
+            _extracted_payload(),
+            {"mismatches": []},
+        ]
+    )
+    parser = StubK6ParsedReportParser(_parsed_report())
+    service = K6ServiceExtractionService(llm=llm, parser=parser)
+
+    with caplog.at_level(logging.INFO, logger=LOGGER_NAME):
+        result = service.extract(service="megatron", report_paths=[report_path])
+
+    assert result.service == "megatron"
+    start_record = next(record for record in caplog.records if record.getMessage() == "Service extraction started")
+    completed_record = next(record for record in caplog.records if record.getMessage() == "Service extraction completed")
+    assert _record_attr(start_record, "service") == "megatron"
+    assert _record_attr(start_record, "report_count") == 1
+    assert _record_attr(completed_record, "service") == "megatron"
+    assert _record_attr(completed_record, "output_run_count") == 1
+    assert _record_attr(completed_record, "parsed_scenario_count") == 1
 
 
 def test_extract_fails_on_verification_mismatch(tmp_path: Path) -> None:

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING
 
 import pytest
@@ -11,7 +12,6 @@ from typer.testing import CliRunner
 from qa_report_generator_performance.adapters.input.cli_adapter import K6CliAdapter
 from qa_report_generator_performance.adapters.input.cli_adapter.output import (
     build_extraction_payload,
-    format_llm_usage_summary,
     format_reporting_error,
 )
 from qa_report_generator_performance.adapters.input.cli_adapter.report_inputs import (
@@ -36,6 +36,12 @@ if TYPE_CHECKING:
 
 
 CLI_RUNNER = CliRunner()
+LOGGER_NAME = "qa_report_generator_performance.adapters.input.cli_adapter.adapter"
+
+
+def _record_attr(record: logging.LogRecord, name: str) -> object:
+    """Return a typed access shim for custom log-record attributes in tests."""
+    return getattr(record, name)
 
 
 def build_result(*, service: str, report_paths: list[Path]) -> K6ServiceExtractionResult:
@@ -170,6 +176,46 @@ def test_generate_command_raises_typer_exit_on_reporting_error(tmp_path: Path) -
         )
 
 
+def test_generate_command_logs_structured_error_context(
+    tmp_path: Path,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Generate command logs stable structured context for reporting failures."""
+    report_path = tmp_path / "report.json"
+    report_path.write_text("{}", encoding="utf-8")
+
+    adapter = build_adapter(FailingExtractionUseCase())
+
+    with caplog.at_level(logging.ERROR, logger=LOGGER_NAME), pytest.raises(typer.Exit):
+        adapter.generate_command(service="megatron", report=[report_path])
+
+    error_record = caplog.records[0]
+    assert error_record.getMessage() == "CLI extraction command failed"
+    assert _record_attr(error_record, "service") == "megatron"
+    assert _record_attr(error_record, "command") == "generate"
+    assert _record_attr(error_record, "error_type") == "ReportingError"
+
+
+def test_generate_command_logs_success_summary(
+    tmp_path: Path,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Generate command logs one stable success event with summary context."""
+    report_path = tmp_path / "report.json"
+    report_path.write_text("{}", encoding="utf-8")
+
+    adapter = build_adapter(SpyExtractionUseCase())
+
+    with caplog.at_level(logging.INFO, logger=LOGGER_NAME):
+        adapter.generate_command(service="megatron", report=[report_path])
+
+    info_record = next(record for record in caplog.records if record.getMessage() == "CLI extraction command completed")
+    assert _record_attr(info_record, "service") == "megatron"
+    assert _record_attr(info_record, "command") == "generate"
+    assert _record_attr(info_record, "report_count") == 1
+    assert _record_attr(info_record, "scenario_summary_count") == 1
+
+
 def test_generate_command_propagates_unexpected_errors(tmp_path: Path) -> None:
     """Generate command propagates unexpected errors without wrapping them."""
     report_path = tmp_path / "report.json"
@@ -202,7 +248,7 @@ def test_generate_command_prints_success_message_heading_and_json_payload(
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    """Generate command prints success text, heading, and JSON payload."""
+    """Generate command emits no stdout or stderr summary on success."""
     report_path = tmp_path / "report.json"
     report_path.write_text("{}", encoding="utf-8")
 
@@ -211,20 +257,15 @@ def test_generate_command_prints_success_message_heading_and_json_payload(
     adapter.generate_command(service="megatron", report=[report_path])
 
     captured = capsys.readouterr()
-    assert "✅ Generated service metrics" in captured.out
-    assert "Service: megatron" in captured.out
-    assert '"service": "megatron"' in captured.out
-    assert '"overall_summary"' in captured.out
-    assert '"scenario_summaries"' in captured.out
-    assert '"executive_note": "Scenario grouped-scenario met all evaluated thresholds."' in captured.out
-    assert '"runs"' not in captured.out
+    assert captured.out == ""
+    assert captured.err == ""
 
 
-def test_generate_command_prints_llm_cost_summary_when_present(
+def test_generate_command_logs_llm_cost_summary_when_present(
     tmp_path: Path,
-    capsys: pytest.CaptureFixture[str],
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
-    """Generate command prints one aggregated LLM cost line when usage is present."""
+    """Generate command logs one aggregated LLM cost event when usage is present."""
     report_path = tmp_path / "report.json"
     report_path.write_text("{}", encoding="utf-8")
 
@@ -251,10 +292,19 @@ def test_generate_command_prints_llm_cost_summary_when_present(
 
     extraction_use_case.extract = _extract_with_usage  # type: ignore[method-assign]
 
-    adapter.generate_command(service="megatron", report=[report_path])
+    with caplog.at_level(logging.INFO, logger=LOGGER_NAME):
+        adapter.generate_command(service="megatron", report=[report_path])
 
-    captured = capsys.readouterr()
-    assert "LLM cost: $0.012345 (2 requests, 100 prompt, 50 completion, 150 total tokens)" in captured.out
+    cost_record = next(record for record in caplog.records if record.getMessage().startswith("LLM usage cost summary recorded:"))
+    assert "service=megatron" in cost_record.getMessage()
+    assert "requests=2" in cost_record.getMessage()
+    assert "estimated_cost_usd=0.012345" in cost_record.getMessage()
+    assert _record_attr(cost_record, "service") == "megatron"
+    assert _record_attr(cost_record, "request_count") == 2
+    assert _record_attr(cost_record, "prompt_tokens") == 100
+    assert _record_attr(cost_record, "completion_tokens") == 50
+    assert _record_attr(cost_record, "total_tokens") == 150
+    assert _record_attr(cost_record, "estimated_cost_usd") == 0.012345
 
 
 def test_generate_command_raises_typer_exit_on_empty_service(
@@ -272,7 +322,7 @@ def test_generate_command_raises_typer_exit_on_empty_service(
 
     captured = capsys.readouterr()
     assert captured.out == ""
-    assert "❌ --service cannot be empty" in captured.err
+    assert captured.err == ""
 
 
 def test_expand_report_inputs_returns_sorted_deduplicated_json_files(tmp_path: Path) -> None:
@@ -321,19 +371,6 @@ def test_build_extraction_payload_returns_summary_payload(tmp_path: Path) -> Non
     assert payload["service"] == "megatron"
     assert "scenario_summaries" in payload
     assert "runs" not in payload
-
-
-def test_format_llm_usage_summary_formats_unavailable_cost_with_tokens() -> None:
-    """CLI usage formatter reports unavailable cost when pricing is missing."""
-    summary = LlmUsageSummary(
-        request_count=3,
-        prompt_tokens=100,
-        completion_tokens=40,
-        total_tokens=140,
-        estimated_cost_usd=None,
-    )
-
-    assert format_llm_usage_summary(summary) == "LLM cost: unavailable (3 requests, 100 prompt, 40 completion, 140 total tokens)"
 
 
 def test_generate_command_expands_directory_reports_in_sorted_order(tmp_path: Path) -> None:
@@ -408,4 +445,4 @@ def test_cli_runner_invokes_generate_command_and_parses_options(tmp_path: Path) 
 
     assert result.exit_code == 0
     assert extraction_use_case.calls == [("megatron", [report_path])]
-    assert "✅ Generated service metrics" in result.stdout
+    assert result.stdout == ""

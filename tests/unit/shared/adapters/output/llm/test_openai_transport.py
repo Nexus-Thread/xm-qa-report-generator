@@ -153,7 +153,7 @@ def test_create_chat_completion_logs_retry_metadata(caplog: pytest.LogCaptureFix
 
     assert response is expected_response
     warning_record = caplog.records[0]
-    assert warning_record.getMessage() == "OpenAI completion failed, retrying"
+    assert warning_record.getMessage() == "OpenAI completion attempt failed; retrying"
     warning_record_any = cast("Any", warning_record)
     assert warning_record_any.attempt == 1
     assert warning_record_any.attempts_remaining == 2
@@ -209,7 +209,7 @@ def test_create_chat_completion_logs_final_exception_once(caplog: pytest.LogCapt
         client.create_chat_completion(model="gpt-test", messages=[{"role": "user", "content": "hello"}])
 
     exception_record = next(record for record in caplog.records if record.levelno == logging.ERROR)
-    assert exception_record.getMessage() == "OpenAI completion failed after retries"
+    assert exception_record.getMessage() == "OpenAI completion failed after exhausting retries"
     exception_record_any = cast("Any", exception_record)
     assert exception_record_any.attempt == 2
     assert exception_record_any.total_attempts == 2

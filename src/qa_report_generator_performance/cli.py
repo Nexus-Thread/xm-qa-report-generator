@@ -26,11 +26,17 @@ def create_cli_adapter() -> K6CliAdapter:
 
     setup_logging(config)
     LOGGER.info(
-        "Application logging configured",
+        "CLI startup initialized",
         extra={
             "component": "cli",
             "log_level": config.log_level,
             "log_format": config.log_format,
+        },
+    )
+    LOGGER.debug(
+        "CLI runtime configuration resolved",
+        extra={
+            "component": "cli",
             "llm_model": config.llm_model,
             "llm_base_url": config.llm_base_url,
             "llm_timeout_seconds": config.llm_timeout,
@@ -42,7 +48,7 @@ def create_cli_adapter() -> K6CliAdapter:
     )
     if config.llm_debug_json_enabled:
         LOGGER.info(
-            "Structured LLM debug JSON output enabled",
+            "Structured LLM debug artifacts enabled",
             extra={
                 "component": "cli",
                 "debug_output": "llm",
@@ -51,7 +57,7 @@ def create_cli_adapter() -> K6CliAdapter:
         )
     if config.model_debug_json_enabled:
         LOGGER.info(
-            "Model debug JSON output enabled",
+            "Model debug artifacts enabled",
             extra={
                 "component": "cli",
                 "debug_output": "model",
