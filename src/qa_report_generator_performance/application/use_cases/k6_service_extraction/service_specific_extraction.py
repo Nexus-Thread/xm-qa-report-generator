@@ -168,6 +168,7 @@ def _build_scenario_processing_error(*, error: ReportingError, scenario: K6Scena
             "scenario_name": scenario.name,
             "source_report_file": scenario.source_report_file,
             "error_type": type(error).__name__,
+            "error_message": str(error),
         },
     )
     return type(error)(message, suggestion=error.suggestion)

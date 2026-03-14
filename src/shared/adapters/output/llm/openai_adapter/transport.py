@@ -136,6 +136,8 @@ class OpenAIClient(OpenAIClientProtocol):
                         extra={
                             "component": self.__class__.__name__,
                             "model": model,
+                            "attempt": attempt,
+                            "total_attempts": total_attempts,
                             "max_retries": self._max_retries,
                         },
                     )
@@ -147,6 +149,8 @@ class OpenAIClient(OpenAIClientProtocol):
                         "component": self.__class__.__name__,
                         "model": model,
                         "attempt": attempt,
+                        "attempts_remaining": total_attempts - attempt,
+                        "total_attempts": total_attempts,
                         "max_retries": self._max_retries,
                         "retry_delay_seconds": delay,
                     },

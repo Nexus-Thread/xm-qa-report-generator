@@ -1,5 +1,9 @@
 """Composition root for the k6-only CLI."""
 
+import logging
+
+import typer
+
 from qa_report_generator_performance.adapters.input.cli_adapter import K6CliAdapter
 from qa_report_generator_performance.adapters.input.env_settings_adapter import EnvSettingsAdapter
 from qa_report_generator_performance.adapters.output.parsers import K6ParsedReportParser
@@ -13,12 +17,47 @@ from qa_report_generator_performance.config import setup_logging
 from shared.adapters.output.llm import OpenAIClientSettings, OpenAIStructuredLlmAdapter, build_client
 from shared.adapters.output.persistence import JsonFileWriterAdapter
 
+LOGGER = logging.getLogger(__name__)
+
 
 def create_cli_adapter() -> K6CliAdapter:
     """Create a k6-only CLI adapter with dependencies wired."""
     config = EnvSettingsAdapter().load()
 
     setup_logging(config)
+    LOGGER.info(
+        "Application logging configured",
+        extra={
+            "component": "cli",
+            "log_level": config.log_level,
+            "log_format": config.log_format,
+            "llm_model": config.llm_model,
+            "llm_base_url": config.llm_base_url,
+            "llm_timeout_seconds": config.llm_timeout,
+            "llm_max_retries": config.llm_max_retries,
+            "llm_max_concurrency": config.llm_max_concurrency,
+            "llm_debug_json_enabled": config.llm_debug_json_enabled,
+            "model_debug_json_enabled": config.model_debug_json_enabled,
+        },
+    )
+    if config.llm_debug_json_enabled:
+        LOGGER.info(
+            "Structured LLM debug JSON output enabled",
+            extra={
+                "component": "cli",
+                "debug_output": "llm",
+                "debug_json_dir": str(config.llm_debug_json_dir),
+            },
+        )
+    if config.model_debug_json_enabled:
+        LOGGER.info(
+            "Model debug JSON output enabled",
+            extra={
+                "component": "cli",
+                "debug_output": "model",
+                "debug_json_dir": str(config.model_debug_json_dir),
+            },
+        )
 
     openai_client = build_client(
         OpenAIClientSettings(
@@ -64,7 +103,16 @@ def create_cli_adapter() -> K6CliAdapter:
 def main() -> None:
     """Run the k6-only CLI application."""
     cli = create_cli_adapter()
-    cli.run()
+    try:
+        cli.run()
+    except typer.Exit:
+        raise
+    except Exception:
+        LOGGER.exception(
+            "CLI execution terminated unexpectedly",
+            extra={"component": "cli"},
+        )
+        raise
 
 
 if __name__ == "__main__":

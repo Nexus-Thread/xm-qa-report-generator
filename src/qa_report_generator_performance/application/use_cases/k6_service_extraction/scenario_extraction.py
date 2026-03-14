@@ -74,7 +74,10 @@ def extract_verified_run_model(
                     "scenario_name": scenario.name,
                     "source_report_file": scenario.source_report_file,
                     "attempt": attempt,
+                    "attempts_remaining": max_verification_attempts - attempt,
                     "max_verification_attempts": max_verification_attempts,
+                    "error_type": type(err).__name__,
+                    "error_message": str(err),
                 },
             )
             continue

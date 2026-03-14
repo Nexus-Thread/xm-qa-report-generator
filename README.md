@@ -18,6 +18,34 @@ Reusable JSON payload persistence also lives in `src/shared/adapters/output/pers
 
 ## k6 CLI
 
+### Logging configuration
+
+The CLI uses centralized logging configured from environment-backed settings.
+
+Environment variables:
+- `LOG_LEVEL` (default: `INFO`)
+- `LOG_FORMAT` (`simple` or `json`, default: `simple`)
+
+Examples:
+
+```bash
+LOG_LEVEL=DEBUG uv run qa-report-generator-performance generate \
+  --service megatron \
+  --report k6_example/20260228/megatron
+```
+
+```bash
+LOG_FORMAT=json uv run qa-report-generator-performance generate \
+  --service megatron \
+  --report k6_example/20260228/megatron
+```
+
+Notes:
+- `simple` format is human-readable and suited to local CLI usage.
+- `json` format emits structured logs with stable fields such as timestamp, level, logger, message, and any supported `extra` context.
+- Regular logs intentionally avoid emitting raw LLM prompt/response payload content.
+- If you need full request/response payload inspection, use the debug JSON artifact options below instead of relying on normal logs.
+
 ### Manual parser coverage check for fixture bundle
 
 ```bash
@@ -87,6 +115,9 @@ Environment variables:
 When multiple parsed scenarios are present, service-specific extraction can process them in parallel
 using a synchronous worker pool. `LLM_MAX_CONCURRENCY` bounds how many scenarios may issue
 overlapping OpenAI-compatible requests at once while preserving deterministic output order.
+
+Normal logs include metadata about structured LLM stages and retry behavior, while the optional
+debug JSON files contain the raw request/response/parsed payload artifacts for deeper inspection.
 
 When pricing variables are configured, the CLI prints one aggregated LLM cost line per run.
 If token usage is returned but pricing is not configured, the CLI still prints the request/token summary

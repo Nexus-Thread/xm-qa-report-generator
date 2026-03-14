@@ -36,6 +36,12 @@ def _get_stream_handler() -> logging.StreamHandler[io.TextIOBase]:
     return cast("logging.StreamHandler[io.TextIOBase]", handler)
 
 
+def _raise_value_error() -> None:
+    """Raise a deterministic error for exception logging tests."""
+    message = "boom"
+    raise ValueError(message)
+
+
 def test_setup_logging_configures_simple_format() -> None:
     """Simple logging setup emits formatted text."""
     root_logger = logging.getLogger()
@@ -80,6 +86,7 @@ def test_setup_logging_configures_json_format_with_extra_fields() -> None:
         logger.info("json message", extra={"component": "test", "service": "demo"})
 
         payload = json.loads(stream.getvalue())
+        assert payload["timestamp"].endswith("+00:00")
         assert payload["level"] == "INFO"
         assert payload["logger"] == "qa_report_generator_performance.tests.json"
         assert payload["message"] == "json message"
@@ -122,6 +129,36 @@ def test_setup_logging_reconfigures_existing_root_handlers() -> None:
         assert payload["level"] == "ERROR"
         assert payload["message"] == "error message"
         assert payload["component"] == "reconfigure"
+    finally:
+        root_logger.handlers.clear()
+        root_logger.handlers.extend(original_handlers)
+        root_logger.setLevel(original_level)
+
+
+def test_setup_logging_json_format_includes_exception_details() -> None:
+    """JSON logging setup includes exception type and formatted traceback."""
+    root_logger = logging.getLogger()
+    original_handlers = list(root_logger.handlers)
+    original_level = root_logger.level
+    stream = io.StringIO()
+
+    try:
+        setup_logging(_build_settings(log_level="ERROR", log_format="json"))
+
+        handler = _get_stream_handler()
+        handler.setStream(stream)
+
+        logger = logging.getLogger("qa_report_generator_performance.tests.exception")
+        try:
+            _raise_value_error()
+        except ValueError:
+            logger.exception("failed")
+
+        payload = json.loads(stream.getvalue())
+        assert payload["level"] == "ERROR"
+        assert payload["message"] == "failed"
+        assert payload["exception_type"] == "ValueError"
+        assert "ValueError: boom" in payload["exception"]
     finally:
         root_logger.handlers.clear()
         root_logger.handlers.extend(original_handlers)

@@ -2,13 +2,12 @@
 
 from __future__ import annotations
 
-import json
 import logging
 from typing import TYPE_CHECKING, Any
 
 from shared.adapters.output.llm.openai_adapter import extract_usage
 
-from .logging_utils import truncate_for_log
+from .logging_utils import build_json_payload_log_extra, build_text_payload_log_extra
 from .response_parser import extract_structured_content, parse_json_object
 from .result import StructuredLlmJsonCompletionResult
 
@@ -94,10 +93,13 @@ class OpenAIStructuredLlmAdapter:
     ) -> None:
         """Write and log one JSON-serializable stage payload."""
         self._write_debug_payload(label=label, payload=payload)
-        self._log_payload_preview(
+        self._log_payload_metadata(
             message=message,
-            serialized_payload=json.dumps(payload, ensure_ascii=False),
-            extra=extra,
+            extra={
+                "debug_label": label,
+                **build_json_payload_log_extra(payload=payload),
+                **({} if extra is None else extra),
+            },
         )
 
     def _log_text_stage(
@@ -110,27 +112,29 @@ class OpenAIStructuredLlmAdapter:
     ) -> None:
         """Write and log one text stage payload."""
         self._write_debug_payload(label=label, payload={"content": content})
-        self._log_payload_preview(message=message, serialized_payload=content, extra=extra)
+        self._log_payload_metadata(
+            message=message,
+            extra={
+                "debug_label": label,
+                **build_text_payload_log_extra(content=content),
+                **({} if extra is None else extra),
+            },
+        )
 
-    def _log_payload_preview(
+    def _log_payload_metadata(
         self,
         *,
         message: str,
-        serialized_payload: str,
-        extra: dict[str, Any] | None = None,
+        extra: dict[str, Any],
     ) -> None:
-        """Log a truncated preview and shared metadata for one payload."""
-        payload_preview, payload_truncated = truncate_for_log(serialized_payload)
+        """Log metadata for one payload without logging raw payload contents."""
         log_extra: dict[str, Any] = {
             "component": self.__class__.__name__,
             "model": self._model,
-            "payload_length": len(serialized_payload),
-            "payload_truncated": payload_truncated,
         }
-        if extra is not None:
-            log_extra.update(extra)
+        log_extra.update(extra)
 
-        LOGGER.debug("%s: %s", message, payload_preview, extra=log_extra)
+        LOGGER.debug("%s", message, extra=log_extra)
 
     def _write_debug_payload(self, *, label: str, payload: Any) -> None:
         """Write debug payload if JSON debug output is enabled."""

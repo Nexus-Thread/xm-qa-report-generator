@@ -160,7 +160,7 @@ def test_complete_json_raises_when_message_content_missing() -> None:
 
 
 def test_complete_json_logs_request_response_and_payload(caplog: pytest.LogCaptureFixture) -> None:
-    """Structured adapter emits debug logs for request and response lifecycle."""
+    """Structured adapter emits metadata-only debug logs for request lifecycle."""
     client = _StubClient([_Response(choices=[_Choice(message=_Message(content='{"ok": true}'))])])
     adapter = OpenAIStructuredLlmAdapter(client=client, model="gpt-test")
 
@@ -177,14 +177,23 @@ def test_complete_json_logs_request_response_and_payload(caplog: pytest.LogCaptu
     parsed_record_any = cast("Any", parsed_record)
 
     assert request_record_any.model == "gpt-test"
-    assert request_record_any.payload_truncated is False
-    assert response_record_any.payload_truncated is False
-    assert parsed_record_any.payload_truncated is False
+    assert request_record_any.debug_label == "request_payload"
+    assert request_record_any.payload_preview_omitted is True
+    assert request_record_any.payload_kind == "dict"
+    assert request_record_any.payload_keys == ["messages", "model"]
+    assert response_record_any.debug_label == "response_content"
+    assert response_record_any.payload_preview_omitted is True
+    assert response_record_any.payload_kind == "text"
+    assert parsed_record_any.debug_label == "parsed_payload"
+    assert parsed_record_any.payload_preview_omitted is True
+    assert parsed_record_any.payload_kind == "dict"
     assert parsed_record_any.payload_keys == ["ok"]
+    assert "system" not in caplog.text
+    assert '"ok": true' not in caplog.text
 
 
-def test_complete_json_truncates_large_request_and_response_logs(caplog: pytest.LogCaptureFixture) -> None:
-    """Structured adapter truncates oversized payloads in debug logs."""
+def test_complete_json_logs_payload_lengths_without_raw_content(caplog: pytest.LogCaptureFixture) -> None:
+    """Structured adapter logs payload sizes without logging raw content."""
     long_text = "x" * 2_100_000
     content = json.dumps({"summary": long_text})
     client = _StubClient([_Response(choices=[_Choice(message=_Message(content=content))])])
@@ -200,12 +209,13 @@ def test_complete_json_truncates_large_request_and_response_logs(caplog: pytest.
     response_record_any = cast("Any", response_record)
     parsed_record_any = cast("Any", parsed_record)
 
-    assert request_record_any.payload_truncated is True
-    assert response_record_any.payload_truncated is True
-    assert parsed_record_any.payload_truncated is True
-    assert "...[truncated]" in request_record.getMessage()
-    assert "...[truncated]" in response_record.getMessage()
-    assert "...[truncated]" in parsed_record.getMessage()
+    assert request_record_any.payload_length > 2_000_000
+    assert response_record_any.payload_length > 2_000_000
+    assert parsed_record_any.payload_length > 2_000_000
+    assert request_record_any.payload_preview_omitted is True
+    assert response_record_any.payload_preview_omitted is True
+    assert parsed_record_any.payload_preview_omitted is True
+    assert long_text not in caplog.text
 
 
 def test_complete_json_writes_debug_files_when_enabled() -> None:

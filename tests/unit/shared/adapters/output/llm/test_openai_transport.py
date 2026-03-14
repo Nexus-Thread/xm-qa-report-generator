@@ -2,13 +2,17 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
+from typing import Any, cast
 
 import httpx
 import pytest
 from openai import APIError
 
 from shared.adapters.output.llm.openai_adapter.transport import OpenAIClient
+
+LOGGER_NAME = "shared.adapters.output.llm.openai_adapter.transport"
 
 
 @dataclass(frozen=True)
@@ -133,6 +137,30 @@ def test_create_chat_completion_retries_and_then_succeeds() -> None:
     assert sleeps == [3.0]
 
 
+def test_create_chat_completion_logs_retry_metadata(caplog: pytest.LogCaptureFixture) -> None:
+    """Transport logs actionable retry metadata for transient API failures."""
+    sleeps: list[float] = []
+    expected_response = object()
+    client, _ = _build_client(
+        outcomes=[_api_error(), expected_response],
+        max_retries=2,
+        backoff_factor=3.0,
+        sleeps=sleeps,
+    )
+
+    with caplog.at_level(logging.WARNING, logger=LOGGER_NAME):
+        response = client.create_chat_completion(model="gpt-test", messages=[{"role": "user", "content": "hello"}])
+
+    assert response is expected_response
+    warning_record = caplog.records[0]
+    assert warning_record.getMessage() == "OpenAI completion failed, retrying"
+    warning_record_any = cast("Any", warning_record)
+    assert warning_record_any.attempt == 1
+    assert warning_record_any.attempts_remaining == 2
+    assert warning_record_any.total_attempts == 3
+    assert warning_record_any.retry_delay_seconds == 3.0
+
+
 def test_create_chat_completion_with_zero_retries_still_attempts_once() -> None:
     """Transport performs one initial request when retries are configured to zero."""
     sleeps: list[float] = []
@@ -165,6 +193,27 @@ def test_create_chat_completion_raises_after_exhausting_retries() -> None:
 
     assert len(completions.calls) == 3
     assert sleeps == [2.0, 4.0]
+
+
+def test_create_chat_completion_logs_final_exception_once(caplog: pytest.LogCaptureFixture) -> None:
+    """Transport logs one final exception with retry context when exhausted."""
+    sleeps: list[float] = []
+    client, _ = _build_client(
+        outcomes=[_api_error(), _api_error()],
+        max_retries=1,
+        backoff_factor=2.0,
+        sleeps=sleeps,
+    )
+
+    with caplog.at_level(logging.ERROR, logger=LOGGER_NAME), pytest.raises(APIError):
+        client.create_chat_completion(model="gpt-test", messages=[{"role": "user", "content": "hello"}])
+
+    exception_record = next(record for record in caplog.records if record.levelno == logging.ERROR)
+    assert exception_record.getMessage() == "OpenAI completion failed after retries"
+    exception_record_any = cast("Any", exception_record)
+    assert exception_record_any.attempt == 2
+    assert exception_record_any.total_attempts == 2
+    assert exception_record.exc_info is not None
 
 
 def test_init_rejects_invalid_retry_configuration() -> None:

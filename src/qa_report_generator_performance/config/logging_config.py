@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -23,6 +24,7 @@ class JsonLogFormatter(logging.Formatter):
     def format(self, record: logging.LogRecord) -> str:
         """Return the log record serialized as JSON."""
         payload: dict[str, object] = {
+            "timestamp": datetime.fromtimestamp(record.created, UTC).isoformat(),
             "level": record.levelname,
             "logger": record.name,
             "message": record.getMessage(),
@@ -34,6 +36,8 @@ class JsonLogFormatter(logging.Formatter):
             payload[key] = value
 
         if record.exc_info is not None:
+            exception_type = record.exc_info[0]
+            payload["exception_type"] = exception_type.__name__ if exception_type is not None else "UnknownException"
             payload["exception"] = self.formatException(record.exc_info)
 
         return json.dumps(payload, default=str)
