@@ -1,0 +1,35 @@
+# Version control
+.git/
+.github/
+.gitignore
+
+# Python runtime artifacts
+.venv/
+__pycache__/
+.cache/
+.coverage
+.hypothesis/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.benchmarks/
+
+# Build / output
+out/
+
+# Environment and secrets
+.env
+
+# Dev tooling (not needed in build context)
+Dockerfile
+Dockerfile.*
+Makefile
+.pre-commit-config.yaml
+.python-version
+
+# Documentation and examples
+# README.md is intentionally kept — required by pyproject.toml (readme = "README.md")
+docs/
+k6_example/
+scripts/
+tests/

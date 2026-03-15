@@ -2,6 +2,33 @@
 
 This project uses `uv` for environment and command execution.
 
+## Docker
+
+Build the CLI image:
+
+```bash
+docker build -t qa-report-generator .
+```
+
+The image uses `qa-report-generator-performance` as its default entrypoint, so you can pass
+CLI arguments directly after the image name.
+
+Example with a mounted k6 report directory:
+
+```bash
+docker run --rm \
+  -e LLM_API_KEY=your-api-key \
+  -v "$PWD/k6_example:/data/k6_example:ro" \
+  qa-report-generator \
+  generate \
+  --service megatron \
+  --report /data/k6_example/20260228/megatron
+```
+
+Optional logging/debug environment variables such as `LOG_LEVEL`, `LOG_FORMAT`,
+`LLM_MAX_CONCURRENCY`, `LLM_DEBUG_JSON_ENABLED`, and `LLM_DEBUG_JSON_DIR` can be provided the
+same way with additional `-e` flags.
+
 ## Shared adapters
 
 Reusable LLM adapter infrastructure lives in `src/shared/adapters/output/llm/`.
