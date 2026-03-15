@@ -1,5 +1,5 @@
 # ── builder stage ─────────────────────────────────────────────────────────────
-FROM python:3.11-slim AS builder
+FROM python:3.13-slim AS builder
 
 COPY --from=ghcr.io/astral-sh/uv:0.8.22 /uv /bin/uv
 
@@ -22,7 +22,7 @@ COPY src ./src
 RUN uv sync --frozen --no-dev --no-editable
 
 # ── final stage ───────────────────────────────────────────────────────────────
-FROM python:3.11-slim AS final
+FROM python:3.13-slim AS final
 
 RUN groupadd --gid 1000 appuser \
  && useradd --uid 1000 --gid 1000 --no-create-home --shell /sbin/nologin appuser
